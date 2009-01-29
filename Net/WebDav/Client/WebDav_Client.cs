@@ -112,9 +112,23 @@ namespace LumiSoft.Net.WebDav.Client
 
         #region method MkCol
 
-        // public void MkCol()
-        // {
-        // }
+        /// <summary>
+        /// Creates new collection to the specified path.
+        /// </summary>
+        /// <param name="uri">Target collection URI.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>uri</b> null reference.</exception>
+        public void MkCol(string uri)
+        {
+            if(uri == null){
+                throw new ArgumentNullException("uri");
+            }
+
+            HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(uri);
+            request.Method = "MKCOL";
+            request.Credentials = m_pCredentials;
+
+            HttpWebResponse response = (HttpWebResponse)request.GetResponse();
+        }
 
         #endregion
 
@@ -235,17 +249,69 @@ namespace LumiSoft.Net.WebDav.Client
 
         #region method Copy
 
-        // public void Copy()
-        // {
-        // }
+        /// <summary>
+        /// Copies source URI resource to the target URI.
+        /// </summary>
+        /// <param name="sourceUri">Source URI.</param>
+        /// <param name="targetUri">Target URI.</param>
+        /// <param name="depth">If source is collection, then depth specified how many nested levels will be copied.</param>
+        /// <param name="overwrite">If true and target resource already exists, it will be over written. 
+        /// If false and target resource exists, exception is thrown.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>sourceUri</b> or <b>targetUri</b> is null reference.</exception>
+        public void Copy(string sourceUri,string targetUri,int depth,bool overwrite)
+        {
+            if(sourceUri == null){
+                throw new ArgumentNullException(sourceUri);
+            }
+            if(targetUri == null){
+                throw new ArgumentNullException(targetUri);
+            }
+
+            HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(sourceUri);
+            request.Method = "COPY";
+            request.Headers.Add("Destination: " + targetUri);
+            request.Headers.Add("Overwrite: " + (overwrite ? "T" : "F"));
+            if(depth > -1){
+                request.Headers.Add("Depth: " + depth);
+            }
+            request.Credentials = m_pCredentials;
+
+            request.GetResponse();
+        }
 
         #endregion
 
         #region method Move
 
-        // public void Move()
-        // {
-        // }
+        /// <summary>
+        /// Moves source URI resource to the target URI.
+        /// </summary>
+        /// <param name="sourceUri">Source URI.</param>
+        /// <param name="targetUri">Target URI.</param>
+        /// <param name="depth">If source is collection, then depth specified how many nested levels will be copied.</param>
+        /// <param name="overwrite">If true and target resource already exists, it will be over written. 
+        /// If false and target resource exists, exception is thrown.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>sourceUri</b> or <b>targetUri</b> is null reference.</exception>
+        public void Move(string sourceUri,string targetUri,int depth,bool overwrite)
+        {
+            if(sourceUri == null){
+                throw new ArgumentNullException(sourceUri);
+            }
+            if(targetUri == null){
+                throw new ArgumentNullException(targetUri);
+            }
+
+            HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(sourceUri);
+            request.Method = "MOVE";
+            request.Headers.Add("Destination: " + targetUri);
+            request.Headers.Add("Overwrite: " + (overwrite ? "T" : "F"));
+            if(depth > -1){
+                request.Headers.Add("Depth: " + depth);
+            }
+            request.Credentials = m_pCredentials;
+
+            request.GetResponse();
+        }
 
         #endregion
 
