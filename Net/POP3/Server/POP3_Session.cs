@@ -1334,6 +1334,9 @@ namespace LumiSoft.Net.POP3.Server
 								this.Socket.BeginWriteLine("+OK Authentication successful.",new SocketCallBack(this.EndSend));
 
                                 this.SetUserName(userName);
+
+                                // Get user messages info.
+						        m_pServer.OnGetMessagesInfo(this,m_POP3_Messages);
 							}
 							else{
 								this.Socket.BeginWriteLine("-ERR Authentication failed",new SocketCallBack(this.EndSend));
