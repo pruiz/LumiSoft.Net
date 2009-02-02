@@ -9,7 +9,7 @@ using LumiSoft.Net.SDP;
 namespace LumiSoft.Net.SIP.Stack
 {
     /// <summary>
-    /// This class represent INVITE dialog. Defined in RFC 3261.
+    /// This class represents INVITE dialog. Defined in RFC 3261.
     /// </summary>
     public class SIP_Dialog_Invite : SIP_Dialog
     {           

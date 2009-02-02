@@ -31,7 +31,7 @@ namespace LumiSoft.Net.WebDav.Client
         /// <param name="propertyNames">Properties to get. Value null means property names listing.</param>
         /// <param name="depth">Maximum depth inside collections to get.</param>
         /// <returns>Returns server returned responses.</returns>
-        public WebDav_Response[] PropFind(string requestUri,string[] propertyNames,int depth)
+        public WebDav_MultiStatus PropFind(string requestUri,string[] propertyNames,int depth)
         {
             if(requestUri == null){
                 throw new ArgumentNullException("requestUri");
@@ -63,41 +63,8 @@ namespace LumiSoft.Net.WebDav.Client
                 request.Headers.Add("Depth: " + depth);
             }
             request.GetRequestStream().Write(requestContent,0,requestContent.Length);
-                                 
-            XmlDocument response = new XmlDocument();
-            response.Load(request.GetResponse().GetResponseStream());
-                        
-            //Console.WriteLine(response.ChildNodes[1].NamespaceURI + response.ChildNodes[1].LocalName);
-
-            // TODO: Invalid response.
-            //if(!string.Compare(response.ChildNodes[1].LocalName,"multistatus",true)){
-            //}
             
-            // Parse responses.
-            List<WebDav_Response> responses = new List<WebDav_Response>();
-            foreach(XmlNode responseNode in response.ChildNodes[1].ChildNodes){
-                WebDav_Response davResponse = new WebDav_Response();
-                davResponse.Parse(responseNode);
-                responses.Add(davResponse);
-            }
-
-            /*
-            using(Stream responseStream = request.GetResponse().GetResponseStream()){
-                byte[] buffer = new byte[32000];
-                using(FileStream fs = File.Create("e:\\aaa.txt")){
-                    while(true){
-                        int readedCount = responseStream.Read(buffer,0,buffer.Length);
-                        // We readed whole response.
-                        if(readedCount == 0){
-                            break;
-                        }
-                        fs.Write(buffer,0,readedCount);
-                    }
-                }
-            }*/
-
-
-            return responses.ToArray();
+            return WebDav_MultiStatus.Parse(request.GetResponse().GetResponseStream());
         }
 
         #endregion

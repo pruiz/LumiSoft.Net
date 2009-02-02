@@ -6,7 +6,7 @@ using System.Xml;
 namespace LumiSoft.Net.WebDav
 {
     /// <summary>
-    /// This class represent WeDav 'response' element.
+    /// This class represent WeDav 'DAV:response' element. Definded in RFC 4918 14.24.
     /// </summary>
     public class WebDav_Response
     {
@@ -22,33 +22,38 @@ namespace LumiSoft.Net.WebDav
         }
 
 
-        #region method Parse
+        #region static method Parse
 
         /// <summary>
         /// Parses WebDav_Response from 'DAV:response' element.
         /// </summary>
         /// <param name="reponseNode">The 'DAV:response' element</param>
+        /// <returns>Returns DAV response.</returns>
         /// <exception cref="ArgumentNullException">Is raised when when <b>responseNode</b> is null reference.</exception>
-        internal void Parse(XmlNode reponseNode)
+        /// <exception cref="ParseException">Is raised when there are any parsing error.</exception>
+        internal static WebDav_Response Parse(XmlNode reponseNode)
         {
             if(reponseNode == null){
                 throw new ArgumentNullException("responseNode");
             }
 
-            // TODO:
-            //if(!string.Equals(reponseNode.LocalName,"response",StringComparison.InvariantCultureIgnoreCase)){
-            //}
+            // Invalid response.
+            if(!string.Equals(reponseNode.NamespaceURI + reponseNode.LocalName,"DAV:response",StringComparison.InvariantCultureIgnoreCase)){
+                throw new ParseException("Invalid DAV:response value.");
+            }
+
+            WebDav_Response retVal = new WebDav_Response();
 
             foreach(XmlNode node in reponseNode.ChildNodes){
                 if(string.Equals(node.LocalName,"href",StringComparison.InvariantCultureIgnoreCase)){
-                    m_HRef = node.ChildNodes[0].Value;
+                    retVal.m_HRef = node.ChildNodes[0].Value;
                 }
                 else if(string.Equals(node.LocalName,"propstat",StringComparison.InvariantCultureIgnoreCase)){
-                    WebDav_PropStat propstat = new WebDav_PropStat();
-                    propstat.Parse(node);
-                    m_pPropStats.Add(propstat);
+                    retVal.m_pPropStats.Add(WebDav_PropStat.Parse(node));
                 }
-            }            
+            }
+
+            return retVal;
         }
 
         #endregion

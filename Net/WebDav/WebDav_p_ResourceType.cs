@@ -6,7 +6,7 @@ using System.Xml;
 namespace LumiSoft.Net.WebDav
 {
     /// <summary>
-    /// This class represents WebDav 'resourcetype' property. Defined in RFC 4918 15.9.
+    /// This class represents WebDav 'DAV:resourcetype' property. Defined in RFC 4918 15.9.
     /// </summary>
     public class WebDav_p_ResourceType : WebDav_p
     {
@@ -42,26 +42,33 @@ namespace LumiSoft.Net.WebDav
         #endregion
 
 
-        #region method Parse
+        #region static method Parse
 
         /// <summary>
-        /// Parses WebDav_p_ResourceType from 'resourcetype' xml element.
+        /// Parses WebDav_p_ResourceType from 'DAV:resourcetype' xml element.
         /// </summary>
-        /// <param name="resourcetypeNode">The 'resourcetype' xml element.</param>
+        /// <param name="resourcetypeNode">The 'DAV:resourcetype' xml element.</param>
+        /// <returns>Returns DAV resourcetype.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>resourcetypeNode</b> is null reference.</exception>
-        internal void Parse(XmlNode resourcetypeNode)
+        /// <exception cref="ParseException">Is raised when there are any parsing error.</exception>
+        internal static WebDav_p_ResourceType Parse(XmlNode resourcetypeNode)
         {
             if(resourcetypeNode == null){
                 throw new ArgumentNullException("resourcetypeNode");
             }
 
-            // TODO:
-            //if(!string.Equals(reponseNode.LocalName,"resourcetype",StringComparison.InvariantCultureIgnoreCase)){
-            //}
+            // Invalid response.
+            if(!string.Equals(resourcetypeNode.NamespaceURI + resourcetypeNode.LocalName,"DAV:resourcetype",StringComparison.InvariantCultureIgnoreCase)){
+                throw new ParseException("Invalid DAV:resourcetype value.");
+            }
+
+            WebDav_p_ResourceType retVal = new WebDav_p_ResourceType();
 
             foreach(XmlNode node in resourcetypeNode.ChildNodes){
-                m_pItems.Add(node.NamespaceURI + node.LocalName);
+                retVal.m_pItems.Add(node.NamespaceURI + node.LocalName);
             }
+
+            return retVal;
         }
 
         #endregion
@@ -74,7 +81,7 @@ namespace LumiSoft.Net.WebDav
         /// </summary>
         public override string Namespace
         {
-            get{ return "TODO:"; }
+            get{ return "DAV:"; }
         }
 
         /// <summary>
@@ -90,7 +97,19 @@ namespace LumiSoft.Net.WebDav
         /// </summary>
         public override string Value
         {
-            get{ return "TODO:"; }
+            get{ 
+                StringBuilder retVal = new StringBuilder();
+                for(int i=0;i<m_pItems.Count;i++){
+                    if(i == (m_pItems.Count - 1)){
+                        retVal.Append(m_pItems[i]);
+                    }
+                    else{
+                        retVal.Append(m_pItems[i] + ";");
+                    }
+                }
+                
+                return retVal.ToString(); 
+            }
         }
 
         /// <summary>

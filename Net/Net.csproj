@@ -1,7 +1,7 @@
 ﻿<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="3.5">
   <PropertyGroup>
     <ProjectType>Local</ProjectType>
-    <ProductVersion>9.0.21022</ProductVersion>
+    <ProductVersion>9.0.30729</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{7AB36CCF-5FFD-4780-A54E-A102ECA028B5}</ProjectGuid>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -162,8 +162,10 @@
     <Compile Include="MIME\MIME_h_Unparsed.cs" />
     <Compile Include="MIME\MIME_h_Unstructured.cs" />
     <Compile Include="ParseException.cs" />
+    <Compile Include="SIP\Stack\SIP_Dialog_Refer.cs" />
     <Compile Include="SMTP\SMTP_t_Mailbox.cs" />
     <Compile Include="WebDav\Client\WebDav_Client.cs" />
+    <Compile Include="WebDav\WebDav_MultiStatus.cs" />
     <Compile Include="WebDav\WebDav_p.cs" />
     <Compile Include="WebDav\WebDav_Prop.cs" />
     <Compile Include="WebDav\WebDav_PropStat.cs" />

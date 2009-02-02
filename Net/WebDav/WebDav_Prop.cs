@@ -6,7 +6,7 @@ using System.Xml;
 namespace LumiSoft.Net.WebDav
 {
     /// <summary>
-    /// This class represents WebDav 'prop' element.
+    /// This class represents WebDav 'DAV:prop' element. Defined in RFC 4918 14.18.
     /// </summary>
     public class WebDav_Prop
     {
@@ -21,35 +21,40 @@ namespace LumiSoft.Net.WebDav
         }
 
 
-        #region method Parse
+        #region static method Parse
 
         /// <summary>
         /// Parses WebDav_Prop from 'DAV:prop' element.
         /// </summary>
-        /// <param name="reponseNode">The 'DAV:prop' element</param>
+        /// <param name="propNode">The 'DAV:prop' element</param>
+        /// <returns>Returns DAV prop.</returns>
         /// <exception cref="ArgumentNullException">Is raised when when <b>propNode</b> is null reference.</exception>
-        internal void Parse(XmlNode propNode)
+        /// <exception cref="ParseException">Is raised when there are any parsing error.</exception>
+        internal static WebDav_Prop Parse(XmlNode propNode)
         {
             if(propNode == null){
                 throw new ArgumentNullException("propNode");
             }
 
-            // TODO:
-            //if(!string.Equals(reponseNode.LocalName,"prop",StringComparison.InvariantCultureIgnoreCase)){
-            //}
+            // Invalid response.
+            if(!string.Equals(propNode.NamespaceURI + propNode.LocalName,"DAV:prop",StringComparison.InvariantCultureIgnoreCase)){
+                throw new ParseException("Invalid DAV:prop value.");
+            }
+
+            WebDav_Prop retVal = new WebDav_Prop();
 
             foreach(XmlNode node in propNode.ChildNodes){
                 // Resource type property.
                 if(string.Equals(node.LocalName,"resourcetype",StringComparison.InvariantCultureIgnoreCase)){
-                    WebDav_p_ResourceType prop = new WebDav_p_ResourceType();
-                    prop.Parse(node);
-                    m_pProperties.Add(prop);
+                    retVal.m_pProperties.Add(WebDav_p_ResourceType.Parse(node));
                 }
                 // Default name-value property.
                 else{
-                    m_pProperties.Add(new WebDav_p_Default("",node.LocalName,node.InnerXml));
+                    retVal.m_pProperties.Add(new WebDav_p_Default(node.NamespaceURI,node.LocalName,node.InnerXml));
                 }
             }
+
+            return retVal;
         }
 
         #endregion
@@ -66,7 +71,7 @@ namespace LumiSoft.Net.WebDav
         }
 
         /// <summary>
-        /// Gets WebDav 'resourcetype' property value. Returns null if no such property available.
+        /// Gets WebDav 'DAV:resourcetype' property value. Returns null if no such property available.
         /// </summary>
         public WebDav_p_ResourceType Prop_ResourceType
         {

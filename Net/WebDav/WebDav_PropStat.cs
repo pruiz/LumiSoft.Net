@@ -6,7 +6,7 @@ using System.Xml;
 namespace LumiSoft.Net.WebDav
 {
     /// <summary>
-    /// This class represents WebDav 'propstat' element.
+    /// This class represents WebDav 'DAV:propstat' element. Defined in RFC 4918 14.22.
     /// </summary>
     public class WebDav_PropStat
     {
@@ -22,32 +22,38 @@ namespace LumiSoft.Net.WebDav
         }
 
 
-        #region method Parse
+        #region static method Parse
 
         /// <summary>
         /// Parses WebDav_PropStat from 'DAV:propstat' element.
         /// </summary>
-        /// <param name="reponseNode">The 'DAV:propstat' element</param>
+        /// <param name="propstatNode">The 'DAV:propstat' element</param>
+        /// <returns>Returns DAV propstat.</returns>
         /// <exception cref="ArgumentNullException">Is raised when when <b>propstatNode</b> is null reference.</exception>
-        internal void Parse(XmlNode propstatNode)
+        /// <exception cref="ParseException">Is raised when there are any parsing error.</exception>
+        internal static WebDav_PropStat Parse(XmlNode propstatNode)
         {
             if(propstatNode == null){
                 throw new ArgumentNullException("propstatNode");
             }
 
-            // TODO:
-            //if(!string.Equals(reponseNode.LocalName,"propstat",StringComparison.InvariantCultureIgnoreCase)){
-            //}
+            // Invalid response.
+            if(!string.Equals(propstatNode.NamespaceURI + propstatNode.LocalName,"DAV:propstat",StringComparison.InvariantCultureIgnoreCase)){
+                throw new ParseException("Invalid DAV:propstat value.");
+            }
+
+            WebDav_PropStat retVAl = new WebDav_PropStat();
 
             foreach(XmlNode node in propstatNode.ChildNodes){
                 if(string.Equals(node.LocalName,"status",StringComparison.InvariantCultureIgnoreCase)){
-                    m_Status = node.ChildNodes[0].Value;
+                    retVAl.m_Status = node.ChildNodes[0].Value;
                 }
                 else if(string.Equals(node.LocalName,"prop",StringComparison.InvariantCultureIgnoreCase)){
-                    m_pProp = new WebDav_Prop();
-                    m_pProp.Parse(node);
+                    retVAl.m_pProp = WebDav_Prop.Parse(node);
                 }                
             }
+
+            return retVAl;
         }
 
         #endregion
