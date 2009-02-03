@@ -5,10 +5,12 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Collections;
 using System.Text;
+
 using LumiSoft.Net;
 using LumiSoft.Net.IMAP;
-using LumiSoft.Net.Mime;
 using LumiSoft.Net.AUTH;
+using LumiSoft.Net.MIME;
+using LumiSoft.Net.Mail;
 
 namespace LumiSoft.Net.IMAP.Server
 {	
@@ -1821,12 +1823,12 @@ namespace LumiSoft.Net.IMAP.Server
 				}
 				
 				mFlags = IMAP_Utils.ParseMessageFlags(flags);				
-				date = MimeUtils.ParseDate(args[2]);
+				date = IMAP_Utils.ParseDate(args[2]);
 			}
 			else if(args.Length == 3){
 				// See if date or flags specified, try date first
 				try{
-					date = MimeUtils.ParseDate(args[1]);
+					date = IMAP_Utils.ParseDate(args[1]);
 				}
 				catch{
 					//--- Parse flags, see if valid ----------------
@@ -2861,7 +2863,7 @@ namespace LumiSoft.Net.IMAP.Server
 				IMAP_Message msg = m_pSelectedFolder.Messages[i];
 				
 				//-- Get message only if matching needs it ------------------------//
-				LumiSoft.Net.Mime.Mime parser = null;
+                Mail_Message message = null;
 				if((messageItems & IMAP_MessageItems_enum.Message) != 0 || (messageItems & IMAP_MessageItems_enum.Header) != 0){
                     // Raise event GetMessageItems, get requested message items.
                     IMAP_eArgs_MessageItems eArgs = m_pServer.OnGetMessageItems(this,msg,messageItems);
@@ -2882,35 +2884,52 @@ namespace LumiSoft.Net.IMAP.Server
 
                     try{
                         if(eArgs.MessageStream != null){
-					        parser = LumiSoft.Net.Mime.Mime.Parse(eArgs.MessageStream);
+					        message = Mail_Message.ParseFromStream(eArgs.MessageStream);
                         }
                         else{
-                            parser = LumiSoft.Net.Mime.Mime.Parse(eArgs.Header);
+                            message = Mail_Message.ParseFromStream(new MemoryStream(eArgs.Header));
                         }
                     }
 					// Message parsing failed, bad message. Just make new warning message.
-					catch(Exception x){
-						parser = LumiSoft.Net.Mime.Mime.CreateSimple(new AddressList(),new AddressList(),"[BAD MESSAGE] Bad message, message parsing failed !","NOTE: Bad message, message parsing failed !\r\n\r\n" + x.Message,"");
+					catch{
+                        message = new Mail_Message();
+                        message.MimeVersion = "1.0";
+                        message.MessageID = MIME_Utils.CreateMessageID();
+                        message.Date = DateTime.Now;
+                        message.From = new Mail_t_MailboxList();
+                        message.From.Add(new Mail_t_Mailbox("system","system"));
+                        message.To = new Mail_t_AddressList();
+                        message.To.Add(new Mail_t_Mailbox("system","system"));
+                        message.Subject = "[BAD MESSAGE] Bad message, message parsing failed !";
+
+                        //--- multipart/mixed -------------------------------------------------------------------------------------------------
+                        MIME_h_ContentType contentType_multipartMixed = new MIME_h_ContentType(MIME_MediaTypes.Multipart.mixed);
+                        contentType_multipartMixed.Param_Boundary = Guid.NewGuid().ToString().Replace('-','.');
+                        MIME_b_MultipartMixed multipartMixed = new MIME_b_MultipartMixed(contentType_multipartMixed);
+                        message.Body = multipartMixed;
+
+                            //--- text/plain ---------------------------------------------------------------------------------------------------
+                            MIME_Entity entity_text_plain = new MIME_Entity();
+                            MIME_b_Text text_plain = new MIME_b_Text(MIME_MediaTypes.Text.plain);
+                            entity_text_plain.Body = text_plain;
+                            text_plain.SetText(MIME_TransferEncodings.QuotedPrintable,Encoding.UTF8,"NOTE: Bad message, message parsing failed.\r\n\r\n");
+                            multipartMixed.BodyParts.Add(entity_text_plain);
 					}
 				}
 				//-----------------------------------------------------------------//
 
 				string bodyText = "";
 				if(searchCriteria.IsBodyTextNeeded()){
-					bodyText = parser.BodyText;
+					bodyText = message.BodyText;
 				}
 
 				// See if message matches to search criteria
-				if(searchCriteria.Match(i,msg.UID,(int)msg.Size,msg.InternalDate,msg.Flags,parser,bodyText)){
+				if(searchCriteria.Match(i,msg.UID,(int)msg.Size,msg.InternalDate,msg.Flags,message,bodyText)){
 					if(uidSearch){
 						this.Socket.Write(" " + msg.UID.ToString());
-
-				//		searchResponse += " " + msg.MessageUID.ToString();
 					}
 					else{
 						this.Socket.Write(" " + (i + 1).ToString());
-
-				//		searchResponse += " " + i.ToString();
 					}
 				}
 			}
@@ -3565,23 +3584,45 @@ namespace LumiSoft.Net.IMAP.Server
 								dataStream = eArgs.MessageStream;
 							}
 							else{
-                                LumiSoft.Net.Mime.Mime parser = null;
+                                Mail_Message message = null;
                                 try{
                                     if(eArgs.MessageStream == null){
-                                        parser = LumiSoft.Net.Mime.Mime.Parse(eArgs.Header);
+                                        message = Mail_Message.ParseFromStream(new MemoryStream(eArgs.Header));
                                     }
                                     else{
-                                        parser = LumiSoft.Net.Mime.Mime.Parse(eArgs.MessageStream);
+                                        message = Mail_Message.ParseFromStream(eArgs.MessageStream);
                                     }
                                 }                                
                                 // Invalid message, parsing failed
                                 catch{
-                                    parser = LumiSoft.Net.Mime.Mime.CreateSimple(new AddressList(),new AddressList(),"BAD Message","This is BAD message, mail server failed to parse it !","");
+                                    message = new Mail_Message();
+                                    message.MimeVersion = "1.0";
+                                    message.MessageID = MIME_Utils.CreateMessageID();
+                                    message.Date = DateTime.Now;
+                                    message.From = new Mail_t_MailboxList();
+                                    message.From.Add(new Mail_t_Mailbox("system","system"));
+                                    message.To = new Mail_t_AddressList();
+                                    message.To.Add(new Mail_t_Mailbox("system","system"));
+                                    message.Subject = "[BAD MESSAGE] Bad message, message parsing failed !";
+
+                                    //--- multipart/mixed -------------------------------------------------------------------------------------------------
+                                    MIME_h_ContentType contentType_multipartMixed = new MIME_h_ContentType(MIME_MediaTypes.Multipart.mixed);
+                                    contentType_multipartMixed.Param_Boundary = Guid.NewGuid().ToString().Replace('-','.');
+                                    MIME_b_MultipartMixed multipartMixed = new MIME_b_MultipartMixed(contentType_multipartMixed);
+                                    message.Body = multipartMixed;
+
+                                        //--- text/plain ---------------------------------------------------------------------------------------------------
+                                        MIME_Entity entity_text_plain = new MIME_Entity();
+                                        MIME_b_Text text_plain = new MIME_b_Text(MIME_MediaTypes.Text.plain);
+                                        entity_text_plain.Body = text_plain;
+                                        text_plain.SetText(MIME_TransferEncodings.QuotedPrintable,Encoding.UTF8,"NOTE: Bad message, message parsing failed.\r\n\r\n");
+                                        multipartMixed.BodyParts.Add(entity_text_plain);
                                 }
-								MimeEntity currentEntity = parser.MainEntity;
+
+								MIME_Entity currentEntity = message;
 								// Specific mime entity requested, get it
 								if(mimePartsSpecifier != ""){
-									currentEntity = FetchHelper.GetMimeEntity(parser,mimePartsSpecifier);
+									currentEntity = FetchHelper.GetMimeEntity(message,mimePartsSpecifier);
 								}
 
 								if(currentEntity != null){
@@ -3595,21 +3636,17 @@ namespace LumiSoft.Net.IMAP.Server
 										dataStream = new MemoryStream(FetchHelper.ParseHeaderFieldsNot(sectionArgs,currentEntity));
 									}
 									else if(sectionType == "TEXT"){
-										try{
-											dataStream = new MemoryStream(currentEntity.DataEncoded);
-										}
-										catch{ // This probably multipart entity, data isn't available
-										}
+                                        if(currentEntity.Body is MIME_b_Text){
+								            dataStream = new MemoryStream(((MIME_b_Text)currentEntity.Body).EncodedData);
+                                        }
 									}
 									else if(sectionType == "MIME"){
 										dataStream = new MemoryStream(FetchHelper.GetMimeEntityHeader(currentEntity));
 									}
 									else if(sectionType == ""){
-										try{
-											dataStream = new MemoryStream(currentEntity.DataEncoded);
-										}
-										catch{ // This probably multipart entity, data isn't available
-										}
+                                        if(currentEntity.Body is MIME_b_SinglepartBase){
+								            dataStream = new MemoryStream(((MIME_b_SinglepartBase)currentEntity.Body).EncodedData);
+                                        }
 									}
 								}
 							}
@@ -3743,17 +3780,14 @@ namespace LumiSoft.Net.IMAP.Server
 							msg.SetFlags(msg.Flags | IMAP_MessageFlags.Seen);
 							
 							//--- Find body text entity ------------------------------------//
-                            LumiSoft.Net.Mime.Mime parser = LumiSoft.Net.Mime.Mime.Parse(eArgs.MessageStream);
-							MimeEntity bodyTextEntity = null;
-							if(parser.MainEntity.ContentType == MediaType_enum.NotSpecified){
-								if(parser.MainEntity.DataEncoded != null){
-									bodyTextEntity = parser.MainEntity;
-								}
+                            Mail_Message message = Mail_Message.ParseFromStream(eArgs.MessageStream);
+							MIME_Entity bodyTextEntity = null;
+							if(message.ContentType == null){
+							    bodyTextEntity = message;								
 							}
 							else{
-								MimeEntity[] entities = parser.MimeEntities;
-								foreach(MimeEntity entity in entities){
-									if(entity.ContentType == MediaType_enum.Text_plain){
+								foreach(MIME_Entity entity in message.AllEntities){
+									if(string.Equals(entity.ContentType.TypeWithSubype,MIME_MediaTypes.Text.plain,StringComparison.InvariantCultureIgnoreCase)){
 										bodyTextEntity = entity;
 										break;
 									}
@@ -3763,12 +3797,11 @@ namespace LumiSoft.Net.IMAP.Server
 
 							// RFC822.TEXT {size}
 							// msg text	
-							byte[] data = null;
+							byte[] data = System.Text.Encoding.ASCII.GetBytes("");
 							if(bodyTextEntity != null){
-								data = bodyTextEntity.DataEncoded;
-							}
-							else{
-								data = System.Text.Encoding.ASCII.GetBytes("");
+                                if(bodyTextEntity.Body is MIME_b_Text){
+								    data = ((MIME_b_Text)bodyTextEntity.Body).EncodedData;
+                                }
 							}
 									
                             this.Socket.Write("RFC822.TEXT {" + data.Length + "}\r\n");

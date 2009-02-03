@@ -2,8 +2,8 @@ using System;
 using System.Collections;
 using System.Text;
 
-using LumiSoft.Net.Mime;
 using LumiSoft.Net.MIME;
+using LumiSoft.Net.Mail;
 
 namespace LumiSoft.Net.IMAP
 {
@@ -15,12 +15,12 @@ namespace LumiSoft.Net.IMAP
 	{
 		private DateTime         m_Date      = DateTime.MinValue;
 		private string           m_Subject   = null;
-		private MailboxAddress[] m_From      = null;
-		private MailboxAddress   m_Sender    = null;
-		private MailboxAddress[] m_ReplyTo   = null;
-		private MailboxAddress[] m_To        = null;
-		private MailboxAddress[] m_Cc        = null;
-		private MailboxAddress[] m_Bcc       = null;
+		private Mail_t_Mailbox[] m_From      = null;
+		private Mail_t_Mailbox   m_Sender    = null;
+		private Mail_t_Mailbox[] m_ReplyTo   = null;
+		private Mail_t_Mailbox[] m_To        = null;
+		private Mail_t_Mailbox[] m_Cc        = null;
+		private Mail_t_Mailbox[] m_Bcc       = null;
 		private string           m_InReplyTo = null;
 		private string           m_MessageID = null;
 
@@ -37,9 +37,9 @@ namespace LumiSoft.Net.IMAP
 		/// <summary>
 		/// Construct secified mime entity ENVELOPE string.
 		/// </summary>
-		/// <param name="entity">Mime entity.</param>
+		/// <param name="entity">Mail message.</param>
 		/// <returns></returns>
-		public static string ConstructEnvelope(MimeEntity entity)
+		public static string ConstructEnvelope(Mail_Message entity)
 		{
 			/* RFC 3501 7.4.2
 				ENVELOPE
@@ -105,12 +105,14 @@ namespace LumiSoft.Net.IMAP
 
 			// NOTE: all header fields and parameters must in ENCODED form !!!
 
+            MIME_Encoding_EncodedWord wordEncoder = new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8);
+
 			StringBuilder retVal = new StringBuilder();
 			retVal.Append("(");
 
 			// date
 			if(entity.Header.Contains("Date:")){
-				retVal.Append(TextUtils.QuoteString(MimeUtils.DateTimeToRfc2822(entity.Date)));
+				retVal.Append(TextUtils.QuoteString(MIME_Utils.DateTimeToRfc2822(entity.Date)));
 			}
 			else{
 				retVal.Append("NIL");
@@ -118,7 +120,7 @@ namespace LumiSoft.Net.IMAP
 
 			// subject
 			if(entity.Subject != null){
-				retVal.Append(" " + TextUtils.QuoteString(MimeUtils.EncodeHeaderField(entity.Subject)));
+				retVal.Append(" " + TextUtils.QuoteString(wordEncoder.Encode(entity.Subject)));
 			}
 			else{
 				retVal.Append(" NIL");
@@ -126,7 +128,7 @@ namespace LumiSoft.Net.IMAP
 
 			// from
 			if(entity.From != null && entity.From.Count > 0){
-				retVal.Append(" " + ConstructAddresses(entity.From));
+				retVal.Append(" " + ConstructAddresses(entity.From.ToArray(),wordEncoder));
 			}
 			else{
 				retVal.Append(" NIL");
@@ -137,12 +139,12 @@ namespace LumiSoft.Net.IMAP
 			if(entity.Sender != null){
 				retVal.Append(" (");
 
-				retVal.Append(ConstructAddress(entity.Sender));
+				retVal.Append(ConstructAddress(entity.Sender,wordEncoder));
 
 				retVal.Append(")");
 			}
 			else if(entity.From != null){
-				retVal.Append(" " + ConstructAddresses(entity.From));
+				retVal.Append(" " + ConstructAddresses(entity.From.ToArray(),wordEncoder));
 			}
 			else{
 				retVal.Append(" NIL");
@@ -150,10 +152,10 @@ namespace LumiSoft.Net.IMAP
 
 			// reply-to
 			if(entity.ReplyTo != null){
-				retVal.Append(" " + ConstructAddresses(entity.ReplyTo));
+				retVal.Append(" " + ConstructAddresses(entity.ReplyTo.Mailboxes,wordEncoder));
 			}
 			else if(entity.From != null){
-				retVal.Append(" " + ConstructAddresses(entity.From));
+				retVal.Append(" " + ConstructAddresses(entity.From.ToArray(),wordEncoder));
 			}
 			else{
 				retVal.Append(" NIL");
@@ -161,7 +163,7 @@ namespace LumiSoft.Net.IMAP
 
 			// to
 			if(entity.To != null && entity.To.Count > 0){
-				retVal.Append(" " + ConstructAddresses(entity.To));
+				retVal.Append(" " + ConstructAddresses(entity.To.Mailboxes,wordEncoder));
 			}
 			else{
 				retVal.Append(" NIL");
@@ -169,7 +171,7 @@ namespace LumiSoft.Net.IMAP
 
 			// cc
 			if(entity.Cc != null && entity.Cc.Count > 0){
-				retVal.Append(" " + ConstructAddresses(entity.Cc));
+				retVal.Append(" " + ConstructAddresses(entity.Cc.Mailboxes,wordEncoder));
 			}
 			else{
 				retVal.Append(" NIL");
@@ -177,7 +179,7 @@ namespace LumiSoft.Net.IMAP
 
 			// bcc
 			if(entity.Bcc != null && entity.Bcc.Count > 0){
-				retVal.Append(" " + ConstructAddresses(entity.Bcc));
+				retVal.Append(" " + ConstructAddresses(entity.Bcc.Mailboxes,wordEncoder));
 			}
 			else{
 				retVal.Append(" NIL");
@@ -185,7 +187,7 @@ namespace LumiSoft.Net.IMAP
 
 			// in-reply-to			
 			if(entity.InReplyTo != null){
-				retVal.Append(" " + TextUtils.QuoteString(MimeUtils.EncodeHeaderField(entity.InReplyTo)));
+				retVal.Append(" " + TextUtils.QuoteString(wordEncoder.Encode(entity.InReplyTo)));
 			}
 			else{
 				retVal.Append(" NIL");
@@ -193,7 +195,7 @@ namespace LumiSoft.Net.IMAP
 
 			// message-id
 			if(entity.MessageID != null){
-				retVal.Append(" " + TextUtils.QuoteString(MimeUtils.EncodeHeaderField(entity.MessageID)));
+				retVal.Append(" " + TextUtils.QuoteString(wordEncoder.Encode(entity.MessageID)));
 			}
 			else{
 				retVal.Append(" NIL");
@@ -237,7 +239,7 @@ namespace LumiSoft.Net.IMAP
 			}
 			else{
                 try{
-				    m_Date = MimeUtils.ParseDate(word);
+				    m_Date = MIME_Utils.ParseRfc2822DateTime(word);
                 }
                 catch{
                     // Failed to parse date, return minimum.
@@ -274,7 +276,7 @@ namespace LumiSoft.Net.IMAP
 
 			// Sender
 			//	NOTE: There is confusing part, according rfc 2822 Sender: is MailboxAddress and not AddressList.
-			MailboxAddress[] sender = ParseAddresses(r);
+			Mail_t_Mailbox[] sender = ParseAddresses(r);
 			if(sender != null && sender.Length > 0){
 				m_Sender = sender[0];
 			}
@@ -356,7 +358,7 @@ namespace LumiSoft.Net.IMAP
 		/// </summary>
 		/// <param name="r"></param>
 		/// <returns></returns>
-		private MailboxAddress[] ParseAddresses(StringReader r)
+		private Mail_t_Mailbox[] ParseAddresses(StringReader r)
 		{
 			r.ReadToFirstChar();
 			if(r.StartsWith("NIL",false)){
@@ -385,7 +387,7 @@ namespace LumiSoft.Net.IMAP
 						rAddresses.ReadToFirstChar();
 					}
 
-					MailboxAddress[] retVal = new MailboxAddress[addresses.Count];
+					Mail_t_Mailbox[] retVal = new Mail_t_Mailbox[addresses.Count];
 					addresses.CopyTo(retVal);
 
 					return retVal;
@@ -402,7 +404,7 @@ namespace LumiSoft.Net.IMAP
 		/// </summary>
 		/// <param name="addressString">Address structure string.</param>
 		/// <returns></returns>
-		private MailboxAddress ParseAddress(string addressString)
+		private Mail_t_Mailbox ParseAddress(string addressString)
 		{
 			/* RFC 3501 7.4.2 ENVELOPE
 				An address structure is a parenthesized list that describes an
@@ -445,7 +447,7 @@ namespace LumiSoft.Net.IMAP
 				emailAddress += r.ReadWord();
 			}
 
-			return new MailboxAddress(personalName,emailAddress);
+			return new Mail_t_Mailbox(personalName,emailAddress);
 		}
 
 		#endregion
@@ -456,15 +458,16 @@ namespace LumiSoft.Net.IMAP
 		/// <summary>
 		/// Constructs ENVELOPE addresses structure.
 		/// </summary>
-		/// <param name="addressList">Address list.</param>
+		/// <param name="mailboxes">Mailboxes.</param>
+        /// <param name="wordEncoder">Unicode words encoder.</param>
 		/// <returns></returns>
-		private static string ConstructAddresses(AddressList addressList)
+		private static string ConstructAddresses(Mail_t_Mailbox[] mailboxes,MIME_Encoding_EncodedWord wordEncoder)
 		{
 			StringBuilder retVal = new StringBuilder();
 			retVal.Append("(");
 
-			foreach(MailboxAddress address in addressList.Mailboxes){
-				retVal.Append(ConstructAddress(address));
+			foreach(Mail_t_Mailbox address in mailboxes){
+				retVal.Append(ConstructAddress(address,wordEncoder));
 			}
 
 			retVal.Append(")");
@@ -480,8 +483,9 @@ namespace LumiSoft.Net.IMAP
 		/// Constructs ENVELOPE address structure.
 		/// </summary>
 		/// <param name="address">Mailbox address.</param>
+        /// <param name="wordEncoder">Unicode words encoder.</param>
 		/// <returns></returns>
-		private static string ConstructAddress(MailboxAddress address)
+		private static string ConstructAddress(Mail_t_Mailbox address,MIME_Encoding_EncodedWord wordEncoder)
 		{
 			/* An address structure is a parenthesized list that describes an
 			   electronic mail address.  The fields of an address structure
@@ -495,16 +499,16 @@ namespace LumiSoft.Net.IMAP
 			retVal.Append("(");
 
 			// personal name
-			retVal.Append(TextUtils.QuoteString(MimeUtils.EncodeHeaderField(address.DisplayName)));
+			retVal.Append(TextUtils.QuoteString(wordEncoder.Encode(address.DisplayName)));
 
 			// source route, always NIL (not used nowdays)
 			retVal.Append(" NIL");
 
 			// mailbox name
-			retVal.Append(" " + TextUtils.QuoteString(MimeUtils.EncodeHeaderField(address.LocalPart)));
+			retVal.Append(" " + TextUtils.QuoteString(wordEncoder.Encode(address.LocalPart)));
 
 			// host name
-			retVal.Append(" " + TextUtils.QuoteString(MimeUtils.EncodeHeaderField(address.Domain)));
+			retVal.Append(" " + TextUtils.QuoteString(wordEncoder.Encode(address.Domain)));
 
 			retVal.Append(")");
 
@@ -535,7 +539,7 @@ namespace LumiSoft.Net.IMAP
 		/// <summary>
 		/// Gets header field "<b>From:</b>" value. Returns null if value isn't set.
 		/// </summary>
-		public MailboxAddress[] From
+		public Mail_t_Mailbox[] From
 		{
 			get{ return m_From; }
 		}
@@ -543,7 +547,7 @@ namespace LumiSoft.Net.IMAP
 		/// <summary>
 		/// Gets header field "<b>Sender:</b>" value. Returns null if value isn't set.
 		/// </summary>
-		public MailboxAddress Sender
+		public Mail_t_Mailbox Sender
 		{
 			get{ return m_Sender; }
 		}
@@ -551,7 +555,7 @@ namespace LumiSoft.Net.IMAP
 		/// <summary>
 		/// Gets header field "<b>Reply-To:</b>" value. Returns null if value isn't set.
 		/// </summary>
-		public MailboxAddress[] ReplyTo
+		public Mail_t_Mailbox[] ReplyTo
 		{
 			get{ return m_ReplyTo; }
 		}
@@ -559,7 +563,7 @@ namespace LumiSoft.Net.IMAP
 		/// <summary>
 		/// Gets header field "<b>To:</b>" value. Returns null if value isn't set.
 		/// </summary>
-		public MailboxAddress[] To
+		public Mail_t_Mailbox[] To
 		{
 			get{ return m_To; }
 		}
@@ -567,7 +571,7 @@ namespace LumiSoft.Net.IMAP
 		/// <summary>
 		/// Gets header field "<b>Cc:</b>" value. Returns null if value isn't set.
 		/// </summary>
-		public MailboxAddress[] Cc
+		public Mail_t_Mailbox[] Cc
 		{
 			get{ return m_Cc; }
 		}
@@ -575,7 +579,7 @@ namespace LumiSoft.Net.IMAP
 		/// <summary>
 		/// Gets header field "<b>Bcc:</b>" value. Returns null if value isn't set.
 		/// </summary>
-		public MailboxAddress[] Bcc
+		public Mail_t_Mailbox[] Bcc
 		{
 			get{ return m_Bcc; }
 		}

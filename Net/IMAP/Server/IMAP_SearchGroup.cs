@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 
 using LumiSoft.Net;
+using LumiSoft.Net.Mail;
 
 namespace LumiSoft.Net.IMAP.Server
 {
@@ -126,18 +127,18 @@ namespace LumiSoft.Net.IMAP.Server
 		/// <param name="size">IMAP message size in bytes.</param>
 		/// <param name="internalDate">IMAP message INTERNALDATE (dateTime when server stored message).</param>
 		/// <param name="flags">IMAP message flags.</param>
-		/// <param name="mime">Mime message main header only.</param>
+		/// <param name="message">Mime message main header only.</param>
 		/// <param name="bodyText">Message body text.</param>
 		/// <returns></returns>
-		internal static bool Match_Key_Value(object searchKey,long no,long uid,long size,DateTime internalDate,IMAP_MessageFlags flags,LumiSoft.Net.Mime.Mime mime,string bodyText)
+		internal static bool Match_Key_Value(object searchKey,long no,long uid,long size,DateTime internalDate,IMAP_MessageFlags flags,Mail_Message message,string bodyText)
 		{
 			if(searchKey.GetType() == typeof(SearchKey)){
-				if(!((SearchKey)searchKey).Match(no,uid,size,internalDate,flags,mime,bodyText)){
+				if(!((SearchKey)searchKey).Match(no,uid,size,internalDate,flags,message,bodyText)){
 					return false;
 				}
 			}
 			else if(searchKey.GetType() == typeof(SearchGroup)){
-				if(!((SearchGroup)searchKey).Match(no,uid,size,internalDate,flags,mime,bodyText)){
+				if(!((SearchGroup)searchKey).Match(no,uid,size,internalDate,flags,message,bodyText)){
 					return false;
 				}
 			}
@@ -209,15 +210,15 @@ namespace LumiSoft.Net.IMAP.Server
 		/// <param name="size">IMAP message size in bytes.</param>
 		/// <param name="internalDate">IMAP message INTERNALDATE (dateTime when server stored message).</param>
 		/// <param name="flags">IMAP message flags.</param>
-		/// <param name="mime">Mime message main header only.</param>
+		/// <param name="message">Mime message main header only.</param>
 		/// <param name="bodyText">Message body text.</param>
 		/// <returns></returns>
-		public bool Match(long no,long uid,long size,DateTime internalDate,IMAP_MessageFlags flags,LumiSoft.Net.Mime.Mime mime,string bodyText)
+		public bool Match(long no,long uid,long size,DateTime internalDate,IMAP_MessageFlags flags,Mail_Message message,string bodyText)
 		{
 			// We must match all keys, if one fails, no need to check others
 
 			foreach(object searckKey in m_pSearchKeys){
-				if(!Match_Key_Value(searckKey,no,uid,size,internalDate,flags,mime,bodyText)){
+				if(!Match_Key_Value(searckKey,no,uid,size,internalDate,flags,message,bodyText)){
 					return false;
 				}
 			}

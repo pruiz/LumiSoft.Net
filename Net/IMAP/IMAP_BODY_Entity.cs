@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-using LumiSoft.Net.Mime;
+using LumiSoft.Net.MIME;
 
 namespace LumiSoft.Net.IMAP
 {
@@ -13,11 +13,10 @@ namespace LumiSoft.Net.IMAP
     {
         private IMAP_BODY_Entity             m_pParentEntity      = null;
         private List<IMAP_BODY_Entity>       m_pChildEntities     = null;
-        private MediaType_enum               m_pContentType       = MediaType_enum.Text_plain;
-        private HeaderFieldParameter[]       m_pContentTypeParams = null;
+        private MIME_h_ContentType           m_pContentType       = null;
         private string                       m_ContentID          = null;
         private string                       m_ContentDescription = null;
-        private ContentTransferEncoding_enum m_ContentEncoding    = ContentTransferEncoding_enum._7bit;
+        private string                       m_ContentEncoding    = MIME_TransferEncodings.SevenBit;
         private int                          m_ContentSize        = 0;
         private IMAP_Envelope                m_pEnvelope          = null;
         private int                          m_ContentLines       = 0;
@@ -56,7 +55,7 @@ namespace LumiSoft.Net.IMAP
                 // Read multipart values. (nestedMimeEntries) contentTypeSubMediaType
                 string contentTypeSubMediaType = r.ReadWord();
 
-                m_pContentType = MimeUtils.ParseMediaType("multipart/" + contentTypeSubMediaType);
+                m_pContentType = new MIME_h_ContentType("multipart/" + contentTypeSubMediaType);
             }
             else{
                 // Basic fields for non-multipart
@@ -66,7 +65,7 @@ namespace LumiSoft.Net.IMAP
                 string contentTypeMainMediaType = r.ReadWord();
                 string contentTypeSubMediaType  = r.ReadWord();
                 if(contentTypeMainMediaType.ToUpper() != "NIL" && contentTypeSubMediaType.ToUpper() != "NIL"){
-                    m_pContentType = MimeUtils.ParseMediaType(contentTypeMainMediaType + "/" + contentTypeSubMediaType);
+                    m_pContentType = new MIME_h_ContentType(contentTypeMainMediaType + "/" + contentTypeSubMediaType);
                 }
 
                 // Content-Type header field parameters
@@ -76,15 +75,13 @@ namespace LumiSoft.Net.IMAP
                 if(r.StartsWith("(")){
                     conentTypeParameters = r.ReadParenthesized();
 
-                    StringReader contentTypeParamReader = new StringReader(MimeUtils.DecodeWords(conentTypeParameters));
-                    List<HeaderFieldParameter> parameters =  new List<HeaderFieldParameter>();
+                    StringReader contentTypeParamReader = new StringReader(conentTypeParameters);
                     while(contentTypeParamReader.Available > 0){
-                        string parameterName = contentTypeParamReader.ReadWord();
-                        string parameterValue = contentTypeParamReader.ReadWord();
+                        string parameterName  = contentTypeParamReader.ReadWord();
+                        string parameterValue = MIME_Encoding_EncodedWord.DecodeS(contentTypeParamReader.ReadWord());
 
-                        parameters.Add(new HeaderFieldParameter(parameterName,parameterValue));
+                        m_pContentType.Parameters[parameterName] = parameterValue;
                     }
-                    m_pContentTypeParams = parameters.ToArray();
                 }
                 else{
                     // Skip NIL
@@ -106,7 +103,7 @@ namespace LumiSoft.Net.IMAP
                 // Content-Transfer-Encoding:
                 string contentEncoding = r.ReadWord();
                 if(contentEncoding.ToUpper() != "NIL"){                   
-                    m_ContentEncoding = MimeUtils.ParseContentTransferEncoding(contentEncoding);
+                    m_ContentEncoding = contentEncoding;
                 }
 
                 // Content Encoded data size in bytes
@@ -116,7 +113,7 @@ namespace LumiSoft.Net.IMAP
                 }
 
                 // Only for ContentType message/rfc822
-                if(this.ContentType == MediaType_enum.Message_rfc822){
+                if(string.Equals(this.ContentType.TypeWithSubype,MIME_MediaTypes.Message.rfc822,StringComparison.InvariantCultureIgnoreCase)){
                     r.ReadToFirstChar();
  
                     // envelope
@@ -176,17 +173,9 @@ namespace LumiSoft.Net.IMAP
         /// <summary>
         /// Gets header field "<b>Content-Type:</b>" value.
         /// </summary>
-        public MediaType_enum ContentType
+        public MIME_h_ContentType ContentType
         {
             get{ return m_pContentType; }
-        }
-
-        /// <summary>
-        /// Gets header field "<b>Content-Type:</b>" prameters. This value is null if no parameters.
-        /// </summary>
-        public HeaderFieldParameter[] ContentType_Paramters
-        {
-            get{ return m_pContentTypeParams; }
         }
 
         /// <summary>
@@ -208,7 +197,7 @@ namespace LumiSoft.Net.IMAP
         /// <summary>
         /// Gets header field "<b>Content-Transfer-Encoding:</b>" value.
         /// </summary>
-        public ContentTransferEncoding_enum ContentTransferEncoding
+        public string ContentTransferEncoding
         {
             get{ return m_ContentEncoding; }
         }
@@ -219,14 +208,14 @@ namespace LumiSoft.Net.IMAP
         public int ContentSize
         {
             get{
-                if((this.ContentType & MediaType_enum.Multipart) != 0){
+                if(string.Equals(this.ContentType.Type,"multipart",StringComparison.InvariantCultureIgnoreCase)){
                     throw new Exception("NOTE: ContentSize property is available only for non-multipart contentype !");
                 }
 
                 return m_ContentSize; 
             }
         }
-
+        /*
         /// <summary>
         /// Gets content envelope. NOTE: This property is available only for message/xxx content type !
         /// Yhis value can be also null if no ENVELOPE provided by server.
@@ -234,13 +223,13 @@ namespace LumiSoft.Net.IMAP
         public IMAP_Envelope Envelope
         {
             get{ 
-                if((this.ContentType & MediaType_enum.Message) == 0){
-                    throw new Exception("NOTE: Envelope property is available only for non-multipart contentype !");
+                if(!string.Equals(this.ContentType.Type,"message",StringComparison.InvariantCultureIgnoreCase)){
+                    throw new Exception("NOTE: Envelope property is available only for message/rfc2822 contentype !");
                 }
 
                 return null; 
             }
-        }
+        }*/
 
         /// <summary>
         /// Gets content encoded data lines. NOTE: This property is available only for text/xxx content type !
@@ -248,7 +237,7 @@ namespace LumiSoft.Net.IMAP
         public int ContentLines
         {
             get{ 
-                if((this.ContentType & MediaType_enum.Text) == 0){
+                if(!string.Equals(this.ContentType.Type,"text",StringComparison.InvariantCultureIgnoreCase)){
                     throw new Exception("NOTE: ContentLines property is available only for text/xxx content type !");
                 }
 

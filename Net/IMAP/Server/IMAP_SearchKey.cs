@@ -1,7 +1,8 @@
 using System;
 
 using LumiSoft.Net;
-using LumiSoft.Net.Mime;
+using LumiSoft.Net.MIME;
+using LumiSoft.Net.Mail;
 
 namespace LumiSoft.Net.IMAP.Server
 {
@@ -829,10 +830,10 @@ namespace LumiSoft.Net.IMAP.Server
 		/// <param name="size">IMAP message size in bytes.</param>
 		/// <param name="internalDate">IMAP message INTERNALDATE (dateTime when server stored message).</param>
 		/// <param name="flags">IMAP message flags.</param>
-		/// <param name="mime">Mime message main header only.</param>
+		/// <param name="message">Mime message main header only.</param>
 		/// <param name="bodyText">Message body text.</param>
 		/// <returns></returns>
-		public bool Match(long no,long uid,long size,DateTime internalDate,IMAP_MessageFlags flags,LumiSoft.Net.Mime.Mime mime,string bodyText)
+		public bool Match(long no,long uid,long size,DateTime internalDate,IMAP_MessageFlags flags,Mail_Message message,string bodyText)
 		{
 			#region ALL
 
@@ -895,11 +896,11 @@ namespace LumiSoft.Net.IMAP.Server
                     headerField_value[0] = headerField_value[0] + ":";
                 }
 
-				if(mime.MainEntity.Header.Contains(headerField_value[0])){
+				if(message.Header.Contains(headerField_value[0])){
 					if(headerField_value[1].Length == 0){
 						return true;
 					}
-					else if(mime.MainEntity.Header.GetFirst(headerField_value[0]).Value.ToLower().IndexOf(headerField_value[1].ToLower()) > -1){
+					else if(message.Header.GetFirst(headerField_value[0]).ToString().ToLower().IndexOf(headerField_value[1].ToLower()) > -1){
 						return true;
 					}
 				}
@@ -936,7 +937,7 @@ namespace LumiSoft.Net.IMAP.Server
 			//	NOT <search-key> or (<search-key> <search-key> ...)(SearchGroup)
 			//		Messages that do not match the specified search key.
 			else if(m_SearchKeyName == "NOT"){
-				return !SearchGroup.Match_Key_Value(m_SearchKeyValue,no,uid,size,internalDate,flags,mime,bodyText);
+				return !SearchGroup.Match_Key_Value(m_SearchKeyValue,no,uid,size,internalDate,flags,message,bodyText);
 			}
 
 			#endregion
@@ -962,7 +963,7 @@ namespace LumiSoft.Net.IMAP.Server
 				object serachKey1 = ((object[])m_SearchKeyValue)[0];
 				object serachKey2 = ((object[])m_SearchKeyValue)[1];
 
-				if(SearchGroup.Match_Key_Value(serachKey1,no,uid,size,internalDate,flags,mime,bodyText) || SearchGroup.Match_Key_Value(serachKey2,no,uid,size,internalDate,flags,mime,bodyText)){
+				if(SearchGroup.Match_Key_Value(serachKey1,no,uid,size,internalDate,flags,message,bodyText) || SearchGroup.Match_Key_Value(serachKey2,no,uid,size,internalDate,flags,message,bodyText)){
 					return true;
 				}
 			}
@@ -975,7 +976,7 @@ namespace LumiSoft.Net.IMAP.Server
 			//	Messages whose [RFC-2822] Date: header (disregarding time and
 			//	timezone) is earlier than the specified date.
 			else if(m_SearchKeyName == "SENTBEFORE"){				
-				if(mime.MainEntity.Date.Date < (DateTime)m_SearchKeyValue){
+				if(message.Date.Date < (DateTime)m_SearchKeyValue){
 					return true;
 				}
 			}
@@ -988,7 +989,7 @@ namespace LumiSoft.Net.IMAP.Server
 			//	Messages whose [RFC-2822] Date: header (disregarding time and
 			//	timezone) is within the specified date.
 			else if(m_SearchKeyName == "SENTON"){				
-				if(mime.MainEntity.Date.Date == (DateTime)m_SearchKeyValue){
+				if(message.Date.Date == (DateTime)m_SearchKeyValue){
 					return true;
 				}
 			}
@@ -1001,7 +1002,7 @@ namespace LumiSoft.Net.IMAP.Server
 			//	Messages whose [RFC-2822] Date: header (disregarding time and
 			//	timezone) is within or later than the specified date.
 			else if(m_SearchKeyName == "SENTSINCE"){
-				if(mime.MainEntity.Date.Date >= (DateTime)m_SearchKeyValue){
+				if(message.Date.Date >= (DateTime)m_SearchKeyValue){
 					return true;
 				}
 			}
@@ -1049,8 +1050,8 @@ namespace LumiSoft.Net.IMAP.Server
 				}
 
 				// If we reach so far, that means body won't contain specified text and we need to check header.
-				foreach(HeaderField headerField in mime.MainEntity.Header){
-					if(headerField.Value.ToLower().IndexOf(((string)m_SearchKeyValue).ToLower()) > -1){
+				foreach(MIME_h headerField in message.Header){
+					if(headerField.ToString().ToLower().IndexOf(((string)m_SearchKeyValue).ToLower()) > -1){
 						return true;
 					}
 				}

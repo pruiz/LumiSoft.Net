@@ -3,7 +3,8 @@ using System.IO;
 using System.Collections;
 using System.Text;
 
-using LumiSoft.Net.Mime;
+using LumiSoft.Net.MIME;
+using LumiSoft.Net.Mail;
 
 namespace LumiSoft.Net.IMAP.Server
 {
@@ -12,7 +13,7 @@ namespace LumiSoft.Net.IMAP.Server
 	/// </summary>
 	internal class FetchHelper
 	{				
-		#region function ParseHeaderFields
+		#region method ParseHeaderFields
 
 		/// <summary>
 		/// Returns requested header fields lines.
@@ -21,9 +22,9 @@ namespace LumiSoft.Net.IMAP.Server
 		/// <param name="fieldsStr">Header fields to get.</param>
 		/// <param name="entity">Entity which header field lines to get.</param>
 		/// <returns></returns>
-		public static byte[] ParseHeaderFields(string fieldsStr,MimeEntity entity)
+		public static byte[] ParseHeaderFields(string fieldsStr,MIME_Entity entity)
 		{
-			return ParseHeaderFields(fieldsStr,System.Text.Encoding.Default.GetBytes(entity.HeaderString));
+			return ParseHeaderFields(fieldsStr,System.Text.Encoding.Default.GetBytes(entity.Header.ToString()));
 		}
 
 		/// <summary>
@@ -86,7 +87,7 @@ namespace LumiSoft.Net.IMAP.Server
 
 		#endregion
 
-		#region function ParseHeaderFieldsNot
+		#region method ParseHeaderFieldsNot
 
 		/// <summary>
 		/// Returns header fields lines except requested.
@@ -95,9 +96,9 @@ namespace LumiSoft.Net.IMAP.Server
 		/// <param name="fieldsStr">Header fields to skip.</param>
 		/// <param name="entity">Entity which header field lines to get.</param>
 		/// <returns></returns>
-		public static byte[] ParseHeaderFieldsNot(string fieldsStr,MimeEntity entity)
+		public static byte[] ParseHeaderFieldsNot(string fieldsStr,MIME_Entity entity)
 		{
-			return ParseHeaderFieldsNot(fieldsStr,System.Text.Encoding.Default.GetBytes(entity.HeaderString));
+			return ParseHeaderFieldsNot(fieldsStr,System.Text.Encoding.Default.GetBytes(entity.Header.ToString()));
 		}
 
 		/// <summary>
@@ -166,11 +167,11 @@ namespace LumiSoft.Net.IMAP.Server
 		/// <summary>
 		/// Gets specified mime entity. Returns null if specified mime entity doesn't exist.
 		/// </summary>
-		/// <param name="parser">Reference to mime parser.</param>
+		/// <param name="message">Mail message.</param>
 		/// <param name="mimeEntitySpecifier">Mime entity specifier. Nested mime entities are pointed by '.'. 
 		/// For example: 1,1.1,2.1, ... .</param>
 		/// <returns></returns>
-		public static MimeEntity GetMimeEntity(LumiSoft.Net.Mime.Mime parser,string mimeEntitySpecifier)
+		public static MIME_Entity GetMimeEntity(Mail_Message message,string mimeEntitySpecifier)
 		{
 			// TODO: nested rfc 822 message
 
@@ -188,9 +189,9 @@ namespace LumiSoft.Net.IMAP.Server
 			//          ...
 
 			// Single part
-			if((parser.MainEntity.ContentType & MediaType_enum.Multipart) == 0){
+			if(message.ContentType.Type.ToLower() != "multipart"){
 				if(mimeEntitySpecifier.Length == 1 && Convert.ToInt32(mimeEntitySpecifier) == 1){
-					return parser.MainEntity;
+					return message;
 				}
 				else{
 					return null;
@@ -198,16 +199,18 @@ namespace LumiSoft.Net.IMAP.Server
 			}
 			// multipart
 			else{
-				MimeEntity entity = parser.MainEntity;
+				MIME_Entity entity = message;
 				string[] parts = mimeEntitySpecifier.Split('.');
 				foreach(string part in parts){
 					int mEntryNo = Convert.ToInt32(part) - 1; // Enitites are zero base, mimeEntitySpecifier is 1 based.
-					if(mEntryNo > -1 && mEntryNo < entity.ChildEntities.Count){
-						entity = entity.ChildEntities[mEntryNo];
-					}
-					else{
-						return null;
-					}
+                    if(entity.Body is MIME_b_Multipart){
+                        MIME_b_Multipart multipart = (MIME_b_Multipart)entity.Body;
+                        if(mEntryNo > -1 && mEntryNo < multipart.BodyParts.Count){
+						    entity = multipart.BodyParts[mEntryNo];
+					    }
+                    }
+					
+			        return null;
 				}
 
 				return entity;
@@ -224,22 +227,22 @@ namespace LumiSoft.Net.IMAP.Server
 		/// </summary>
 		/// <param name="entity">Mime entity.</param>
 		/// <returns></returns>
-		public static byte[] GetMimeEntityHeader(MimeEntity entity)
+		public static byte[] GetMimeEntityHeader(MIME_Entity entity)
 		{
-			return System.Text.Encoding.ASCII.GetBytes(entity.HeaderString + "\r\n");
+			return System.Text.Encoding.ASCII.GetBytes(entity.ToString() + "\r\n");
 		}
 
 		/// <summary>
 		/// Gets requested mime entity header. Returns null if specified mime entity doesn't exist.
 		/// Note: Header terminator blank line is included.
 		/// </summary>
-		/// <param name="parser">Reference to mime parser.</param>
+		/// <param name="message">Mail message.</param>
 		/// <param name="mimeEntitySpecifier">Mime entity specifier. Nested mime entities are pointed by '.'. 
 		/// For example: 1,1.1,2.1, ... .</param>
 		/// <returns>Returns requested mime entity data or NULL if requested entry doesn't exist.</returns>
-		public static byte[] GetMimeEntityHeader(LumiSoft.Net.Mime.Mime parser,string mimeEntitySpecifier)
+		public static byte[] GetMimeEntityHeader(Mail_Message message,string mimeEntitySpecifier)
 		{
-			MimeEntity mEntry = GetMimeEntity(parser,mimeEntitySpecifier);
+			MIME_Entity mEntry = GetMimeEntity(message,mimeEntitySpecifier);
 			if(mEntry != null){
 				return GetMimeEntityHeader(mEntry);
 			}
@@ -255,19 +258,20 @@ namespace LumiSoft.Net.IMAP.Server
 		/// <summary>
 		/// Gets requested mime entity data. Returns null if specified mime entity doesn't exist.
 		/// </summary>
-		/// <param name="parser">Reference to mime parser.</param>
+		/// <param name="message">Mail message.</param>
 		/// <param name="mimeEntitySpecifier">Mime entity specifier. Nested mime entities are pointed by '.'. 
 		/// For example: 1,1.1,2.1, ... .</param>
 		/// <returns>Returns requested mime entity data or NULL if requested entry doesn't exist.</returns>
-		public static byte[] GetMimeEntityData(LumiSoft.Net.Mime.Mime parser,string mimeEntitySpecifier)
+		public static byte[] GetMimeEntityData(Mail_Message message,string mimeEntitySpecifier)
 		{
-			MimeEntity entity = GetMimeEntity(parser,mimeEntitySpecifier);
+			MIME_Entity entity = GetMimeEntity(message,mimeEntitySpecifier);
 			if(entity != null){
-				return entity.DataEncoded;
+                if(entity.Body is MIME_b_SinglepartBase){
+                    return ((MIME_b_SinglepartBase)entity.Body).EncodedData;
+                }
 			}
-			else{
-				return null;
-			}
+			
+            return null;			
 		}
 
 		#endregion

@@ -9,6 +9,8 @@ using System.Security.Cryptography;
 using LumiSoft.Net.TCP;
 using LumiSoft.Net.AUTH;
 using LumiSoft.Net.Dns.Client;
+using LumiSoft.Net.Mail;
+using LumiSoft.Net.MIME;
 using LumiSoft.Net.Mime;
 
 namespace LumiSoft.Net.SMTP.Client
@@ -1429,6 +1431,7 @@ namespace LumiSoft.Net.SMTP.Client
         /// </summary>
         /// <param name="message">Message to send.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>message</b> is null.</exception>
+        [Obsolete("Use QuickSend(Mail_Message) instead")]
         public static void QuickSend(LumiSoft.Net.Mime.Mime message)
         {
             if(message == null){
@@ -1465,6 +1468,53 @@ namespace LumiSoft.Net.SMTP.Client
 
             foreach(string recipient in recipients){
                 QuickSend(null,from,recipient,new MemoryStream(message.ToByteData()));
+            }
+        }
+
+        /// <summary>
+        /// Sends specified mime message.
+        /// </summary>
+        /// <param name="message">Message to send.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>message</b> is null.</exception>
+        public static void QuickSend(Mail_Message message)
+        {
+            if(message == null){
+                throw new ArgumentNullException("message");
+            }
+
+            string from = "";
+            if(message.From != null && message.From.Count > 0){
+                from = ((Mail_t_Mailbox)message.From[0]).Address;
+            }
+
+            List<string> recipients = new List<string>();
+            if(message.To != null){
+				Mail_t_Mailbox[] addresses = message.To.Mailboxes;	
+				foreach(Mail_t_Mailbox address in addresses){
+					recipients.Add(address.Address);
+				}
+			}
+			if(message.Cc != null){
+				Mail_t_Mailbox[] addresses = message.Cc.Mailboxes;				
+				foreach(Mail_t_Mailbox address in addresses){
+					recipients.Add(address.Address);
+				}
+			}
+			if(message.Bcc != null){
+				Mail_t_Mailbox[] addresses = message.Bcc.Mailboxes;				
+				foreach(Mail_t_Mailbox address in addresses){
+					recipients.Add(address.Address);
+				}
+
+                // We must hide BCC
+                message.Bcc.Clear();
+			}
+
+            foreach(string recipient in recipients){
+                MemoryStream ms = new MemoryStream();
+                message.ToStream(ms,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.Q,Encoding.UTF8),Encoding.UTF8);
+                ms.Position = 0;
+                QuickSend(null,from,recipient,ms);
             }
         }
 

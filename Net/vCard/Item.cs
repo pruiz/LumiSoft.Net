@@ -91,10 +91,67 @@ namespace LumiSoft.Net.Mime.vCard
         internal string ToItemString()
         {
             if(m_Parameters.Length > 0){
-                return m_Name + ";" + m_Parameters + ":" + MimeUtils.FoldData(m_Value);
+                return m_Name + ";" + m_Parameters + ":" + FoldData(m_Value);
             }
             else{
-                return m_Name + ":" + MimeUtils.FoldData(m_Value);
+                return m_Name + ":" + FoldData(m_Value);
+            }
+        }
+
+        #endregion
+
+
+        // Is it needed ?
+        #region static method FoldData
+
+        /// <summary>
+        /// Folds long data line to folded lines.
+        /// </summary>
+        /// <param name="data">Data to fold.</param>
+        /// <returns></returns>
+        private string FoldData(string data)
+        {
+            /* Folding rules:
+                *) Line may not be bigger than 76 chars.
+                *) If possible fold between TAB or SP
+                *) If no fold point, just fold from char 76
+            */
+
+            // Data line too big, we need to fold data.
+            if(data.Length > 76){
+                int startPosition       = 0;
+                int lastPossibleFoldPos = -1;
+                StringBuilder retVal = new StringBuilder();
+                for(int i=0;i<data.Length;i++){
+                    char c = data[i];
+                    // We have possible fold point
+                    if(c == ' ' || c == '\t'){
+                        lastPossibleFoldPos = i;
+                    }
+
+                    // End of data reached
+                    if(i == (data.Length - 1)){
+                        retVal.Append(data.Substring(startPosition));
+                    }
+                    // We need to fold
+                    else if((i - startPosition) >= 76){
+                        // There wasn't any good fold point(word is bigger than line), just fold from current position.
+                        if(lastPossibleFoldPos == -1){
+                            lastPossibleFoldPos = i;
+                        }
+                    
+                        retVal.Append(data.Substring(startPosition,lastPossibleFoldPos - startPosition) + "\r\n\t");
+
+                        i = lastPossibleFoldPos;
+                        lastPossibleFoldPos = -1;
+                        startPosition       = i;
+                    }
+                }
+
+                return retVal.ToString();
+            }
+            else{
+                return data;
             }
         }
 

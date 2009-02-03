@@ -15,6 +15,7 @@ namespace LumiSoft.Net.Mail
     ///     mailbox    = name-addr / addr-spec
     ///     name-addr  = [display-name] angle-addr
     ///     angle-addr = [CFWS] "&lt;" addr-spec "&gt;" [CFWS]
+    ///     addr-spec  = local-part "@" domain
     /// </code>
     /// </example>
     public class Mail_t_Mailbox : Mail_t_Address
@@ -89,6 +90,30 @@ namespace LumiSoft.Net.Mail
         public string Address
         {
             get{ return m_Address; }
+        }
+
+        /// <summary>
+        /// Gets local-part of address.
+        /// </summary>
+        public string LocalPart
+        {
+            get{ 
+                string[] localpart_domain = m_Address.Split('@');
+
+                return localpart_domain[0]; 
+            }
+        }
+
+        /// <summary>
+        /// Gets domain part of address.
+        /// </summary>
+        public string Domain
+        {
+            get{ 
+                string[] localpart_domain = m_Address.Split('@');
+
+                return localpart_domain[1]; 
+            }
         }
 
         #endregion

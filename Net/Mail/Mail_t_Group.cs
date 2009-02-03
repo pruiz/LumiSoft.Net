@@ -7,7 +7,7 @@ using LumiSoft.Net.MIME;
 namespace LumiSoft.Net.Mail
 {
     /// <summary>
-    /// Defined in RFC 2822 3.4.
+    /// This class represents "group" address. Defined in RFC 5322 3.4.
     /// </summary>
     public class Mail_t_Group : Mail_t_Address
     {

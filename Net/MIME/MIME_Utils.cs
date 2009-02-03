@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Text;
 
@@ -433,6 +434,117 @@ namespace LumiSoft.Net.MIME
 		public static string CreateMessageID()
 		{
 			return "<" + Guid.NewGuid().ToString().Replace("-","").Substring(16) + "@" + Guid.NewGuid().ToString().Replace("-","").Substring(16) + ">";
+		}
+
+		#endregion
+
+
+        #region static method ParseHeaders
+
+		/// <summary>
+		/// Parses headers from message or mime entry.
+		/// </summary>
+		/// <param name="entryStrm">Stream from where to read headers.</param>
+		/// <returns>Returns header lines.</returns>
+		internal static string ParseHeaders(Stream entryStrm)
+		{
+			/* Rfc 2822 3.1.  GENERAL DESCRIPTION
+				A message consists of header fields and, optionally, a body.
+				The  body  is simply a sequence of lines containing ASCII charac-
+				ters.  It is separated from the headers by a null line  (i.e.,  a
+				line with nothing preceding the CRLF).
+			*/
+
+			byte[] crlf = new byte[]{(byte)'\r',(byte)'\n'};
+			MemoryStream msHeaders = new MemoryStream();
+			StreamLineReader r = new StreamLineReader(entryStrm);
+			byte[] lineData = r.ReadLine();
+			while(lineData != null){
+				if(lineData.Length == 0){
+					break;
+				}
+
+				msHeaders.Write(lineData,0,lineData.Length);
+				msHeaders.Write(crlf,0,crlf.Length);
+				lineData = r.ReadLine();
+			}
+
+			return System.Text.Encoding.Default.GetString(msHeaders.ToArray());
+		}
+
+		#endregion
+
+        #region static method ParseHeaderField
+
+		/// <summary>
+		/// Parse header specified header field value.
+		/// 
+		/// Use this method only if you need to get only one header field, otherwise use
+		/// MimeParser.ParseHeaderField(string fieldName,string headers).
+		/// This avoid parsing headers multiple times.
+		/// </summary>
+		/// <param name="fieldName">Header field which to parse. Eg. Subject: .</param>
+		/// <param name="entryStrm">Stream from where to read headers.</param>
+		/// <returns></returns>
+		public static string ParseHeaderField(string fieldName,Stream entryStrm)
+		{
+			return ParseHeaderField(fieldName,ParseHeaders(entryStrm));
+		}
+
+		/// <summary>
+		/// Parse header specified header field value.
+		/// </summary>
+		/// <param name="fieldName">Header field which to parse. Eg. Subject: .</param>
+		/// <param name="headers">Full headers string. Use MimeParser.ParseHeaders() to get this value.</param>
+		public static string ParseHeaderField(string fieldName,string headers)
+		{
+			/* Rfc 2822 2.2 Header Fields
+				Header fields are lines composed of a field name, followed by a colon
+				(":"), followed by a field body, and terminated by CRLF.  A field
+				name MUST be composed of printable US-ASCII characters (i.e.,
+				characters that have values between 33 and 126, inclusive), except
+				colon.  A field body may be composed of any US-ASCII characters,
+				except for CR and LF.  However, a field body may contain CRLF when
+				used in header "folding" and  "unfolding" as described in section
+				2.2.3.  All field bodies MUST conform to the syntax described in
+				sections 3 and 4 of this standard. 
+				
+			   Rfc 2822 2.2.3 (Multiline header fields)
+				The process of moving from this folded multiple-line representation
+				of a header field to its single line representation is called
+				"unfolding". Unfolding is accomplished by simply removing any CRLF
+				that is immediately followed by WSP.  Each header field should be
+				treated in its unfolded form for further syntactic and semantic
+				evaluation.
+				
+				Example:
+					Subject: aaaaa<CRLF>
+					<TAB or SP>aaaaa<CRLF>
+			*/
+
+			using(TextReader r = new StreamReader(new MemoryStream(System.Text.Encoding.Default.GetBytes(headers)))){
+				string line = r.ReadLine();
+				while(line != null){
+					// Find line where field begins
+					if(line.ToUpper().StartsWith(fieldName.ToUpper())){
+						// Remove field name and start reading value
+						string fieldValue = line.Substring(fieldName.Length).Trim();
+
+						// see if multi line value. See commnt above.
+						line = r.ReadLine();
+						while(line != null && (line.StartsWith("\t") || line.StartsWith(" "))){
+							fieldValue += line;
+							line = r.ReadLine();
+						}
+
+						return fieldValue;
+					}
+
+					line = r.ReadLine();
+				}
+			}
+
+			return "";
 		}
 
 		#endregion

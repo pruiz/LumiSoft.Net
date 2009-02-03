@@ -316,7 +316,7 @@ namespace LumiSoft.Net.SIP.Stack
                     m_pMessage.Write(new byte[]{(byte)'\r',(byte)'\n'},0,2);
 
                     m_pMessage.Position = 0;
-                    string contentLengthValue = Mime.MimeUtils.ParseHeaderField("Content-Length:",m_pMessage);
+                    string contentLengthValue = LumiSoft.Net.MIME.MIME_Utils.ParseHeaderField("Content-Length:",m_pMessage);
                     m_pMessage.Position = m_pMessage.Length;
 
                     int contentLength = 0;

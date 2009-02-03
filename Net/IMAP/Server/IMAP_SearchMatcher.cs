@@ -1,6 +1,6 @@
 using System;
 
-using LumiSoft.Net.Mime;
+using LumiSoft.Net.Mail;
 
 namespace LumiSoft.Net.IMAP.Server
 {
@@ -37,10 +37,10 @@ namespace LumiSoft.Net.IMAP.Server
 		public bool Matches(int no,int uid,int size,DateTime internalDate,IMAP_MessageFlags flags,string header,string bodyText)
 		{
 			// Parse header only if it's needed
-			LumiSoft.Net.Mime.Mime m = null;
+			Mail_Message m = null;
             if(m_pSearchCriteria.IsHeaderNeeded()){
-				m = new LumiSoft.Net.Mime.Mime();
-				m.MainEntity.Header.Parse(header);
+				m = new Mail_Message();
+				m.Header.Parse(header);
 			}
 
 			return m_pSearchCriteria.Match(no,uid,size,internalDate,flags,m,bodyText);

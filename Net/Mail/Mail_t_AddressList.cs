@@ -194,6 +194,26 @@ namespace LumiSoft.Net.Mail
             }
         }
 
+        /// <summary>
+        /// Gets this address list mailboxes(group address mailboxes + mailboxes).
+        /// </summary>
+        public Mail_t_Mailbox[] Mailboxes
+        {
+            get{
+                List<Mail_t_Mailbox> retVal = new List<Mail_t_Mailbox>();
+                foreach(Mail_t_Address address in this){
+                    if(address is Mail_t_Mailbox){
+                        retVal.Add((Mail_t_Mailbox)address);
+                    }
+                    else{
+                        retVal.AddRange(((Mail_t_Group)address).Members);
+                    }
+                }
+
+                return retVal.ToArray(); 
+            }
+        }
+
         #endregion
     }
 }

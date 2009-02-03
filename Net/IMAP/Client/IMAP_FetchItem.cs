@@ -169,8 +169,8 @@ namespace LumiSoft.Net.IMAP.Client
 					throw new Exception("IMAP_FetchItem_Flags.Header wasn't specified in FetchMessages command, becuse of it this property is unavailable.");
 				}
 
-				if((m_FetchFlags & IMAP_FetchItem_Flags.Message) != 0){
-					return System.Text.Encoding.ASCII.GetBytes(LumiSoft.Net.Mime.MimeUtils.ParseHeaders(new MemoryStream(m_Data)));
+				if((m_FetchFlags & IMAP_FetchItem_Flags.Message) != 0){                    
+					return System.Text.Encoding.ASCII.GetBytes(LumiSoft.Net.MIME.MIME_Utils.ParseHeaders(new MemoryStream(m_Data)));
 				}
 				else{
 					return m_Data;
