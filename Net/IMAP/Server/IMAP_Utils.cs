@@ -174,7 +174,22 @@ namespace LumiSoft.Net.IMAP.Server
                 throw new ArgumentNullException("date");
             }
 
-            return LumiSoft.Net.MIME.MIME_Utils.ParseRfc2822DateTime(date);
+            /* RFC 3501. IMAP date format. 
+			    date-time       = DQUOTE date-day-fixed "-" date-month "-" date-year SP time SP zone DQUOTE
+				date            = day-month-year
+				time            = 2DIGIT ":" 2DIGIT ":" 2DIGIT
+			*/
+            if(date.IndexOf('-') > -1){
+                try{
+                    return DateTime.ParseExact(date.Trim(),"d-MMM-yyyy HH:mm:ss zzz",System.Globalization.DateTimeFormatInfo.InvariantInfo);
+                }
+                catch{
+                    throw new ArgumentException("Argument 'date' value '" + date + "' is not valid IMAP date.");
+                }
+            }
+            else{
+                return LumiSoft.Net.MIME.MIME_Utils.ParseRfc2822DateTime(date);
+            }
 		}
 
 		#endregion
