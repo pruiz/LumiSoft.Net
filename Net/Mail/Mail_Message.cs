@@ -1816,11 +1816,53 @@ namespace LumiSoft.Net.Mail
 
 
         /// <summary>
+        /// Gets this message attachments.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        public MIME_Entity[] Attachments
+        {
+            get{
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                List<MIME_Entity> retVal = new List<MIME_Entity>();
+                foreach(MIME_Entity entity in this.AllEntities){
+                    if(entity.ContentDisposition != null && string.Equals(entity.ContentDisposition.DispositionType,"attachment",StringComparison.InvariantCultureIgnoreCase)){
+                        retVal.Add(entity);
+                    }
+                    else if(entity.ContentType != null && entity.ContentType.Type.ToLower() == "application"){
+                        retVal.Add(entity);
+                    }
+                    else if(entity.ContentType != null && entity.ContentType.Type.ToLower() == "image"){
+                        retVal.Add(entity);
+                    }
+                    else if(entity.ContentType != null && entity.ContentType.Type.ToLower() == "video"){
+                        retVal.Add(entity);
+                    }
+                    else if(entity.ContentType != null && entity.ContentType.Type.ToLower() == "audio"){
+                        retVal.Add(entity);
+                    }
+                    else if(entity.ContentType != null && entity.ContentType.Type.ToLower() == "message"){
+                        retVal.Add(entity);
+                    }
+                }
+
+                return retVal.ToArray();
+            }
+        }
+
+        /// <summary>
         /// Gets message body text. Returns null if no body text available.
         /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
         public string BodyText
         {
-            get{ 
+            get{
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
                 foreach(MIME_Entity e in this.AllEntities){
                     if(e.Body.ContentType.TypeWithSubype.ToLower() == MIME_MediaTypes.Text.plain){
                         return ((MIME_b_Text)e.Body).Text;
@@ -1834,9 +1876,14 @@ namespace LumiSoft.Net.Mail
         /// <summary>
         /// Gets message body html text. Returns null if no body html text available.
         /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
         public string BodyHtmlText
         {
             get{ 
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
                 foreach(MIME_Entity e in this.AllEntities){
                     if(e.Body.ContentType.TypeWithSubype.ToLower() == MIME_MediaTypes.Text.html){
                         return ((MIME_b_Text)e.Body).Text;
