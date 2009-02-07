@@ -114,6 +114,25 @@ namespace LumiSoft.Net.MIME
 
         #endregion
 
+        #region method ToByte
+
+        /// <summary>
+        /// Returns MIME entity as byte[].
+        /// </summary>
+        /// <param name="headerWordEncoder">Header 8-bit words ecnoder. Value null means that words are not encoded.</param>
+        /// <param name="headerParmetersCharset">Charset to use to encode 8-bit header parameters. Value null means parameters not encoded.</param>
+        /// <returns>Returns MIME entity as byte[].</returns>
+        public byte[] ToByte(MIME_Encoding_EncodedWord headerWordEncoder,Encoding headerParmetersCharset)
+        {
+            using(MemoryStream ms = new MemoryStream()){
+                ToStream(ms,headerWordEncoder,headerParmetersCharset);
+
+                return ms.ToArray();
+            }
+        }
+
+        #endregion
+
 
         #region method Parse
 
