@@ -112,7 +112,12 @@ namespace LumiSoft.Net.Mail
             get{ 
                 string[] localpart_domain = m_Address.Split('@');
 
-                return localpart_domain[1]; 
+                if(localpart_domain.Length == 2){
+                    return localpart_domain[1]; 
+                }
+                else{
+                    return "";
+                }
             }
         }
 
