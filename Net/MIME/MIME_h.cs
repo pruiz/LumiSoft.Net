@@ -39,6 +39,31 @@ namespace LumiSoft.Net.MIME
 
         #endregion
 
+        #region method ValueToString
+
+        /// <summary>
+        /// Returns header field value as string.
+        /// </summary>
+        /// <returns>Returns header field value as string.</returns>
+        public string ValueToString()
+        {
+            return ValueToString(null,null);
+        }
+
+        /// <summary>
+        /// Returns header field value as string.
+        /// </summary>
+        /// <param name="wordEncoder">8-bit words ecnoder. Value null means that words are not encoded.</param>
+        /// <param name="parmetersCharset">Charset to use to encode 8-bit characters. Value null means parameters not encoded.
+        /// If encoding needed, UTF-8 is strongly reccomended if not sure.</param>
+        /// <returns>Returns header field value as string.</returns>
+        public string ValueToString(MIME_Encoding_EncodedWord wordEncoder,Encoding parmetersCharset)
+        {
+            return ToString(wordEncoder,parmetersCharset).Split(new char[]{':'},2)[1].TrimStart();
+        }
+
+        #endregion
+
 
         #region Properties implementation
 

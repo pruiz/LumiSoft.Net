@@ -162,6 +162,8 @@
     <Compile Include="MIME\MIME_h_Unparsed.cs" />
     <Compile Include="MIME\MIME_h_Unstructured.cs" />
     <Compile Include="ParseException.cs" />
+    <Compile Include="SIP\Proxy\SIP_ProxyHandler.cs" />
+    <Compile Include="SIP\Proxy\SIP_RequestContext.cs" />
     <Compile Include="SIP\Stack\SIP_Dialog_Refer.cs" />
     <Compile Include="SMTP\SMTP_t_Mailbox.cs" />
     <Compile Include="WebDav\Client\WebDav_Client.cs" />
@@ -267,13 +269,10 @@
     <Compile Include="RTP\RTP_Utils.cs" />
     <Compile Include="SIP\Proxy\SIP_B2BUA.cs" />
     <Compile Include="SIP\Proxy\SIP_B2BUA_Call.cs" />
-    <Compile Include="SIP\Proxy\SIP_Gateway.cs" />
-    <Compile Include="SIP\Proxy\SIP_GatewayEventArgs.cs" />
     <Compile Include="SIP\Proxy\SIP_ProxyTarget.cs" />
     <Compile Include="SIP\Proxy\SIP_RegistrationBinding.cs" />
     <Compile Include="SIP\Proxy\SIP_Registration.cs" />
     <Compile Include="SIP\Proxy\SIP_RegistrationEventArgs.cs" />
-    <Compile Include="SIP\Proxy\SIP_Route.cs" />
     <Compile Include="SIP\Stack\SIP_Dialog.cs" />
     <Compile Include="SIP\Stack\SIP_Dialog_Invite.cs" />
     <Compile Include="SIP\Stack\SIP_Dialog_Subscribe.cs" />
@@ -734,7 +733,7 @@
     <Compile Include="SIP\Proxy\SIP_RegistrationCollection.cs" />
     <Compile Include="SIP\Stack\SIP_Request.cs" />
     <Compile Include="SIP\Stack\SIP_Response.cs" />
-    <Compile Include="SIP\Proxy\SIP_ProxyCore.cs" />
+    <Compile Include="SIP\Proxy\SIP_Proxy.cs" />
     <Compile Include="SIP\SIP_Utils.cs" />
     <Compile Include="SIP\Message\SIP_t_ContactParam.cs" />
     <Compile Include="SIP\Stack\SIP_DialogState.cs" />

@@ -151,8 +151,10 @@ namespace LumiSoft.Net.MIME
                 throw new ArgumentNullException("defaultContentType");
             }
             
-            m_pHeader.Parse(stream);            
-            this.Body = m_pBodyProvider.Parse(this,stream,defaultContentType);            
+            m_pHeader.Parse(stream); 
+           
+            m_pBody = m_pBodyProvider.Parse(this,stream,defaultContentType);
+            m_pBody.SetParent(this,false);         
         }
 
         #endregion
@@ -801,8 +803,7 @@ namespace LumiSoft.Net.MIME
                 }
 
                 m_pBody = value;
-                m_pBody.SetParent(this);
-                this.ContentType = m_pBody.ContentType;
+                m_pBody.SetParent(this,true);
             }
         }
                         

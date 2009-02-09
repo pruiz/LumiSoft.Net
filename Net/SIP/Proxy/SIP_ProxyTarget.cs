@@ -28,7 +28,7 @@ namespace LumiSoft.Net.SIP.Proxy
         /// Default constructor.
         /// </summary>
         /// <param name="targetUri">Target request-URI.</param>
-        /// <param name="flow">Data flow to try for forwarding..</param>
+        /// <param name="flow">Data flow to try for forwarding.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>targetUri</b> is null reference.</exception>
         public SIP_ProxyTarget(SIP_Uri targetUri,SIP_Flow flow)
         {

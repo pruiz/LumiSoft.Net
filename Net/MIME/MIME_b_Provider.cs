@@ -97,7 +97,7 @@ namespace LumiSoft.Net.MIME
                 }
             }
 
-            return (MIME_b)bodyType.GetMethod("Parse",System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.FlattenHierarchy).Invoke(null,new object[]{owner,mediaType,stream});
+            return (MIME_b)bodyType.GetMethod("Parse",System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.FlattenHierarchy).Invoke(null,new object[]{owner,defaultContentType,stream});
         }
 
         #endregion

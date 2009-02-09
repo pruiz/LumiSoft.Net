@@ -499,7 +499,12 @@ namespace LumiSoft.Net.IMAP
 			retVal.Append("(");
 
 			// personal name
-			retVal.Append(TextUtils.QuoteString(wordEncoder.Encode(address.DisplayName)));
+            if(address.DisplayName != null){
+			    retVal.Append(TextUtils.QuoteString(wordEncoder.Encode(address.DisplayName)));
+            }
+            else{
+                retVal.Append("NIL");
+            }
 
 			// source route, always NIL (not used nowdays)
 			retVal.Append(" NIL");
@@ -508,7 +513,12 @@ namespace LumiSoft.Net.IMAP
 			retVal.Append(" " + TextUtils.QuoteString(wordEncoder.Encode(address.LocalPart)));
 
 			// host name
-			retVal.Append(" " + TextUtils.QuoteString(wordEncoder.Encode(address.Domain)));
+            if(address.Domain != null){
+			    retVal.Append(" " + TextUtils.QuoteString(wordEncoder.Encode(address.Domain)));
+            }
+            else{
+                retVal.Append(" NIL");
+            }
 
 			retVal.Append(")");
 

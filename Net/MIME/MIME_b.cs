@@ -37,18 +37,18 @@ namespace LumiSoft.Net.MIME
         /// Parses body from the specified stream
         /// </summary>
         /// <param name="owner">Owner MIME entity.</param>
-        /// <param name="mediaType">MIME media type. For example: text/plain.</param>
+        /// <param name="defaultContentType">Default content-type for this body.</param>
         /// <param name="stream">Stream from where to read body.</param>
         /// <returns>Returns parsed body.</returns>
-        /// <exception cref="ArgumentNullException">Is raised when <b>stream</b>, <b>mediaType</b> or <b>stream</b> is null reference.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>stream</b>, <b>defaultContentType</b> or <b>stream</b> is null reference.</exception>
         /// <exception cref="ParseException">Is raised when any parsing errors.</exception>
-        protected static MIME_b Parse(MIME_Entity owner,string mediaType,SmartStream stream)
+        protected static MIME_b Parse(MIME_Entity owner,MIME_h_ContentType defaultContentType,SmartStream stream)
         {
             if(owner == null){
                 throw new ArgumentNullException("owner");
             }
-            if(mediaType == null){
-                throw new ArgumentNullException("mediaType");
+            if(defaultContentType == null){
+                throw new ArgumentNullException("defaultContentType");
             }
             if(stream == null){
                 throw new ArgumentNullException("stream");
@@ -66,7 +66,8 @@ namespace LumiSoft.Net.MIME
         /// Sets body parent.
         /// </summary>
         /// <param name="entity">Owner entity.</param>
-        internal void SetParent(MIME_Entity entity)
+        /// <param name="setContentType">If true sets entity.ContentType header value.</param>
+        internal virtual void SetParent(MIME_Entity entity,bool setContentType)
         {
             m_pEntity = entity;
         }
@@ -106,11 +107,11 @@ namespace LumiSoft.Net.MIME
         }
 
         /// <summary>
-        /// Gets MIME entity body content type.
+        /// Gets body media type. For example: 'text/plain'.
         /// </summary>
-        public MIME_h_ContentType ContentType
+        public string MediaType
         {
-            get{ return m_pContentType; }
+            get{ return m_pContentType.TypeWithSubype; }
         }
 
         #endregion

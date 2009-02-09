@@ -352,6 +352,7 @@ namespace LumiSoft.Net.MIME
 
         #endregion
 
+        private MIME_h_ContentType    m_pContentType = null;
         private MIME_EntityCollection m_pBodyParts   = null;
         private string                m_TextPreamble = "";
         private string                m_TextEpilogue = "";
@@ -371,6 +372,8 @@ namespace LumiSoft.Net.MIME
                 throw new ArgumentException("Argument 'contentType' doesn't contain required boundary parameter.");
             }
 
+            m_pContentType = contentType;
+
             m_pBodyParts = new MIME_EntityCollection();
         }
 
@@ -381,18 +384,18 @@ namespace LumiSoft.Net.MIME
         /// Parses body from the specified stream
         /// </summary>
         /// <param name="owner">Owner MIME entity.</param>
-        /// <param name="mediaType">MIME media type. For example: text/plain.</param>
+        /// <param name="defaultContentType">Default content-type for this body.</param>
         /// <param name="stream">Stream from where to read body.</param>
         /// <returns>Returns parsed body.</returns>
-        /// <exception cref="ArgumentNullException">Is raised when <b>stream</b>, <b>mediaType</b> or <b>stream</b> is null reference.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>stream</b>, <b>defaultContentType</b> or <b>stream</b> is null reference.</exception>
         /// <exception cref="ParseException">Is raised when any parsing errors.</exception>
-        protected static new MIME_b Parse(MIME_Entity owner,string mediaType,SmartStream stream)
+        protected static new MIME_b Parse(MIME_Entity owner,MIME_h_ContentType defaultContentType,SmartStream stream)
         {
             if(owner == null){
                 throw new ArgumentNullException("owner");
             }
-            if(mediaType == null){
-                throw new ArgumentNullException("mediaType");
+            if(defaultContentType == null){
+                throw new ArgumentNullException("defaultContentType");
             }
             if(stream == null){
                 throw new ArgumentNullException("stream");
@@ -402,7 +405,7 @@ namespace LumiSoft.Net.MIME
             }
             
             MIME_b_Multipart retVal = new MIME_b_Multipart(owner.ContentType);
-            ParseInternal(owner,mediaType,stream,retVal);
+            ParseInternal(owner,owner.ContentType.TypeWithSubype,stream,retVal);
 
             return retVal;
         }
@@ -453,6 +456,25 @@ namespace LumiSoft.Net.MIME
         #endregion
 
 
+        #region override SetParent
+
+        /// <summary>
+        /// Sets body parent.
+        /// </summary>
+        /// <param name="entity">Owner entity.</param>
+        /// <param name="setContentType">If true sets entity.ContentType header value.</param>
+        internal override void SetParent(MIME_Entity entity,bool setContentType)
+        {
+            base.SetParent(entity,setContentType);
+
+            // Owner entity has no content-type or has different content-type, just add/overwrite it.
+            if(setContentType && (this.Entity.ContentType == null || !string.Equals(this.Entity.ContentType.TypeWithSubype,this.MediaType,StringComparison.InvariantCultureIgnoreCase))){
+                this.Entity.ContentType = m_pContentType;
+            }
+        }
+
+        #endregion
+
         #region method ToStream
 
         /// <summary>
@@ -483,14 +505,14 @@ namespace LumiSoft.Net.MIME
             for(int i=0;i<m_pBodyParts.Count;i++){
                 MIME_Entity bodyPart = m_pBodyParts[i];
                 // Start new body part.
-                byte[] bStart = Encoding.UTF8.GetBytes("--" + this.ContentType.Param_Boundary + "\r\n");
+                byte[] bStart = Encoding.UTF8.GetBytes("--" + this.Entity.ContentType.Param_Boundary + "\r\n");
                 stream.Write(bStart,0,bStart.Length);
                 
                 bodyPart.ToStream(stream,headerWordEncoder,headerParmetersCharset);
 
                 // Last body part, close boundary.
                 if(i == (m_pBodyParts.Count - 1)){
-                    byte[] bEnd = Encoding.UTF8.GetBytes("--" + this.ContentType.Param_Boundary + "--\r\n");
+                    byte[] bEnd = Encoding.UTF8.GetBytes("--" + this.Entity.ContentType.Param_Boundary + "--\r\n");
                     stream.Write(bEnd,0,bEnd.Length);
                 }
             }

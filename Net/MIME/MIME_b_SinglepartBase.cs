@@ -13,24 +13,41 @@ namespace LumiSoft.Net.MIME
     public abstract class MIME_b_SinglepartBase : MIME_b
     {
         private bool       m_IsModified         = false;
-        private string     m_MediaType          = "";
         private FileStream m_pEncodedDataStream = null;
-
+                
         /// <summary>
         /// Default constructor.
         /// </summary>
-        /// <exception cref="ArgumentNullException">Is raised when <b>mediaType</b> is null reference.</exception>
-        public MIME_b_SinglepartBase(string mediaType) : base(new MIME_h_ContentType(mediaType))
+        /// <param name="contentType">Content type.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>contentType</b> is null reference.</exception>
+        public MIME_b_SinglepartBase(MIME_h_ContentType contentType) : base(contentType)
         {
-            if(mediaType == null){
-                throw new ArgumentNullException("mediaType");
+            if(contentType == null){
+                throw new ArgumentNullException("contentType");
             }
-
-            m_MediaType = mediaType;
 
             m_pEncodedDataStream = new FileStream(Path.GetTempFileName(),FileMode.Create,FileAccess.ReadWrite,FileShare.None,32000,FileOptions.DeleteOnClose);
         }
-               
+        
+  
+        #region override SetParent
+
+        /// <summary>
+        /// Sets body parent.
+        /// </summary>
+        /// <param name="entity">Owner entity.</param>
+        /// <param name="setContentType">If true sets entity.ContentType header value.</param>
+        internal override void SetParent(MIME_Entity entity,bool setContentType)
+        {
+            base.SetParent(entity,setContentType);
+
+            // Owner entity has no content-type or has different content-type, just add/overwrite it.
+            if(setContentType && (this.Entity.ContentType == null || !string.Equals(this.Entity.ContentType.TypeWithSubype,this.MediaType,StringComparison.InvariantCultureIgnoreCase))){
+                this.Entity.ContentType = new MIME_h_ContentType(MediaType);
+            }
+        }
+
+        #endregion
 
         #region method ToStream
 
@@ -59,8 +76,13 @@ namespace LumiSoft.Net.MIME
         /// Gets body encoded data stream.
         /// </summary>
         /// <returns>Returns body encoded data stream.</returns>
+        /// <exception cref="InvalidOperationException">Is raised when this method is accessed and this body is not bounded to any entity.</exception>
         public Stream GetEncodedDataStream()
         {
+            if(this.Entity == null){
+                throw new InvalidOperationException("Body must be bounded to some entity first.");
+            }
+
             m_pEncodedDataStream.Position = 0;
 
             return m_pEncodedDataStream;
@@ -77,6 +99,7 @@ namespace LumiSoft.Net.MIME
         /// <param name="stream">Stream data to add.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>contentTransferEncoding</b> or <b>stream</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the argumennts has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when this method is accessed and this body is not bounded to any entity.</exception>
         public void SetEncodedData(string contentTransferEncoding,Stream stream)
         {
             if(contentTransferEncoding == null){
@@ -88,6 +111,15 @@ namespace LumiSoft.Net.MIME
             if(stream == null){
                 throw new ArgumentNullException("stream");
             }
+            if(this.Entity == null){
+                throw new InvalidOperationException("Body must be bounded to some entity first.");
+            }
+
+            // Owner entity has no content-type or has different content-type, just add/overwrite it.
+            if(this.Entity.ContentType == null || !string.Equals(this.Entity.ContentType.TypeWithSubype,this.MediaType,StringComparison.InvariantCultureIgnoreCase)){
+                this.Entity.ContentType = new MIME_h_ContentType(this.MediaType);
+            }
+            this.Entity.ContentTransferEncoding = contentTransferEncoding;
 
             m_pEncodedDataStream.SetLength(0);
             Net_Utils.StreamCopy(stream,m_pEncodedDataStream,32000);
@@ -99,8 +131,7 @@ namespace LumiSoft.Net.MIME
             if(m_pEncodedDataStream.ReadByte() != '\r' && m_pEncodedDataStream.ReadByte() != '\n'){
                 m_pEncodedDataStream.Write(new byte[]{(byte)'\r',(byte)'\n'},0,2);
             }
-            this.Entity.ContentTransferEncoding = contentTransferEncoding;
-
+            
             m_IsModified = true;
         }
 
@@ -112,10 +143,15 @@ namespace LumiSoft.Net.MIME
         /// Gets body decoded data stream.
         /// </summary>
         /// <returns>Returns body decoded data stream.</returns>
+        /// <exception cref="InvalidOperationException">Is raised when this method is accessed and this body is not bounded to any entity.</exception>
         /// <exception cref="NotSupportedException">Is raised when body contains not supported Content-Transfer-Encoding.</exception>
-        /// <remarks>The returned stream should be clossed/disposed as soon as it's not needed any more.</remarks>
+        /// <remarks>The returned stream should be closed/disposed as soon as it's not needed any more.</remarks>
         public Stream GetDataStream()
-        { 
+        {             
+            if(this.Entity == null){
+                throw new InvalidOperationException("Body must be bounded to some entity first.");
+            }
+
             /* RFC 2045 6.1.
                 This is the default value -- that is, "Content-Transfer-Encoding: 7BIT" is assumed if the
                 Content-Transfer-Encoding header field is not present.
@@ -156,6 +192,7 @@ namespace LumiSoft.Net.MIME
         /// <param name="stream">Source stream.</param>
         /// <param name="transferEncoding">Specifies content-transfer-encoding to use to encode data.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>stream</b> or <b>transferEncoding</b> is null reference.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when this method is accessed and this body is not bounded to any entity.</exception>
         public void SetData(Stream stream,string transferEncoding)
         {            
             if(stream == null){
@@ -199,7 +236,7 @@ namespace LumiSoft.Net.MIME
 
         #endregion
 
-        #region method SetBodyDataFromFile
+        #region method SetDataFromFile
 
         /// <summary>
         /// Sets body data from the specified file.
@@ -207,7 +244,8 @@ namespace LumiSoft.Net.MIME
         /// <param name="file">File name with optional path.</param>
         /// <param name="transferEncoding">Specifies content-transfer-encoding to use to encode data.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>file</b> is null reference.</exception>
-        public void SetBodyDataFromFile(string file,string transferEncoding)
+        /// <exception cref="InvalidOperationException">Is raised when this method is accessed and this body is not bounded to any entity.</exception>
+        public void SetDataFromFile(string file,string transferEncoding)
         {
             if(file == null){
                 throw new ArgumentNullException("file");

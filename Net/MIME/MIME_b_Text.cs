@@ -21,7 +21,7 @@ namespace LumiSoft.Net.MIME
         /// <param name="mediaType">MIME media type.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>mediaSubType</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        public MIME_b_Text(string mediaType) : base(mediaType)
+        public MIME_b_Text(string mediaType) : base(new MIME_h_ContentType(mediaType))
         {            
         }
 
@@ -31,24 +31,30 @@ namespace LumiSoft.Net.MIME
         /// Parses body from the specified stream
         /// </summary>
         /// <param name="owner">Owner MIME entity.</param>
-        /// <param name="mediaType">MIME media type. For example: text/plain.</param>
+        /// <param name="defaultContentType">Default content-type for this body.</param>
         /// <param name="stream">Stream from where to read body.</param>
         /// <returns>Returns parsed body.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>stream</b>, <b>mediaType</b> or <b>stream</b> is null reference.</exception>
         /// <exception cref="ParseException">Is raised when any parsing errors.</exception>
-        protected static new MIME_b Parse(MIME_Entity owner,string mediaType,SmartStream stream)
+        protected static new MIME_b Parse(MIME_Entity owner,MIME_h_ContentType defaultContentType,SmartStream stream)
         {
             if(owner == null){
                 throw new ArgumentNullException("owner");
             }
-            if(mediaType == null){
-                throw new ArgumentNullException("mediaType");
+            if(defaultContentType == null){
+                throw new ArgumentNullException("defaultContentType");
             }
             if(stream == null){
                 throw new ArgumentNullException("stream");
             }
 
-            MIME_b_Text retVal = new MIME_b_Text(mediaType);
+            MIME_b_Text retVal = null;
+            if(owner.ContentType != null){
+                retVal = new MIME_b_Text(owner.ContentType.TypeWithSubype);
+            }
+            else{
+                retVal = new MIME_b_Text(defaultContentType.TypeWithSubype);
+            }
 
             Net_Utils.StreamCopy(stream,retVal.EncodedStream,32000);
 
@@ -67,6 +73,7 @@ namespace LumiSoft.Net.MIME
         /// <param name="charset">Charset to use to encode text. If not sure, utf-8 is recommended.</param>
         /// <param name="text">Text.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>transferEncoding</b>, <b>charset</b> or <b>text</b> is null reference.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when this method is accessed and this body is not bounded to any entity.</exception>
         /// <exception cref="NotSupportedException">Is raised when body contains not supported Content-Transfer-Encoding.</exception>
         public void SetText(string transferEncoding,Encoding charset,string text)
         {
@@ -79,9 +86,12 @@ namespace LumiSoft.Net.MIME
             if(text == null){
                 throw new ArgumentNullException("text");
             }
+            if(this.Entity == null){
+                throw new InvalidOperationException("Body must be bounded to some entity first.");
+            }
 
             SetEncodedData(transferEncoding,new MemoryStream(charset.GetBytes(text)));
-            this.ContentType.Param_Charset = charset.WebName;            
+            this.Entity.ContentType.Param_Charset = charset.WebName;            
         }
 
         #endregion
@@ -98,11 +108,11 @@ namespace LumiSoft.Net.MIME
         {
             // RFC 2046 4.1.2. The default character set, US-ASCII.
             
-            if(string.IsNullOrEmpty(this.ContentType.Param_Charset)){
+            if(string.IsNullOrEmpty(this.Entity.ContentType.Param_Charset)){
                 return Encoding.ASCII;
             }
             else{
-                return Encoding.GetEncoding(this.ContentType.Param_Charset);
+                return Encoding.GetEncoding(this.Entity.ContentType.Param_Charset);
             }
         }
 

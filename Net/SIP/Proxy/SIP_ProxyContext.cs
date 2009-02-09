@@ -801,7 +801,7 @@ namespace LumiSoft.Net.SIP.Proxy
         
         private bool                        m_IsDisposed          = false;
         private bool                        m_IsStarted           = false;
-        private SIP_ProxyCore               m_pProxy              = null;
+        private SIP_Proxy                   m_pProxy              = null;
         private SIP_ServerTransaction       m_pServerTransaction  = null;
         private SIP_Request                 m_pRequest            = null;
         private bool                        m_AddRecordRoute      = false;
@@ -831,10 +831,9 @@ namespace LumiSoft.Net.SIP.Proxy
         /// <param name="noRecurse">Specifies what proxy server does when it gets 3xx response. If true proxy will forward
         /// request to new specified address if false, proxy will return 3xx response to caller.</param>
         /// <param name="targets">Possible remote targets. NOTE: These values must be in priority order !</param>
-        /// <param name="credentials">Target set credentials.</param>
         /// <exception cref="ArgumentNullException">Is raised when any of the reference type prameters is null.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        internal SIP_ProxyContext(SIP_ProxyCore proxy,SIP_ServerTransaction transaction,SIP_Request request,bool addRecordRoute,SIP_ForkingMode forkingMode,bool isB2BUA,bool noCancel,bool noRecurse,SIP_ProxyTarget[] targets,NetworkCredential[] credentials)
+        internal SIP_ProxyContext(SIP_Proxy proxy,SIP_ServerTransaction transaction,SIP_Request request,bool addRecordRoute,SIP_ForkingMode forkingMode,bool isB2BUA,bool noCancel,bool noRecurse,SIP_ProxyTarget[] targets)
         {
             if(proxy == null){
                 throw new ArgumentNullException("proxy");
@@ -877,7 +876,6 @@ namespace LumiSoft.Net.SIP.Proxy
             }
 
             m_pCredentials = new List<NetworkCredential>();
-            m_pCredentials.AddRange(credentials);
 
             /*  RFC 3841 9.1.
                 The Request-Disposition header field specifies caller preferences for
@@ -1555,7 +1553,7 @@ namespace LumiSoft.Net.SIP.Proxy
         /// Gets owner SIP proxy server.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
-        public SIP_ProxyCore Proxy
+        public SIP_Proxy Proxy
         {
             get{  
                 if(m_IsDisposed){
@@ -1672,22 +1670,6 @@ namespace LumiSoft.Net.SIP.Proxy
                 return m_pRequest; 
             }
         }
-        /*
-        /// <summary>
-        /// Gets active client transactions that will handle forward request. 
-        /// There may be more than 1 active client transaction if parallel forking.
-        /// </summary>
-        /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this property is accessed.</exception>
-        public SIP_ClientTransaction[] ClientTransactions
-        {
-            get{
-                if(m_IsDisposed){
-                    throw new ObjectDisposedException("SIP_ProxyContext");
-                }
-
-                return m_pClientTransactions.ToArray(); 
-            }
-        } */
        
         /// <summary>
         /// Gets all responses what proxy context has received.
@@ -1697,10 +1679,25 @@ namespace LumiSoft.Net.SIP.Proxy
         {
             get{ 
                 if(m_IsDisposed){
-                    throw new ObjectDisposedException("SIP_ProxyContext");
+                    throw new ObjectDisposedException(this.GetType().Name);
                 }
 
                 return m_pResponses.ToArray(); 
+            }
+        }
+
+        /// <summary>
+        /// Gets credentials collection.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this property is accessed.</exception>
+        public List<NetworkCredential> Credentials
+        {
+            get{
+                if(m_IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return m_pCredentials; 
             }
         }
 

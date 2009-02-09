@@ -219,7 +219,7 @@ namespace LumiSoft.Net.MIME
                             value = v;
                         }
                     }
-                    
+               
                     // RFC 2231 encoded/splitted parameter.
                     if(name.IndexOf('*') > -1){
                         string[] name_x_no_x = name.Split('*');
@@ -272,13 +272,13 @@ namespace LumiSoft.Net.MIME
                                 }
                             }
                         }
-                                               
+                                                 
                         this[name] = valueBuffer.ToString();
                     }
                     // Regular parameter.
                     else{
                         this[name] = value;
-                    }                    
+                    }
                 }
             }
 
@@ -333,7 +333,7 @@ namespace LumiSoft.Net.MIME
 		/// <returns></returns>
 		public IEnumerator GetEnumerator()
 		{
-			return m_pParameters.GetEnumerator();
+			return m_pParameters.Values.GetEnumerator();
 		}
 
 		#endregion

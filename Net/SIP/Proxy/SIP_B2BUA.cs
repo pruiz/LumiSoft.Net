@@ -13,7 +13,7 @@ namespace LumiSoft.Net.SIP.Proxy
     /// </summary>
     public class SIP_B2BUA : IDisposable
     {
-        private SIP_ProxyCore        m_pProxy     = null;
+        private SIP_Proxy            m_pProxy     = null;
         private List<SIP_B2BUA_Call> m_pCalls     = null;
         private bool                 m_IsDisposed = false;
 
@@ -21,7 +21,7 @@ namespace LumiSoft.Net.SIP.Proxy
         /// Default constructor.
         /// </summary>
         /// <param name="owner">Onwer SIP proxy.</param>
-        internal SIP_B2BUA(SIP_ProxyCore owner)
+        internal SIP_B2BUA(SIP_Proxy owner)
         {
             m_pProxy = owner; 
             m_pCalls = new List<SIP_B2BUA_Call>();
@@ -172,7 +172,7 @@ namespace LumiSoft.Net.SIP.Proxy
                 }
 
                 // Forward request.
-                m_pProxy.ForwardRequest(true,e,b2buaRequest,false);
+                //m_pProxy.ForwardRequest(true,e,b2buaRequest,false);
             }
         }
                 

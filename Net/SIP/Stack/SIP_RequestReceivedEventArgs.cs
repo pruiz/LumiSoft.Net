@@ -47,7 +47,15 @@ namespace LumiSoft.Net.SIP.Stack
         #region Properties Implementation
 
         /// <summary>
-        /// Gets request received by SIP stack.
+        /// Gets data flow what received SIP request.
+        /// </summary>
+        public SIP_Flow Flow
+        {
+            get{ return m_pFlow; }
+        }
+
+        /// <summary>
+        /// Gets the received rquest.
         /// </summary>
         public SIP_Request Request
         {

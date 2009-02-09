@@ -27,7 +27,7 @@ namespace LumiSoft.Net.SIP.Proxy
     public class SIP_Registrar
     {
         private bool                       m_IsDisposed     = false;
-        private SIP_ProxyCore              m_pProxy         = null;
+        private SIP_Proxy                  m_pProxy         = null;
         private SIP_Stack                  m_pStack         = null;
         private SIP_RegistrationCollection m_pRegistrations = null;
         private Timer                      m_pTimer         = null;
@@ -37,7 +37,7 @@ namespace LumiSoft.Net.SIP.Proxy
         /// </summary>
         /// <param name="proxy">Owner proxy.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>proxy</b> is null reference.</exception>
-        internal SIP_Registrar(SIP_ProxyCore proxy)
+        internal SIP_Registrar(SIP_Proxy proxy)
         {
             if(proxy == null){
                 throw new ArgumentNullException("proxy");
@@ -426,7 +426,7 @@ namespace LumiSoft.Net.SIP.Proxy
         /// <summary>
         /// Gets owner proxy core.
         /// </summary>
-        public SIP_ProxyCore Proxy
+        public SIP_Proxy Proxy
         {
             get{ return m_pProxy; }
         }

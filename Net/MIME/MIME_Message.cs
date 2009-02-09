@@ -84,7 +84,7 @@ namespace LumiSoft.Net.MIME
             MIME_Entity retVal = new MIME_Entity();
             MIME_b_Application body = new MIME_b_Application(MIME_MediaTypes.Application.octet_stream);
             retVal.Body = body;
-            body.SetBodyDataFromFile(file,MIME_TransferEncodings.Base64);
+            body.SetDataFromFile(file,MIME_TransferEncodings.Base64);
             retVal.ContentType.Param_Name = Path.GetFileName(file);
 
             FileInfo fileInfo = new FileInfo(file);
@@ -96,6 +96,39 @@ namespace LumiSoft.Net.MIME
             disposition.Param_ReadDate         = fileInfo.LastAccessTime;
             retVal.ContentDisposition = disposition;
             
+            return retVal;
+        }
+
+        /// <summary>
+        /// Creates attachment entity.
+        /// </summary>
+        /// <param name="stream">Attachment data stream.</param>
+        /// <param name="fileName">File name.</param>
+        /// <returns>Returns created attachment entity.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>stream</b> or <b>fileName</b> is null reference.</exception>
+        public static MIME_Entity CreateAttachment(Stream stream,string fileName)
+        {
+            if(stream == null){
+                throw new ArgumentNullException("stream");
+            }
+            if(fileName == null){
+                throw new ArgumentNullException("fileName");
+            }
+
+            MIME_Entity retVal = new MIME_Entity();
+            MIME_b_Application body = new MIME_b_Application(MIME_MediaTypes.Application.octet_stream);
+            retVal.Body = body;
+            body.SetData(stream,MIME_TransferEncodings.Base64);
+            retVal.ContentType.Param_Name = Path.GetFileName(fileName);
+
+            MIME_h_ContentDisposition disposition = new MIME_h_ContentDisposition(MIME_DispositionTypes.Attachment);
+            disposition.Param_FileName         = Path.GetFileName(fileName);
+            disposition.Param_Size             = stream.CanSeek ? (stream.Length - stream.Position) : -1;
+            //disposition.Param_CreationDate     = fileInfo.CreationTime;
+            //disposition.Param_ModificationDate = fileInfo.LastWriteTime;
+            //disposition.Param_ReadDate         = fileInfo.LastAccessTime;
+            retVal.ContentDisposition = disposition;
+
             return retVal;
         }
 
