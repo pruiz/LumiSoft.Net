@@ -109,6 +109,29 @@ namespace LumiSoft.Net.Mail
 
         #endregion
 
+        #region override method ToString
+
+        /// <summary>
+        /// Returns address-list as string.
+        /// </summary>
+        /// <returns>Returns address-list as string.</returns>
+        public override string ToString()
+        {
+            StringBuilder retVal = new StringBuilder();
+            for(int i=0;i<m_pList.Count;i++){
+                if(i == (m_pList.Count - 1)){
+                    retVal.Append(m_pList[i].ToString());
+                }
+                else{
+                    retVal.Append(m_pList[i].ToString() + ",");
+                }
+            }
+
+            return retVal.ToString();
+        }
+
+        #endregion
+
 
         #region method AcceptChanges
 

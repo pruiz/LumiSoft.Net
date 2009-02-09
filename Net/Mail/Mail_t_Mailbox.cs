@@ -62,7 +62,7 @@ namespace LumiSoft.Net.Mail
                 return "<" + m_Address + ">";
             }
             else{
-                if(MIME_Encoding_EncodedWord.MustEncode(m_DisplayName)){
+                if(wordEncoder != null && MIME_Encoding_EncodedWord.MustEncode(m_DisplayName)){
                     return wordEncoder.Encode(m_DisplayName) + " " + "<" + m_Address + ">";
                 }
                 else{
