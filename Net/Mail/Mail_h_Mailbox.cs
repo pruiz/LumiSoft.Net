@@ -65,7 +65,7 @@ namespace LumiSoft.Net.Mail
                 throw new ParseException("Invalid header field value '" + value + "'.");
             }
 
-            MIME_Reader r = new MIME_Reader(name_value[1]);
+            MIME_Reader r = new MIME_Reader(name_value[1].Trim());
 
             string word = r.QuotedReadToDelimiter(new char[]{',','<',':'});
             // Invalid value.

@@ -12,12 +12,12 @@ namespace LumiSoft.Net.SMTP.Server
     /// </summary>
     public class SMTP_Server : TCP_Server<SMTP_Session>
     {
-        private List<string>  m_pServiceExtentions = null;
-        private string        m_GreetingText       = "";
-        private int           m_MaxBadCommands     = 30;
-        private int           m_MaxTransactions    = 10;
-        private int           m_MaxMessageSize     = 10000000;
-        private int           m_MaxRecipients      = 100;
+        private List<string> m_pServiceExtentions = null;
+        private string       m_GreetingText       = "";
+        private int          m_MaxBadCommands     = 30;
+        private int          m_MaxTransactions    = 10;
+        private int          m_MaxMessageSize     = 10000000;
+        private int          m_MaxRecipients      = 100;
 
         /// <summary>
         /// Default constructor.

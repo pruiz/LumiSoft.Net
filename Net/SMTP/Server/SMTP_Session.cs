@@ -728,11 +728,11 @@ namespace LumiSoft.Net.SMTP.Server
                 return;
             }
 
-            string address = "";
-            int    size    = -1;
-            string body    = null;
-            string ret     = null;
-            string envID   = null;
+            string       address = "";
+            int          size    = -1;
+            string       body    = null;
+            SMTP_DSN_Ret ret     = SMTP_DSN_Ret.NotSpecified;
+            string       envID   = null;
 
             // Mailbox not between <>.
             if(!cmdText.StartsWith("<") || cmdText.IndexOf('>') == -1){
@@ -794,11 +794,16 @@ namespace LumiSoft.Net.SMTP.Server
                         WriteLine("501 Syntax error: RET parameter value must be specified.");
                         return;
                     }
-                    if(name_value[1].ToUpper() != "FULL" && name_value[1].ToUpper() != "HDRS"){
+                    else if(name_value[1].ToUpper() != "FULL"){
+                        ret = SMTP_DSN_Ret.FullMessage;
+                    }
+                    else if(name_value[1].ToUpper() != "HDRS"){
+                        ret = SMTP_DSN_Ret.Headers;
+                    }
+                    else{
                         WriteLine("501 Syntax error: RET parameter value must be \"FULL\" or \"HDRS\".");
                         return;
                     }
-                    ret = name_value[1].ToUpper();
                 }
                 // ENVID
                 else if(this.Server.Extentions.Contains(SMTP_ServiceExtensions.DSN) && name_value[0].ToUpper() == "ENVID"){
@@ -897,9 +902,9 @@ namespace LumiSoft.Net.SMTP.Server
                 return;
             }
 
-            string      address = "";
-            SMTP_Notify notify  = SMTP_Notify.NotSpecified;
-            string      orcpt   = null;
+            string          address = "";
+            SMTP_DSN_Notify notify  = SMTP_DSN_Notify.NotSpecified;
+            string          orcpt   = null;
 
             // Mailbox not between <>.
             if(!cmdText.StartsWith("<") || cmdText.IndexOf('>') == -1){
@@ -938,16 +943,16 @@ namespace LumiSoft.Net.SMTP.Server
                     string[] notifyItems = name_value[1].ToUpper().Split(',');
                     foreach(string notifyItem in notifyItems){
                         if(notifyItem.Trim().ToUpper() == "NEVER"){
-                            notify |= SMTP_Notify.Never;
+                            notify |= SMTP_DSN_Notify.Never;
                         }
                         else if(notifyItem.Trim().ToUpper() == "SUCCESS"){
-                            notify |= SMTP_Notify.Success;
+                            notify |= SMTP_DSN_Notify.Success;
                         }
                         else if(notifyItem.Trim().ToUpper() == "FAILURE"){
-                            notify |= SMTP_Notify.Failure;
+                            notify |= SMTP_DSN_Notify.Failure;
                         }
                         else if(notifyItem.Trim().ToUpper() == "DELAY"){
-                            notify |= SMTP_Notify.Delay;
+                            notify |= SMTP_DSN_Notify.Delay;
                         }
                         // Invalid or not supported notify item.
                         else{

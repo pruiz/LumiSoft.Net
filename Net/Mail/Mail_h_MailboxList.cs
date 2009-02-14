@@ -78,7 +78,7 @@ namespace LumiSoft.Net.Mail
                 mailbox-list  =   (mailbox *("," mailbox)) / obs-mbox-list
             */
 
-            MIME_Reader r = new MIME_Reader(name_value[1]);
+            MIME_Reader r = new MIME_Reader(name_value[1].Trim());
 
             Mail_h_MailboxList retVal = new Mail_h_MailboxList(name_value[0],new Mail_t_MailboxList());
 

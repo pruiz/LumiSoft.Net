@@ -67,7 +67,7 @@ namespace LumiSoft.Net.Mail
                 throw new ParseException("Invalid header field value '" + value + "'.");
             }
 
-            MIME_Reader r = new MIME_Reader(name_value[1]);
+            MIME_Reader r = new MIME_Reader(name_value[1].Trim());
 
             /* RFC 5322 3.4.
                 address         =   mailbox / group

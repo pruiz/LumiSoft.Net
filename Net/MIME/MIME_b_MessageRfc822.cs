@@ -90,9 +90,27 @@ namespace LumiSoft.Net.MIME
         /// <summary>
         /// Gets embbed mail message.
         /// </summary>
+        /// <exception cref="ArgumentNullException">Is raised when null reference passed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when this method is accessed and this body is not bounded to any entity.</exception>
         public Mail_Message Message
         {
             get{ return m_pMessage; }
+
+            set{
+                if(value == null){
+                    throw new ArgumentNullException("value");
+                }
+                if(this.Entity == null){
+                    throw new InvalidOperationException("Body must be bounded to some entity first.");
+                }
+
+                // Owner entity has no content-type or has different content-type, just add/overwrite it.
+                if(this.Entity.ContentType == null || !string.Equals(this.Entity.ContentType.TypeWithSubype,this.MediaType,StringComparison.InvariantCultureIgnoreCase)){
+                    this.Entity.ContentType = new MIME_h_ContentType(this.MediaType);
+                }
+
+                m_pMessage = value;
+            }
         }
 
         #endregion

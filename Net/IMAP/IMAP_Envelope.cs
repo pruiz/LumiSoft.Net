@@ -106,17 +106,23 @@ namespace LumiSoft.Net.IMAP
 			// NOTE: all header fields and parameters must in ENCODED form !!!
 
             MIME_Encoding_EncodedWord wordEncoder = new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8);
+            wordEncoder.Split = false;
 
 			StringBuilder retVal = new StringBuilder();
 			retVal.Append("(");
 
 			// date
-			if(entity.Header.Contains("Date:")){
-				retVal.Append(TextUtils.QuoteString(MIME_Utils.DateTimeToRfc2822(entity.Date)));
-			}
-			else{
-				retVal.Append("NIL");
-			}
+            try{
+			    if(entity.Date != DateTime.MinValue){
+				    retVal.Append(TextUtils.QuoteString(MIME_Utils.DateTimeToRfc2822(entity.Date)));
+		    	}
+			    else{
+				    retVal.Append("NIL");
+			    }
+            }
+            catch{
+                retVal.Append("NIL");
+            }
 
 			// subject
 			if(entity.Subject != null){
@@ -143,9 +149,6 @@ namespace LumiSoft.Net.IMAP
 
 				retVal.Append(")");
 			}
-			else if(entity.From != null){
-				retVal.Append(" " + ConstructAddresses(entity.From.ToArray(),wordEncoder));
-			}
 			else{
 				retVal.Append(" NIL");
 			}
@@ -153,9 +156,6 @@ namespace LumiSoft.Net.IMAP
 			// reply-to
 			if(entity.ReplyTo != null){
 				retVal.Append(" " + ConstructAddresses(entity.ReplyTo.Mailboxes,wordEncoder));
-			}
-			else if(entity.From != null){
-				retVal.Append(" " + ConstructAddresses(entity.From.ToArray(),wordEncoder));
 			}
 			else{
 				retVal.Append(" NIL");
@@ -466,7 +466,7 @@ namespace LumiSoft.Net.IMAP
 			StringBuilder retVal = new StringBuilder();
 			retVal.Append("(");
 
-			foreach(Mail_t_Mailbox address in mailboxes){
+			foreach(Mail_t_Mailbox address in mailboxes){                
 				retVal.Append(ConstructAddress(address,wordEncoder));
 			}
 

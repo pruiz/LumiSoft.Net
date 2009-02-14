@@ -245,7 +245,7 @@ namespace LumiSoft.Net.MIME
 
                 MIME_h h = m_pHeader.GetFirst("MIME-Version");
                 if(h != null){
-                    return h.ToString();
+                    return ((MIME_h_Unstructured)h).Value;
                 }
                 else{
                     return null;
@@ -287,7 +287,7 @@ namespace LumiSoft.Net.MIME
 
                 MIME_h h = m_pHeader.GetFirst("Content-ID");
                 if(h != null){
-                    return h.ToString();
+                    return ((MIME_h_Unstructured)h).Value;
                 }
                 else{
                     return null;
@@ -329,7 +329,7 @@ namespace LumiSoft.Net.MIME
 
                 MIME_h h = m_pHeader.GetFirst("Content-Description");
                 if(h != null){
-                    return h.ToString();
+                    return ((MIME_h_Unstructured)h).Value;
                 }
                 else{
                     return null;
@@ -370,9 +370,9 @@ namespace LumiSoft.Net.MIME
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                MIME_h_Unstructured h = (MIME_h_Unstructured)m_pHeader.GetFirst("Content-Transfer-Encoding");
+                MIME_h h = m_pHeader.GetFirst("Content-Description");
                 if(h != null){
-                    return h.Value;
+                    return ((MIME_h_Unstructured)h).Value;
                 }
                 else{
                     return null;
@@ -457,9 +457,9 @@ namespace LumiSoft.Net.MIME
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                MIME_h h = m_pHeader.GetFirst("Content-Base");
+                MIME_h h = m_pHeader.GetFirst("Content-Description");
                 if(h != null){
-                    return h.ToString();
+                    return ((MIME_h_Unstructured)h).Value;
                 }
                 else{
                     return null;
@@ -500,9 +500,9 @@ namespace LumiSoft.Net.MIME
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                MIME_h h = m_pHeader.GetFirst("Content-Location");
+                MIME_h h = m_pHeader.GetFirst("Content-Description");
                 if(h != null){
-                    return h.ToString();
+                    return ((MIME_h_Unstructured)h).Value;
                 }
                 else{
                     return null;
@@ -543,9 +543,9 @@ namespace LumiSoft.Net.MIME
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                MIME_h h = m_pHeader.GetFirst("Content-features");
+                MIME_h h = m_pHeader.GetFirst("Content-Description");
                 if(h != null){
-                    return h.ToString();
+                    return ((MIME_h_Unstructured)h).Value;
                 }
                 else{
                     return null;
@@ -633,9 +633,9 @@ namespace LumiSoft.Net.MIME
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                MIME_h h = m_pHeader.GetFirst("Content-Language");
+                MIME_h h = m_pHeader.GetFirst("Content-Description");
                 if(h != null){
-                    return h.ToString();
+                    return ((MIME_h_Unstructured)h).Value;
                 }
                 else{
                     return null;
@@ -675,9 +675,9 @@ namespace LumiSoft.Net.MIME
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                MIME_h h = m_pHeader.GetFirst("Content-Alternative");
+                MIME_h h = m_pHeader.GetFirst("Content-Description");
                 if(h != null){
-                    return h.ToString();
+                    return ((MIME_h_Unstructured)h).Value;
                 }
                 else{
                     return null;
@@ -717,9 +717,9 @@ namespace LumiSoft.Net.MIME
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                MIME_h h = m_pHeader.GetFirst("Content-MD5");
+                MIME_h h = m_pHeader.GetFirst("Content-Description");
                 if(h != null){
-                    return h.ToString();
+                    return ((MIME_h_Unstructured)h).Value;
                 }
                 else{
                     return null;
@@ -759,9 +759,9 @@ namespace LumiSoft.Net.MIME
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                MIME_h h = m_pHeader.GetFirst("Content-Duration");
+                MIME_h h = m_pHeader.GetFirst("Content-Description");
                 if(h != null){
-                    return h.ToString();
+                    return ((MIME_h_Unstructured)h).Value;
                 }
                 else{
                     return null;

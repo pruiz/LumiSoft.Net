@@ -9,9 +9,9 @@ namespace LumiSoft.Net.SMTP.Server
     /// </summary>
     public class SMTP_RcptTo
     {
-        private string      m_Mailbox = "";
-        private SMTP_Notify m_Notify  = SMTP_Notify.NotSpecified;
-        private string      m_ORCPT   = "";
+        private string          m_Mailbox = "";
+        private SMTP_DSN_Notify m_Notify  = SMTP_DSN_Notify.NotSpecified;
+        private string          m_ORCPT   = "";
 
         /// <summary>
         /// Default constructor.
@@ -20,7 +20,7 @@ namespace LumiSoft.Net.SMTP.Server
         /// <param name="notify">DSN NOTIFY parameter value.</param>
         /// <param name="orcpt">DSN ORCPT parameter value.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>mailbox</b> is null reference.</exception>
-        public SMTP_RcptTo(string mailbox,SMTP_Notify notify,string orcpt)
+        public SMTP_RcptTo(string mailbox,SMTP_DSN_Notify notify,string orcpt)
         {
             if(mailbox == null){
                 throw new ArgumentNullException("mailbox");
@@ -47,7 +47,7 @@ namespace LumiSoft.Net.SMTP.Server
         /// This value specified when SMTP server should send delivery status notification.
         /// Defined in RFC 1891.
         /// </summary>
-        public SMTP_Notify Notify
+        public SMTP_DSN_Notify Notify
         {
             get{ return m_Notify; }
         }

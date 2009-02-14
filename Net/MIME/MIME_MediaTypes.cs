@@ -191,6 +191,11 @@ namespace LumiSoft.Net.MIME
             /// "message/disposition-notification". 
             /// </summary>
             public static readonly string disposition_notification = "message/disposition-notification";
+
+            /// <summary>
+            /// "message/delivery-status". Defined in RFC 3464.
+            /// </summary>
+            public static readonly string delivery_status = "message/delivery-status";
         }
 
         #endregion        

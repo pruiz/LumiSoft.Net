@@ -26,6 +26,7 @@ namespace LumiSoft.Net.SMTP.Relay
         /// </summary>
         private class Relay_Target
         {
+            private string     m_HostName = "";
             private IPEndPoint m_pTarget  = null;
             private SslMode    m_SslMode  = SslMode.None;
             private string     m_UserName = null;
@@ -34,21 +35,25 @@ namespace LumiSoft.Net.SMTP.Relay
             /// <summary>
             /// Default constructor.
             /// </summary>
+            /// <param name="hostName">Target host name.</param>
             /// <param name="target">Target host IP end point.</param>
-            public Relay_Target(IPEndPoint target)
+            public Relay_Target(string hostName,IPEndPoint target)
             {
-                m_pTarget = target;
+                m_HostName = hostName;
+                m_pTarget  = target;
             }
 
             /// <summary>
             /// Default constructor.
             /// </summary>
+            /// <param name="hostName">Target host name.</param>
             /// <param name="target">Target host IP end point.</param>
             /// <param name="sslMode">SSL mode.</param>
             /// <param name="userName">Target host user name.</param>
             /// <param name="password">Target host password.</param>
-            public Relay_Target(IPEndPoint target,SslMode sslMode,string userName,string password)
+            public Relay_Target(string hostName,IPEndPoint target,SslMode sslMode,string userName,string password)
             {
+                m_HostName = hostName;
                 m_pTarget  = target;
                 m_SslMode  = sslMode;
                 m_UserName = userName;
@@ -57,6 +62,14 @@ namespace LumiSoft.Net.SMTP.Relay
 
 
             #region Properties Implementation
+
+            /// <summary>
+            /// Gets target host name.
+            /// </summary>
+            public string HostName
+            {
+                get{ return m_HostName; }
+            }
 
             /// <summary>
             /// Gets specified target IP end point.
@@ -250,7 +263,7 @@ namespace LumiSoft.Net.SMTP.Relay
                     foreach(string host in SMTP_Client.GetDomainHosts(m_pRelayItem.To)){
                         try{
                             foreach(IPAddress ip in Dns_Client.Resolve(host)){
-                                m_pTargets.Add(new Relay_Target(new IPEndPoint(ip,25)));                                
+                                m_pTargets.Add(new Relay_Target(host,new IPEndPoint(ip,25)));                                
                             }
                         }
                         catch{
@@ -263,7 +276,7 @@ namespace LumiSoft.Net.SMTP.Relay
                 else if(m_RelayMode == Relay_Mode.SmartHost){
                     foreach(Relay_SmartHost smartHost in m_pSmartHosts){
                         try{
-                            m_pTargets.Add(new Relay_Target(new IPEndPoint(Dns_Client.Resolve(smartHost.Host)[0],smartHost.Port),smartHost.SslMode,smartHost.UserName,smartHost.Password));                            
+                            m_pTargets.Add(new Relay_Target(smartHost.Host,new IPEndPoint(Dns_Client.Resolve(smartHost.Host)[0],smartHost.Port),smartHost.SslMode,smartHost.UserName,smartHost.Password));                            
                         }
                         catch{
                             // Failed to resolve smart host name.
@@ -623,6 +636,21 @@ namespace LumiSoft.Net.SMTP.Relay
         }
 
         /// <summary>
+        /// Gets local host name for LoaclEP.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        public string LocalHostName
+        {
+            get{ 
+                if(m_IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return m_pLocalBindInfo.HostName; 
+            }
+        }
+
+        /// <summary>
         /// Gets time when relay session created.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
@@ -709,6 +737,25 @@ namespace LumiSoft.Net.SMTP.Relay
                 }
 
                 return m_pRelayItem.MessageStream; 
+            }
+        }
+
+        /// <summary>
+        /// Gets current remote host name. Returns null if not connected to any target.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        public string RemoteHostName
+        {
+            get{
+                if(m_IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                if(m_pActiveTarget != null){
+                    return m_pActiveTarget.HostName;
+                }
+
+                return null;
             }
         }
 

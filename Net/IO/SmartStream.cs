@@ -15,6 +15,8 @@ namespace LumiSoft.Net.IO
     { 
         private delegate void BufferCallback(Exception x);
 
+        //--- Obsolete ----------------------
+
         #region class ReadLineAsyncOperation
 
         /// <summary>
@@ -911,6 +913,8 @@ namespace LumiSoft.Net.IO
 
         #endregion
 
+        //-----------------------------------
+
 
         #region class ReadLineAsyncOP
 
@@ -1063,7 +1067,9 @@ namespace LumiSoft.Net.IO
                         
                         // Line buffer full.
                         if(m_BytesInBuffer >= m_pBuffer.Length){
-                            m_pException = new LineSizeExceededException();
+                            if(m_pException == null){
+                                m_pException = new LineSizeExceededException();
+                            }
 
                             if(m_ExceededAction == SizeExceededAction.ThrowException){                                
                                 return true;
@@ -1076,7 +1082,8 @@ namespace LumiSoft.Net.IO
 
                         // We have LF line.
                         if(b == '\n'){
-                            if(!m_CRLFLinesOnly || m_CRLFLinesOnly && m_LastByte == '\r'){                                
+                            if(!m_CRLFLinesOnly || m_CRLFLinesOnly && m_LastByte == '\r'){
+                                m_IsCompleted = true;
                                 return true;
                             }                   
                         }
@@ -1089,6 +1096,24 @@ namespace LumiSoft.Net.IO
                 }
 
                 return true;
+            }
+
+            #endregion
+
+
+            #region method SetInfo
+
+            /// <summary>
+            /// Sets specified field values.
+            /// </summary>
+            /// <param name="bytesInBuffer">Number of bytes in buffer.</param>
+            /// <param name="exception">Exception.</param>
+            internal void SetInfo(int bytesInBuffer,Exception exception)
+            {
+                m_IsCompleted     = true;
+                m_IsCompletedSync = true;
+                m_BytesInBuffer   = bytesInBuffer;
+                m_pException      = exception;
             }
 
             #endregion
@@ -1132,6 +1157,14 @@ namespace LumiSoft.Net.IO
 
                     return m_IsCompletedSync; 
                 }
+            }
+
+            /// <summary>
+            /// Gets line size exceeded action.
+            /// </summary>
+            public SizeExceededAction SizeExceededAction
+            {
+                get{ return m_ExceededAction; }
             }
 
             /// <summary>
@@ -2002,7 +2035,7 @@ namespace LumiSoft.Net.IO
         }
 
         #endregion
-
+                
         #region method ReadLine
 
         /// <summary>
@@ -2018,26 +2051,75 @@ namespace LumiSoft.Net.IO
                 throw new ArgumentNullException("op");
             }
 
-            if(!op.Start(async,this)){
-                /* REMOVE ME:
-                if(!async){
-                    // Wait while async operation completes.
-                    while(!op.IsCompleted){
-                        Thread.Sleep(1);
-                    }
+            #region async
 
-                    return true;
-                }
-                else{
-                    return false;
-                }*/
-
-                return false;
+            if(async){
+                return op.Start(async,this);
             }
-            // Completed synchronously.
+
+            #endregion
+
+            #region sync
+
             else{
+                byte[]             buffer         = op.Buffer;
+                int                bytesInBuffer  = 0;
+                int                lastByte       = -1;
+                bool               CRLFLinesOnly  = true;
+                int                lineBuffSize   = buffer.Length;
+                SizeExceededAction exceededAction = op.SizeExceededAction;
+                Exception          exception      = null;
+
+                try{
+                    while(true){                        
+                        // Read buffer empty, buff next data block.
+                        if(m_ReadBufferOffset >= m_ReadBufferCount){                        
+                            this.BufferRead(false,null);
+                        
+                            // We reached end of stream, no more data.
+                            if(m_ReadBufferCount == 0){                                    
+                                break;
+                            }                        
+                        }
+
+                        byte b = m_pReadBuffer[m_ReadBufferOffset++];
+                        
+                        // Line buffer full.
+                        if(bytesInBuffer >= lineBuffSize){
+                            if(exception == null){
+                                exception = new LineSizeExceededException();
+                            }
+
+                            if(exceededAction == SizeExceededAction.ThrowException){                                
+                                return true;
+                            }
+                        }
+                        // Store byte.
+                        else{
+                            buffer[bytesInBuffer++] = b;
+                        }
+
+                        // We have LF line.
+                        if(b == '\n'){
+                            if(!CRLFLinesOnly || CRLFLinesOnly && lastByte == '\r'){
+                                break;
+                            }
+                        }
+
+                        lastByte = b;
+                    }
+                }
+                catch(Exception x){
+                    exception = x;
+                }
+
+                // Set read line operation result data.
+                op.SetInfo(bytesInBuffer,exception);
+
                 return true;
             }
+
+            #endregion
         }
 
         #endregion
@@ -2773,74 +2855,61 @@ namespace LumiSoft.Net.IO
 
             m_ReadBufferOffset =  0;
             m_ReadBufferCount  =  0;
-            
-            m_pReadBufferOP.ReleaseEvents();
-            m_pReadBufferOP.Completed += new EventHandler<EventArgs<BufferReadAsyncOP>>(delegate(object s,EventArgs<BufferReadAsyncOP> e){            
-                if(e.Value.Error != null){
-                    if(asyncCallback != null){
-                        asyncCallback(e.Value.Error);
-                    }
-                }
-                else{
-                    m_ReadBufferOffset =  0;
-                    m_ReadBufferCount  =  e.Value.BytesInBuffer;
-                    m_BytesReaded      += e.Value.BytesInBuffer;
-                    m_LastActivity     =  DateTime.Now; 
 
-                    if(asyncCallback != null){
-                        asyncCallback(null);
-                    }
-                }
-            });
+            #region async
 
             if(async){
-                Console.WriteLine(new System.Diagnostics.StackTrace().ToString());
-            }
+                m_pReadBufferOP.ReleaseEvents();
+                m_pReadBufferOP.Completed += new EventHandler<EventArgs<BufferReadAsyncOP>>(delegate(object s,EventArgs<BufferReadAsyncOP> e){            
+                    if(e.Value.Error != null){
+                        if(asyncCallback != null){
+                            asyncCallback(e.Value.Error);
+                        }
+                    }
+                    else{
+                        m_ReadBufferOffset =  0;
+                        m_ReadBufferCount  =  e.Value.BytesInBuffer;
+                        m_BytesReaded      += e.Value.BytesInBuffer;
+                        m_LastActivity     =  DateTime.Now; 
 
-            if(!m_pReadBufferOP.Start(async,m_pReadBuffer,m_pReadBuffer.Length)){
-                return true;
-            }
-            else{
-                if(m_pReadBufferOP.Error != null){
-                    throw m_pReadBufferOP.Error;
+                        if(asyncCallback != null){
+                            asyncCallback(null);
+                        }
+                    }
+                });
+                        
+                if(!m_pReadBufferOP.Start(async,m_pReadBuffer,m_pReadBuffer.Length)){
+                    return true;
                 }
                 else{
-                    m_ReadBufferOffset =  0;
-                    m_ReadBufferCount  =  m_pReadBufferOP.BytesInBuffer;
-                    m_BytesReaded      += m_pReadBufferOP.BytesInBuffer;
-                    m_LastActivity     =  DateTime.Now; 
-                }
-
-                return false;
-            }
-
-            /* REMOVE ME:
-            if(!m_pReadBufferOP.Start(m_pReadBuffer,m_pReadBuffer.Length)){
-                if(async == false){
-                    // Wait while async operation completes.
-                    while(!m_pReadBufferOP.IsCompleted){
-                        Thread.Sleep(1);
+                    if(m_pReadBufferOP.Error != null){
+                        throw m_pReadBufferOP.Error;
+                    }
+                    else{
+                        m_ReadBufferOffset =  0;
+                        m_ReadBufferCount  =  m_pReadBufferOP.BytesInBuffer;
+                        m_BytesReaded      += m_pReadBufferOP.BytesInBuffer;
+                        m_LastActivity     =  DateTime.Now; 
                     }
 
                     return false;
                 }
-                else{
-                    return true;
-                }
             }
+
+            #endregion
+
+            #region sync
+
             else{
-                if(m_pReadBufferOP.Error != null){
-                    throw m_pReadBufferOP.Error;
-                }
-                else{
-                    m_ReadBufferOffset =  0;
-                    m_ReadBufferCount  =  m_pReadBufferOP.BytesInBuffer;
-                    m_BytesReaded      += m_pReadBufferOP.BytesInBuffer;
-                    m_LastActivity     =  DateTime.Now; 
-                }
+                int countReaded = m_pStream.Read(m_pReadBuffer,0,m_pReadBuffer.Length);
+                m_ReadBufferCount  =  countReaded;
+                m_BytesReaded      += countReaded;
+                m_LastActivity     =  DateTime.Now;
 
                 return false;
-            } */
+            }
+
+            #endregion                        
         }
 
         #endregion

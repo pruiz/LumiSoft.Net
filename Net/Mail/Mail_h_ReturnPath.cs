@@ -54,7 +54,7 @@ namespace LumiSoft.Net.Mail
 
             Mail_h_ReturnPath retVal = new Mail_h_ReturnPath(null);
 
-            MIME_Reader r = new MIME_Reader(name_value[1]);
+            MIME_Reader r = new MIME_Reader(name_value[1].Trim());
             r.ToFirstChar();
             // Return-Path missing <>, some server won't be honor RFC.
             if(!r.StartsWith("<")){

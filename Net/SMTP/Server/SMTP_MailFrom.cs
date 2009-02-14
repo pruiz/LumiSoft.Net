@@ -9,11 +9,11 @@ namespace LumiSoft.Net.SMTP.Server
     /// </summary>
     public class SMTP_MailFrom
     {
-        private string m_Mailbox = "";
-        private int    m_Size    = -1;
-        private string m_Body    = null;
-        private string m_RET     = null;
-        private string m_ENVID   = null;
+        private string       m_Mailbox = "";
+        private int          m_Size    = -1;
+        private string       m_Body    = null;
+        private SMTP_DSN_Ret m_RET     = SMTP_DSN_Ret.NotSpecified;
+        private string       m_ENVID   = null;
 
         /// <summary>
         /// Default constructor.
@@ -24,7 +24,7 @@ namespace LumiSoft.Net.SMTP.Server
         /// <param name="ret">DSN RET parameter value.</param>
         /// <param name="envid">DSN ENVID parameter value.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>mailbox</b> is null reference.</exception>
-        public SMTP_MailFrom(string mailbox,int size,string body,string ret,string envid)
+        public SMTP_MailFrom(string mailbox,int size,string body,SMTP_DSN_Ret ret,string envid)
         {
             if(mailbox == null){
                 throw new ArgumentNullException("mailbox");
@@ -72,7 +72,7 @@ namespace LumiSoft.Net.SMTP.Server
         /// RET specifies whether message or headers should be included in any failed DSN issued for message transmission.
         /// Defined in RFC 1891.
         /// </summary>
-        public string RET
+        public SMTP_DSN_Ret RET
         {
             get{ return m_RET; }
         }

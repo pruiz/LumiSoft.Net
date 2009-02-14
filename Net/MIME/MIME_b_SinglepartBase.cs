@@ -128,7 +128,7 @@ namespace LumiSoft.Net.MIME
             if(m_pEncodedDataStream.Length >= 2){
                 m_pEncodedDataStream.Position = m_pEncodedDataStream.Length - 2;
             }
-            if(m_pEncodedDataStream.ReadByte() != '\r' && m_pEncodedDataStream.ReadByte() != '\n'){
+            if(!(m_pEncodedDataStream.ReadByte() == '\r' && m_pEncodedDataStream.ReadByte() == '\n')){
                 m_pEncodedDataStream.Write(new byte[]{(byte)'\r',(byte)'\n'},0,2);
             }
             

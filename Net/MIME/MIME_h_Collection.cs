@@ -214,7 +214,7 @@ namespace LumiSoft.Net.MIME
             }
 
             foreach(MIME_h field in m_pFields.ToArray()){
-                if(string.Compare(name,field.Name,true) == 0){
+                if(string.Equals(name,field.Name,StringComparison.InvariantCultureIgnoreCase)){
                     return field;
                 }
             }
@@ -280,6 +280,26 @@ namespace LumiSoft.Net.MIME
 
             using(FileStream fs = File.Create(fileName)){
                 ToStream(fs,wordEncoder,parmetersCharset);
+            }
+        }
+
+        #endregion
+
+        #region method ToByte
+
+        /// <summary>
+        /// Returns header as byte[] data.
+        /// </summary>
+        /// <param name="wordEncoder">8-bit words ecnoder. Value null means that words are not encoded.</param>
+        /// <param name="parmetersCharset">Charset to use to encode 8-bit header parameters. Value null means parameters not encoded.</param>
+        /// <returns>Returns header as byte[] data.</returns>
+        public byte[] ToByte(MIME_Encoding_EncodedWord wordEncoder,Encoding parmetersCharset)
+        {
+            using(MemoryStream ms = new MemoryStream()){
+                ToStream(ms,wordEncoder,parmetersCharset);
+                ms.Position = 0;
+
+                return ms.ToArray();
             }
         }
 

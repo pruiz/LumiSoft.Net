@@ -5,9 +5,11 @@ using System.Text;
 namespace LumiSoft.Net.SMTP
 {
     /// <summary>
-    /// This value implements SMTP Notify value. Defined in RFC 1891.
+    /// This value implements SMTP Notify value. Defined in RFC 3461.
     /// </summary>
-    public enum SMTP_Notify
+    /// <remarks>Values Success,Failure,Delay may be mixed if NotSpecified or Never flag is not set.</remarks>
+    [Flags()]
+    public enum SMTP_DSN_Notify
     {
         /// <summary>
         /// Notify value not specified.
@@ -35,7 +37,7 @@ namespace LumiSoft.Net.SMTP
         Failure = 4,
 
         /// <summary>
-        /// This value indicates the sender's willingness to receive "delayed" DSNs.
+        /// DSN should be sent on delayed delivery.
         /// </summary>
         Delay = 8,
     }

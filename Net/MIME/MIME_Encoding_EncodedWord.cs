@@ -11,6 +11,7 @@ namespace LumiSoft.Net.MIME
     {
         private MIME_EncodedWordEncoding m_Encoding;
         private Encoding                 m_pCharset = null;
+        private bool                     m_Split    = true;
 
         /// <summary>
         /// Default constructor.
@@ -39,7 +40,7 @@ namespace LumiSoft.Net.MIME
         public string Encode(string text)
         {            
             if(MustEncode(text)){
-                return EncodeS(m_Encoding,m_pCharset,text);
+                return EncodeS(m_Encoding,m_pCharset,m_Split,text);
             }
             else{
                 return text;
@@ -102,10 +103,11 @@ namespace LumiSoft.Net.MIME
         /// </summary>
         /// <param name="encoding">Encoding to use to encode text.</param>
         /// <param name="charset">Charset to use for encoding. If not sure UTF-8 is strongly recommended.</param>
+        /// <param name="split">If true, words are splitted after 75 chars.</param>
         /// <param name="text">Text to encode.</param>
         /// <returns>Returns encoded text.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>charset</b> or <b>text</b> is null reference.</exception>
-        public static string EncodeS(MIME_EncodedWordEncoding encoding,Encoding charset,string text)
+        public static string EncodeS(MIME_EncodedWordEncoding encoding,Encoding charset,bool split,string text)
         {
             if(charset == null){
                 throw new ArgumentNullException("charset");
@@ -130,7 +132,10 @@ namespace LumiSoft.Net.MIME
             if(MustEncode(text)){
                 StringBuilder retVal             = new StringBuilder();
                 byte[]        data               = charset.GetBytes(text);
-                int           maxEncodedTextSize = 75 - ((string)("=?" + charset.WebName + "?" + encoding.ToString() + "?" + "?=")).Length;
+                int           maxEncodedTextSize = int.MaxValue;
+                if(split){
+                    maxEncodedTextSize = 75 - ((string)("=?" + charset.WebName + "?" + encoding.ToString() + "?" + "?=")).Length;
+                }
 
                 #region B encode
 
@@ -234,6 +239,21 @@ namespace LumiSoft.Net.MIME
                 // Failed to parse encoded-word, leave it as is. RFC 2047 6.3.
                 return word;
             }
+        }
+
+        #endregion
+
+
+        #region Properties implementation
+
+        /// <summary>
+        /// Gets or sets if long words(over 75 char) are splitted.
+        /// </summary>
+        public bool Split
+        {
+            get{ return m_Split; }
+
+            set{ m_Split = value; }
         }
 
         #endregion

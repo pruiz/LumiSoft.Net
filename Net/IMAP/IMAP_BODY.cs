@@ -198,6 +198,7 @@ namespace LumiSoft.Net.IMAP
 			*/
 
             MIME_Encoding_EncodedWord wordEncoder = new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8);
+            wordEncoder.Split = false;
 
 			StringBuilder retVal = new StringBuilder();
 			// Multipart message
@@ -228,7 +229,7 @@ namespace LumiSoft.Net.IMAP
 
 				// Add contentTypeMainMediaType
 				if(entity.ContentType != null && entity.ContentType.Type != null){
-					retVal.Append(" \"" + entity.ContentType.Type + "\"");
+					retVal.Append("\"" + entity.ContentType.Type + "\"");
 				}
 				else{
 					retVal.Append("NIL");

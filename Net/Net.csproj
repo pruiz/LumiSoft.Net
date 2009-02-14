@@ -165,6 +165,7 @@
     <Compile Include="SIP\Proxy\SIP_ProxyHandler.cs" />
     <Compile Include="SIP\Proxy\SIP_RequestContext.cs" />
     <Compile Include="SIP\Stack\SIP_Dialog_Refer.cs" />
+    <Compile Include="SMTP\SMTP_DSN_Ret.cs" />
     <Compile Include="SMTP\SMTP_t_Mailbox.cs" />
     <Compile Include="WebDav\Client\WebDav_Client.cs" />
     <Compile Include="WebDav\WebDav_MultiStatus.cs" />
@@ -314,7 +315,7 @@
     <Compile Include="SMTP\Server\SMTP_Server.cs" />
     <Compile Include="SMTP\Server\SMTP_Session.cs" />
     <Compile Include="SMTP\Server\SMTP_e_Started.cs" />
-    <Compile Include="SMTP\SMTP_Notify.cs" />
+    <Compile Include="SMTP\SMTP_DSN_Notify.cs" />
     <Compile Include="SMTP\SMTP_ServiceExtensions.cs" />
     <Compile Include="SMTP\SMTP_Utils.cs" />
     <Compile Include="SslMode.cs" />
