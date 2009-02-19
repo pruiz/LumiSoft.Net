@@ -10,6 +10,7 @@ namespace LumiSoft.Data.lsDB
     /// <summary>
     /// Table what all columns are with fixed length.
     /// </summary>
+    [Obsolete()]
     public class lsDB_FixedLengthTable : IDisposable
     {
         private LDB_DataColumnCollection m_pColumns           = null;

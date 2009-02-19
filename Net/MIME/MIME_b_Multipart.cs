@@ -451,6 +451,8 @@ namespace LumiSoft.Net.MIME
 
             body.m_TextPreamble = multipartReader.TextPreamble;
             body.m_TextEpilogue = multipartReader.TextEpilogue;
+
+            body.BodyParts.SetModified(false);
         }
 
         #endregion

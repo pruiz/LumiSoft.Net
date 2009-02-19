@@ -69,6 +69,19 @@ namespace LumiSoft.Net.MIME
 
         #endregion
 
+        #region method SetModified
+
+        /// <summary>
+        /// Sets IsModified property value.
+        /// </summary>
+        /// <param name="isModified">Modified flag.</param>
+        protected void SetModified(bool isModified)
+        {
+            m_IsModified = isModified;
+        }
+
+        #endregion
+
 
         #region method GetEncodedDataStream
 
@@ -129,6 +142,7 @@ namespace LumiSoft.Net.MIME
                 m_pEncodedDataStream.Position = m_pEncodedDataStream.Length - 2;
             }
             if(!(m_pEncodedDataStream.ReadByte() == '\r' && m_pEncodedDataStream.ReadByte() == '\n')){
+                m_pEncodedDataStream.Position = m_pEncodedDataStream.Length;
                 m_pEncodedDataStream.Write(new byte[]{(byte)'\r',(byte)'\n'},0,2);
             }
             

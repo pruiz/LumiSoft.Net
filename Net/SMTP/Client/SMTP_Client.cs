@@ -620,7 +620,7 @@ namespace LumiSoft.Net.SMTP.Client
         /// <summary>
         /// Internal helper method for asynchronous MailFrom method.
         /// </summary>
-        private delegate void MailFromDelegate(string from,long messageSize);
+        private delegate void MailFromDelegate(string from,long messageSize,SMTP_DSN_Ret ret,string envid);
 
         /// <summary>
         /// Starts sending MAIL FROM: command to SMTP server.
@@ -634,6 +634,24 @@ namespace LumiSoft.Net.SMTP.Client
         /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
         public IAsyncResult BeginMailFrom(string from,long messageSize,AsyncCallback callback,object state)
         {
+            return BeginMailFrom(from,messageSize,SMTP_DSN_Ret.NotSpecified,null,callback,state);
+        }
+
+        /// <summary>
+        /// Starts sending MAIL FROM: command to SMTP server.
+        /// </summary>
+        /// <param name="from">Sender email address reported to SMTP server.</param>
+        /// <param name="messageSize">Sendable message size in bytes, -1 if message size unknown.</param>
+        /// <param name="ret">Delivery satus notification(DSN) ret value. For more info see RFC 3461.</param>
+        /// <param name="envid">Envelope ID. Value null means not specified. For more info see RFC 3461.</param>
+        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
+        /// <param name="state">User data.</param>
+        /// <returns>An IAsyncResult that references the asynchronous disconnect.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        /// <remarks>Before using <b>ret</b> or <b>envid</b> arguments, check that remote server supports SMTP DSN extention.</remarks>
+        public IAsyncResult BeginMailFrom(string from,long messageSize,SMTP_DSN_Ret ret,string envid,AsyncCallback callback,object state)
+        {
             if(this.IsDisposed){
                 throw new ObjectDisposedException(this.GetType().Name);
             }
@@ -643,7 +661,7 @@ namespace LumiSoft.Net.SMTP.Client
 
             MailFromDelegate asyncMethod = new MailFromDelegate(this.MailFrom);
             AsyncResultState asyncState = new AsyncResultState(this,asyncMethod,callback,state);
-            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(from,messageSize,new AsyncCallback(asyncState.CompletedCallback),null));
+            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(from,messageSize,ret,envid,new AsyncCallback(asyncState.CompletedCallback),null));
 
             return asyncState;
         }
@@ -701,6 +719,23 @@ namespace LumiSoft.Net.SMTP.Client
         /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
         public void MailFrom(string from,long messageSize)
         {
+            MailFrom(from,messageSize,SMTP_DSN_Ret.NotSpecified,null);
+        }
+
+        /// <summary>
+        /// Sends MAIL FROM: command to SMTP server.
+        /// </summary>
+        /// <param name="from">Sender email address reported to SMTP server.</param>
+        /// <param name="messageSize">Sendable message size in bytes, -1 if message size unknown.</param>
+        /// <param name="ret">Delivery satus notification(DSN) RET value. For more info see RFC 3461.</param>
+        /// <param name="envid">Delivery satus notification(DSN) ENVID value. Value null means not specified. For more info see RFC 3461.</param>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
+        /// <remarks>Before using <b>ret</b> or <b>envid</b> arguments, check that remote server supports SMTP DSN extention.</remarks>
+        public void MailFrom(string from,long messageSize,SMTP_DSN_Ret ret,string envid)
+        {
             if(this.IsDisposed){
                 throw new ObjectDisposedException(this.GetType().Name);
             }
@@ -719,6 +754,8 @@ namespace LumiSoft.Net.SMTP.Client
 			    SIZE keyword may only be used if it's reported in EHLO command response.
 			 	 Examples:
 			 		MAIL FROM:<ivx@lumisoft.ee> SIZE=1000
+             
+               RFC 3461 adds RET and ENVID paramters.
 			*/
 
             bool isSizeSupported = false;
@@ -729,14 +766,24 @@ namespace LumiSoft.Net.SMTP.Client
                 }
             }
 
-            string line = "MAIL FROM:<" + from + ">";
+            StringBuilder cmd = new StringBuilder();
+            cmd.Append("MAIL FROM:<" + from + ">");
             if(isSizeSupported && messageSize > 0){
-                line = "MAIL FROM:<" + from + "> SIZE=" + messageSize.ToString();
+                cmd.Append(" SIZE=" + messageSize.ToString());
             }
-            WriteLine(line);
+            if(ret == SMTP_DSN_Ret.FullMessage){
+                cmd.Append(" RET=FULL");
+            }
+            else if(ret == SMTP_DSN_Ret.Headers){
+                cmd.Append(" RET=HDRS");
+            }
+            if(!string.IsNullOrEmpty(envid)){
+                cmd.Append(" ENVID=" + messageSize.ToString());
+            }
+            WriteLine(cmd.ToString());
 
             // Read first line of reply, check if it's ok.
-			line = ReadLine();
+			string line = ReadLine();
 			if(!line.StartsWith("250")){
 				throw new SMTP_ClientException(line);
 			}
@@ -763,6 +810,23 @@ namespace LumiSoft.Net.SMTP.Client
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
         /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
         public IAsyncResult BeginRcptTo(string to,AsyncCallback callback,object state)
+        {
+            return BeginRcptTo(to,SMTP_DSN_Notify.NotSpecified,null,callback,state);
+        }
+
+        /// <summary>
+        /// Starts sending RCPT TO: command to SMTP server.
+        /// </summary>
+        /// <param name="to">Recipient email address.</param>
+        /// <param name="notify">Delivery satus notification(DSN) NOTIFY value. For more info see RFC 3461.</param>
+        /// <param name="orcpt">Delivery satus notification(DSN) ORCPT value. Value null means not specified. For more info see RFC 3461.</param>
+        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
+        /// <param name="state">User data.</param>
+        /// <returns>An IAsyncResult that references the asynchronous disconnect.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        /// <remarks>Before using <b>notify</b> or <b>orcpt</b> arguments, check that remote server supports SMTP DSN extention.</remarks>
+        public IAsyncResult BeginRcptTo(string to,SMTP_DSN_Notify notify,string orcpt,AsyncCallback callback,object state)
         {
             if(this.IsDisposed){
                 throw new ObjectDisposedException(this.GetType().Name);
@@ -830,6 +894,22 @@ namespace LumiSoft.Net.SMTP.Client
         /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
         public void RcptTo(string to)
         {
+            RcptTo(to,SMTP_DSN_Notify.NotSpecified,null);
+        }
+
+        /// <summary>
+        /// Sends RCPT TO: command to SMTP server.
+        /// </summary>
+        /// <param name="to">Recipient email address.</param>
+        /// <param name="notify">Delivery satus notification(DSN) NOTIFY value. For more info see RFC 3461.</param>
+        /// <param name="orcpt">Delivery satus notification(DSN) ORCPT value. Value null means not specified. For more info see RFC 3461.</param>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
+        /// <remarks>Before using <b>notify</b> or <b>orcpt</b> arguments, check that remote server supports SMTP DSN extention.</remarks>
+        public void RcptTo(string to,SMTP_DSN_Notify notify,string orcpt)
+        {
             if(this.IsDisposed){
                 throw new ObjectDisposedException(this.GetType().Name);
             }
@@ -846,9 +926,47 @@ namespace LumiSoft.Net.SMTP.Client
 
 			    Examples:
 			 		RCPT TO:<ivar@lumisoft.ee>
+             
+                RFC 3461 adds NOTIFY and ORCPT parameters.
 			*/
 
-            WriteLine("RCPT TO:<" + to + ">");
+            StringBuilder cmd = new StringBuilder();
+            cmd.Append("RCPT TO:<" + to + ">");            
+            if(notify == SMTP_DSN_Notify.NotSpecified){
+            }
+            else if(notify == SMTP_DSN_Notify.Never){
+                cmd.Append(" NOTIFY=NEVER");
+            }
+            else{
+                bool first = true;                
+                if((notify & SMTP_DSN_Notify.Delay) != 0){
+                    cmd.Append("DELAY");
+                    first = false;
+                }
+                if((notify & SMTP_DSN_Notify.Failure) != 0){
+                    if(first){
+                        cmd.Append("FAILURE");   
+                    }
+                    else{
+                        cmd.Append(",FAILURE");
+                    }
+                    first = false;
+                }
+                if((notify & SMTP_DSN_Notify.Success) != 0){
+                    if(first){
+                        cmd.Append("SUCCESS");   
+                    }
+                    else{
+                        cmd.Append(",SUCCESS");
+                    }
+                    first = false;
+                }
+            }
+            if(!string.IsNullOrEmpty(orcpt)){
+                cmd.Append(" ORCPT=" + orcpt);
+            }
+
+            WriteLine(cmd.ToString());
 
             // Read first line of reply, check if it's ok.
 			string line = ReadLine();

@@ -5,6 +5,7 @@ namespace LumiSoft.Data.lsDB
 	/// <summary>
 	///LDB utility methods.
 	/// </summary>
+    [Obsolete()]
 	internal class ldb_Utils
 	{
 		#region static method LongToByte

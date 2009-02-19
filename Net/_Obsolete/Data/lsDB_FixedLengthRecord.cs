@@ -7,6 +7,7 @@ namespace LumiSoft.Data.lsDB
     /// <summary>
     /// lsDB_FixedLengthTable table record.
     /// </summary>
+    [Obsolete()]
     public class lsDB_FixedLengthRecord
     {
         private lsDB_FixedLengthTable m_pOwnerDb               = null;

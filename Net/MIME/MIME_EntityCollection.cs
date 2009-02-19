@@ -125,6 +125,20 @@ namespace LumiSoft.Net.MIME
         #endregion
 
 
+        #region method SetModified
+
+        /// <summary>
+        /// Sets IsModified property value.
+        /// </summary>
+        /// <param name="isModified">Modified flag.</param>
+        internal void SetModified(bool isModified)
+        {
+            m_IsModified = isModified;
+        }
+
+        #endregion
+
+
         #region interface IEnumerator
 
         /// <summary>

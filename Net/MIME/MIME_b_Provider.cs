@@ -20,6 +20,7 @@ namespace LumiSoft.Net.MIME
         {
             m_pBodyTypes = new Dictionary<string,Type>(StringComparer.CurrentCultureIgnoreCase);
             m_pBodyTypes.Add("message/rfc822",typeof(MIME_b_MessageRfc822));
+            m_pBodyTypes.Add("message/delivery-status",typeof(MIME_b_MessageDeliveryStatus));
             m_pBodyTypes.Add("multipart/alternative",typeof(MIME_b_MultipartAlternative));
             m_pBodyTypes.Add("multipart/digest",typeof(MIME_b_MultipartDigest));
             m_pBodyTypes.Add("multipart/encrypted",typeof(MIME_b_MultipartEncrypted));

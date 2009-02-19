@@ -788,7 +788,7 @@ namespace LumiSoft.Net.SMTP.Server
                 }
                 // RET
                 else if(this.Server.Extentions.Contains(SMTP_ServiceExtensions.DSN) && name_value[0].ToUpper() == "RET"){
-                    // RFC 1891 5.3.
+                    // RFC 3461 4.3.
                     //  ret-value = "FULL" / "HDRS"
                     if(name_value.Length == 1){
                         WriteLine("501 Syntax error: RET parameter value must be specified.");
@@ -807,6 +807,8 @@ namespace LumiSoft.Net.SMTP.Server
                 }
                 // ENVID
                 else if(this.Server.Extentions.Contains(SMTP_ServiceExtensions.DSN) && name_value[0].ToUpper() == "ENVID"){
+                    // RFC 3461 4.4.
+                    //  envid-parameter = "ENVID=" xtext
                     if(name_value.Length == 1){
                         WriteLine("501 Syntax error: ENVID parameter value must be specified.");
                         return;

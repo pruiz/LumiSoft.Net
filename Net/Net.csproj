@@ -136,6 +136,7 @@
     <Compile Include="MIME\MIME_b_Audio.cs" />
     <Compile Include="MIME\MIME_b_Image.cs" />
     <Compile Include="MIME\MIME_b_Message.cs" />
+    <Compile Include="MIME\MIME_b_MessageDeliveryStatus.cs" />
     <Compile Include="MIME\MIME_b_MessageRfc822.cs" />
     <Compile Include="MIME\MIME_b_Multipart.cs" />
     <Compile Include="MIME\MIME_b_MultipartAlternative.cs" />

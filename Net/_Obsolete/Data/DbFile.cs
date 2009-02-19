@@ -9,6 +9,7 @@ namespace LumiSoft.Data.lsDB
 	/// <summary>
 	/// LumiSoft database file.
 	/// </summary>
+    [Obsolete()]
 	public class DbFile : IDisposable
 	{
 		private LDB_DataColumnCollection m_pColumns             = null;

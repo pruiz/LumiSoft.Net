@@ -8,6 +8,7 @@ using System.Security.Principal;
 using LumiSoft.Net;
 using LumiSoft.Net.IO;
 using LumiSoft.Net.TCP;
+using LumiSoft.Net.SMTP;
 using LumiSoft.Net.SMTP.Client;
 using LumiSoft.Net.Dns.Client;
 using LumiSoft.Net.Log;
@@ -418,7 +419,14 @@ namespace LumiSoft.Net.SMTP.Relay
                         // Stream doesn't support seeking.
                     }
 
-                    m_pSmtpClient.BeginMailFrom(this.From,messageSize,new AsyncCallback(this.MailFromCallback),null);
+                    m_pSmtpClient.BeginMailFrom(
+                        this.From,
+                        messageSize,
+                        IsDsnSupported() ? m_pRelayItem.DSN_Ret : SMTP_DSN_Ret.NotSpecified,
+                        IsDsnSupported() ? m_pRelayItem.EnvelopeID : null,
+                        new AsyncCallback(this.MailFromCallback),
+                        null
+                   );
                 }
             }
             catch(Exception x){
@@ -496,7 +504,14 @@ namespace LumiSoft.Net.SMTP.Relay
                     // Stream doesn't support seeking.
                 }
 
-                m_pSmtpClient.BeginMailFrom(this.From,messageSize,new AsyncCallback(this.MailFromCallback),null);
+                m_pSmtpClient.BeginMailFrom(
+                    this.From,
+                    messageSize,
+                    IsDsnSupported() ? m_pRelayItem.DSN_Ret : SMTP_DSN_Ret.NotSpecified,
+                    IsDsnSupported() ? m_pRelayItem.EnvelopeID : null,
+                    new AsyncCallback(this.MailFromCallback),
+                    null
+                );
             }
             catch(Exception x){
                 Dispose(x);
@@ -516,7 +531,13 @@ namespace LumiSoft.Net.SMTP.Relay
             try{
                 m_pSmtpClient.EndMailFrom(ar);
 
-                m_pSmtpClient.BeginRcptTo(this.To,new AsyncCallback(this.RcptToCallback),null);
+                m_pSmtpClient.BeginRcptTo(
+                    this.To,
+                    IsDsnSupported() ? m_pRelayItem.DSN_Notify : SMTP_DSN_Notify.NotSpecified,
+                    IsDsnSupported() ? m_pRelayItem.OriginalRecipient : null,
+                    new AsyncCallback(this.RcptToCallback),
+                    null
+                );
             }
             catch(Exception x){
                 Dispose(x);
@@ -620,6 +641,25 @@ namespace LumiSoft.Net.SMTP.Relay
                 }
                 m_pServer.Logger.AddText(m_SessionID,identity,text,localEP,remoteEP);
             }
+        }
+
+        #endregion
+
+        #region method IsDsnSupported
+
+        /// <summary>
+        /// Gets if DSN extention is supported by remote server.
+        /// </summary>
+        /// <returns></returns>
+        private bool IsDsnSupported()
+        {
+            foreach(string feature in m_pSmtpClient.EsmtpFeatures){
+                if(string.Equals(feature,SMTP_ServiceExtensions.DSN,StringComparison.InvariantCultureIgnoreCase)){
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         #endregion

@@ -6,6 +6,7 @@ namespace LumiSoft.Data.lsDB
 	/// <summary>
 	/// lsDB data column collection.
 	/// </summary>
+    [Obsolete()]
 	public class LDB_DataColumnCollection //: IEnumerable<LDB_DataColumn>
 	{
 		private object               m_pOwner   = null;

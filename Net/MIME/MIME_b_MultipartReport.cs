@@ -10,9 +10,8 @@ namespace LumiSoft.Net.MIME
     /// This class represents MIME multipart/report body. Defined in RFC 3462.
     /// </summary>
     /// <remarks>
-    /// The Multipart/Report Multipurpose Internet Mail Extensions (MIME)
-    /// content-type is a general "family" or "container" type for electronic
-    /// mail reports of any kind.
+    /// The Multipart/Report Multipurpose Internet Mail Extensions (MIME) content-type is a general "family" or 
+    /// "container" type for electronic mail reports of any kind. The most used type is <b>delivery-status</b>.
     /// </remarks>
     public class MIME_b_MultipartReport : MIME_b_Multipart
     {

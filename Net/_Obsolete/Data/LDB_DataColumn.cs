@@ -5,6 +5,7 @@ namespace LumiSoft.Data.lsDB
 	/// <summary>
 	/// 
 	/// </summary>
+    [Obsolete()]
 	public class LDB_DataColumn
 	{
 		private LDB_DataType m_DataType   = LDB_DataType.String;

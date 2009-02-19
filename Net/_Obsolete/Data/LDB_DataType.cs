@@ -5,6 +5,7 @@ namespace LumiSoft.Data.lsDB
 	/// <summary>
 	/// lsDB data types.
 	/// </summary>
+    [Obsolete()]
 	public enum LDB_DataType
 	{
 		/// <summary>

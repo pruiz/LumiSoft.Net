@@ -7,6 +7,7 @@ namespace LumiSoft.Data.lsDB
 	/// <summary>
 	/// lsDB database record.
 	/// </summary>
+    [Obsolete()]
 	public class LDB_Record
 	{
 		private DbFile     m_pOwnerDb        = null;

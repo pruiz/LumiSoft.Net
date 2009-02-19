@@ -70,6 +70,11 @@ namespace LumiSoft.Net.MIME
         internal virtual void SetParent(MIME_Entity entity,bool setContentType)
         {
             m_pEntity = entity;
+
+            // Owner entity has no content-type or has different content-type, just add/overwrite it.
+            if(setContentType &&(entity.ContentType == null || !string.Equals(entity.ContentType.TypeWithSubype,this.MediaType,StringComparison.InvariantCultureIgnoreCase))){
+                entity.ContentType = m_pContentType;
+            }
         }
 
         #endregion

@@ -57,6 +57,7 @@ namespace LumiSoft.Net.MIME
             }
 
             Net_Utils.StreamCopy(stream,retVal.EncodedStream,32000);
+            retVal.SetModified(false);
 
             return retVal;
         }
@@ -90,7 +91,7 @@ namespace LumiSoft.Net.MIME
                 throw new InvalidOperationException("Body must be bounded to some entity first.");
             }
 
-            SetEncodedData(transferEncoding,new MemoryStream(charset.GetBytes(text)));
+            SetEncodedData(transferEncoding,new MemoryStream(charset.GetBytes(text)));            
             this.Entity.ContentType.Param_Charset = charset.WebName;            
         }
 

@@ -6,6 +6,7 @@ namespace LumiSoft.Data.lsDB
 	/// <summary>
 	/// Data page.
 	/// </summary>
+    [Obsolete()]
 	internal class DataPage
 	{
 		private DbFile     m_pOwnerDB             = null;
