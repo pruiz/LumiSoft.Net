@@ -97,7 +97,7 @@ namespace LumiSoft.Net.MIME
 
         #endregion
 
-        #region override method ToString
+        #region method ToString
 
         /// <summary>
         /// Returns MIME entity as string.
@@ -105,8 +105,19 @@ namespace LumiSoft.Net.MIME
         /// <returns>Returns MIME entity as string.</returns>
         public override string ToString()
         {
+            return ToString(null,null);
+        }
+
+        /// <summary>
+        /// Returns MIME entity as string.
+        /// </summary>
+        /// <param name="headerWordEncoder">Header 8-bit words ecnoder. Value null means that words are not encoded.</param>
+        /// <param name="headerParmetersCharset">Charset to use to encode 8-bit header parameters. Value null means parameters not encoded.</param>
+        /// <returns>Returns MIME entity as string.</returns>
+        public string ToString(MIME_Encoding_EncodedWord headerWordEncoder,Encoding headerParmetersCharset)
+        {
             using(MemoryStream ms = new MemoryStream()){
-                ToStream(ms,null,null);
+                ToStream(ms,headerWordEncoder,headerParmetersCharset);
 
                 return Encoding.UTF8.GetString(ms.ToArray());
             }
@@ -370,7 +381,7 @@ namespace LumiSoft.Net.MIME
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                MIME_h h = m_pHeader.GetFirst("Content-Description");
+                MIME_h h = m_pHeader.GetFirst("Content-Transfer-Encoding");
                 if(h != null){
                     return ((MIME_h_Unstructured)h).Value;
                 }

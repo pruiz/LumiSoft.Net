@@ -798,7 +798,7 @@ namespace LumiSoft.Net.SMTP.Client
         /// <summary>
         /// Internal helper method for asynchronous RcptTo method.
         /// </summary>
-        private delegate void RcptToDelegate(string to);
+        private delegate void RcptToDelegate(string to,SMTP_DSN_Notify notify,string orcpt);
 
         /// <summary>
         /// Starts sending RCPT TO: command to SMTP server.
@@ -837,7 +837,7 @@ namespace LumiSoft.Net.SMTP.Client
 
             RcptToDelegate asyncMethod = new RcptToDelegate(this.RcptTo);
             AsyncResultState asyncState = new AsyncResultState(this,asyncMethod,callback,state);
-            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(to,new AsyncCallback(asyncState.CompletedCallback),null));
+            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(to,notify,orcpt,new AsyncCallback(asyncState.CompletedCallback),null));
 
             return asyncState;
         }
@@ -940,12 +940,12 @@ namespace LumiSoft.Net.SMTP.Client
             else{
                 bool first = true;                
                 if((notify & SMTP_DSN_Notify.Delay) != 0){
-                    cmd.Append("DELAY");
+                    cmd.Append(" NOTIFY=DELAY");
                     first = false;
                 }
                 if((notify & SMTP_DSN_Notify.Failure) != 0){
                     if(first){
-                        cmd.Append("FAILURE");   
+                        cmd.Append(" NOTIFY=FAILURE");   
                     }
                     else{
                         cmd.Append(",FAILURE");
@@ -954,7 +954,7 @@ namespace LumiSoft.Net.SMTP.Client
                 }
                 if((notify & SMTP_DSN_Notify.Success) != 0){
                     if(first){
-                        cmd.Append("SUCCESS");   
+                        cmd.Append(" NOTIFY=SUCCESS");   
                     }
                     else{
                         cmd.Append(",SUCCESS");
