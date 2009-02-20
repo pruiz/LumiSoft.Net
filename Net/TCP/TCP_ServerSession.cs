@@ -69,7 +69,9 @@ namespace LumiSoft.Net.TCP
             m_pLocalEP = null;
             m_pRemoteEP = null;
             m_pCertificate = null;
-            m_pTcpStream.Dispose();
+            if(m_pTcpStream != null){
+                m_pTcpStream.Dispose();
+            }
             m_pTcpStream = null;
             m_pTags = null;
 
