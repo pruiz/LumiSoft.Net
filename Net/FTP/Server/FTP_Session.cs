@@ -1098,10 +1098,10 @@ namespace LumiSoft.Net.FTP.Server
 			// Notify client on what IP and port server is listening client to connect.
 			// PORT h1,h2,h3,h4,p1,p2
             if(m_pServer.PassivePublicIP != null){
-                this.Socket.WriteLine("227 Entering Passive Mode (" + m_pServer.PassivePublicIP.ToString() + "," + (port >> 8) + "," + (port & 255)  + ").");
+                this.Socket.WriteLine("227 Entering Passive Mode (" + m_pServer.PassivePublicIP.ToString().Replace(".",",") + "," + (port >> 8) + "," + (port & 255)  + ").");
             }
             else{
-                this.Socket.WriteLine("227 Entering Passive Mode (" + ((IPEndPoint)this.Socket.LocalEndPoint).Address.ToString() + "," + (port >> 8) + "," + (port & 255)  + ").");
+                this.Socket.WriteLine("227 Entering Passive Mode (" + ((IPEndPoint)this.Socket.LocalEndPoint).Address.ToString().Replace(".",",") + "," + (port >> 8) + "," + (port & 255)  + ").");
             }
 			m_PassiveMode = true;
 		}
