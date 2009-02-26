@@ -267,42 +267,41 @@ namespace LumiSoft.Net.Dns.Client
 			byte[] query = CreateQuery(queryID,qname,qtype,qclass);
                         
             // Create sending UDP socket.
-            Socket udpClient = new Socket(AddressFamily.InterNetwork,SocketType.Dgram,ProtocolType.Udp);
-            udpClient.SendTimeout = 500;
+            using(Socket udpClient = new Socket(AddressFamily.InterNetwork,SocketType.Dgram,ProtocolType.Udp)){
+                udpClient.SendTimeout = 500;
 
-            // Send parallel query to all dns servers and get first answer.
-            DateTime startTime = DateTime.Now;
-            while(startTime.AddMilliseconds(timeout) > DateTime.Now){
-                foreach(IPAddress dnsServer in m_DnsServers){
-                    try{
-                        udpClient.SendTo(query,new IPEndPoint(dnsServer,53));
+                // Send parallel query to all dns servers and get first answer.
+                DateTime startTime = DateTime.Now;
+                while(startTime.AddMilliseconds(timeout) > DateTime.Now){
+                    foreach(IPAddress dnsServer in m_DnsServers){
+                        try{
+                            udpClient.SendTo(query,new IPEndPoint(dnsServer,53));
+                        }
+                        catch{
+                        }
                     }
-                    catch{
-                    }
-                }
 
-                // Wait 10 ms response to arrive, if no response, retransmit query.
-                if(udpClient.Poll(10,SelectMode.SelectRead)){
-                    try{
-                        byte[] retVal = new byte[1024];
-					    int countRecieved = udpClient.Receive(retVal);
+                    // Wait 10 ms response to arrive, if no response, retransmit query.
+                    if(udpClient.Poll(10,SelectMode.SelectRead)){
+                        try{
+                            byte[] retVal = new byte[1024];
+					        int countRecieved = udpClient.Receive(retVal);
                         					    
-					    // If reply is ok, return it
-					    DnsServerResponse serverResponse = ParseQuery(retVal,queryID);
+					        // If reply is ok, return it
+					        DnsServerResponse serverResponse = ParseQuery(retVal,queryID);
 				
-					    // Cache query
-					    if(m_UseDnsCache && serverResponse.ResponseCode == RCODE.NO_ERROR){
-						    DnsCache.AddToCache(qname,(int)qtype,serverResponse);
-					    }
+    					    // Cache query
+					        if(m_UseDnsCache && serverResponse.ResponseCode == RCODE.NO_ERROR){
+	    					    DnsCache.AddToCache(qname,(int)qtype,serverResponse);
+		    			    }
 
-					    return serverResponse;
-                    }
-                    catch{
+			    		    return serverResponse;
+                        }
+                        catch{
+                        }
                     }
                 }
             }
-
-            udpClient.Close();
 
 			// If we reach so far, we probably won't get connection to dsn server
 			return new DnsServerResponse(false,RCODE.SERVER_FAILURE,new List<DNS_rr_base>(),new List<DNS_rr_base>(),new List<DNS_rr_base>());
