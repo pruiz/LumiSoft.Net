@@ -1216,12 +1216,12 @@ namespace LumiSoft.Net.POP3.Server
                     }
 
 					if(aArgs.Validated){
-						this.Socket.BeginWriteLine("+OK Authentication successful.",new SocketCallBack(this.EndSend));
-						
-						this.SetUserName(userName);
+                        this.SetUserName(userName);
 
 						// Get user messages info.
 						m_pServer.OnGetMessagesInfo(this,m_POP3_Messages);
+
+						this.Socket.BeginWriteLine("+OK Authentication successful.",new SocketCallBack(this.EndSend));					
 					}
 					else{
 						this.Socket.BeginWriteLine("-ERR Authentication failed",new SocketCallBack(this.EndSend));
@@ -1259,12 +1259,12 @@ namespace LumiSoft.Net.POP3.Server
                     }
 
 					if(aArgs.Validated){
-						this.Socket.BeginWriteLine("+OK Authentication successful.",new SocketCallBack(this.EndSend));
-						
                         this.SetUserName(userName);
 
 						// Get user messages info.
 						m_pServer.OnGetMessagesInfo(this,m_POP3_Messages);
+
+						this.Socket.BeginWriteLine("+OK Authentication successful.",new SocketCallBack(this.EndSend));                       
 					}
 					else{
 						this.Socket.BeginWriteLine("-ERR Authentication failed",new SocketCallBack(this.EndSend));
@@ -1331,12 +1331,12 @@ namespace LumiSoft.Net.POP3.Server
 							// We must got empty line here
 							clientResponse = this.Socket.ReadLine();
 							if(clientResponse == ""){
-								this.Socket.BeginWriteLine("+OK Authentication successful.",new SocketCallBack(this.EndSend));
-
                                 this.SetUserName(userName);
 
                                 // Get user messages info.
 						        m_pServer.OnGetMessagesInfo(this,m_POP3_Messages);
+
+								this.Socket.BeginWriteLine("+OK Authentication successful.",new SocketCallBack(this.EndSend));                                
 							}
 							else{
 								this.Socket.BeginWriteLine("-ERR Authentication failed",new SocketCallBack(this.EndSend));
