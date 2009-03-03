@@ -598,9 +598,9 @@ namespace LumiSoft.Net.MIME
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                MIME_h h = m_pHeader.GetFirst("Content-Dispostition");
+                MIME_h h = m_pHeader.GetFirst("Content-Disposition");
                 if(h != null){
-                    if(!(h is MIME_h_ContentType)){
+                    if(!(h is MIME_h_ContentDisposition)){
                         throw new ParseException("Header field 'ContentDisposition' parsing failed.");
                     }
 
@@ -617,10 +617,10 @@ namespace LumiSoft.Net.MIME
                 }
                 
                 if(value == null){
-                    m_pHeader.RemoveAll("Content-Dispostition");
+                    m_pHeader.RemoveAll("Content-Disposition");
                 }
                 else{
-                    MIME_h h = m_pHeader.GetFirst("Content-Dispostition");
+                    MIME_h h = m_pHeader.GetFirst("Content-Disposition");
                     if(h == null){
                         m_pHeader.Add(value);
                     }
