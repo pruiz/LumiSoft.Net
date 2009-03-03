@@ -33,7 +33,7 @@ namespace LumiSoft.Net.MIME
         /// <param name="defaultContentType">Default content-type for this body.</param>
         /// <param name="stream">Stream from where to read body.</param>
         /// <returns>Returns parsed body.</returns>
-        /// <exception cref="ArgumentNullException">Is raised when <b>stream</b>, <b>mediaTypedefaultContentTypeb> or <b>stream</b> is null reference.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>stream</b>, <b>mediaTypedefaultContentTypeb></b> or <b>stream</b> is null reference.</exception>
         /// <exception cref="ParseException">Is raised when any parsing errors.</exception>
         protected static new MIME_b Parse(MIME_Entity owner,MIME_h_ContentType defaultContentType,SmartStream stream)
         {
