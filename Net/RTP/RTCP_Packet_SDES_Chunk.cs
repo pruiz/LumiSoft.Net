@@ -210,7 +210,7 @@ namespace LumiSoft.Net.RTP
             // Pad to 4(32-bit) bytes boundary.
             while((offset - startOffset) % 4 > 0){
                 buffer[offset++] = 0;
-            }
+            }            
         }
 
         #endregion
@@ -377,7 +377,9 @@ namespace LumiSoft.Net.RTP
 
                 // Add terminate byte and padding bytes.
                 size++;
-                size += size % 4;
+                while((size % 4) > 0){
+                    size++;
+                }
 
                 return size; 
             }
