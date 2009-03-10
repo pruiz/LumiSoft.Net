@@ -21,7 +21,7 @@ namespace LumiSoft.Net.MIME
 
             m_pHeadrFields = new Dictionary<string,Type>(StringComparer.CurrentCultureIgnoreCase);
             m_pHeadrFields.Add("Content-Type",typeof(MIME_h_ContentType));
-            m_pHeadrFields.Add("Content-Dispostion",typeof(MIME_h_ContentDisposition));
+            m_pHeadrFields.Add("Content-Disposition",typeof(MIME_h_ContentDisposition));
         }
 
 
