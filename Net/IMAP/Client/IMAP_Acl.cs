@@ -34,7 +34,7 @@ namespace LumiSoft.Net.IMAP.Client
         internal static IMAP_Acl Parse(string aclResponseString)
         {
             string[] args = TextUtils.SplitQuotedString(aclResponseString,' ',true);
-            return new IMAP_Acl(args[1],LumiSoft.Net.IMAP.Server.IMAP_Utils.ACL_From_String(args[2]));
+            return new IMAP_Acl(args[1],IMAP_Utils.ACL_From_String(args[2]));
         }
 
         #endregion
