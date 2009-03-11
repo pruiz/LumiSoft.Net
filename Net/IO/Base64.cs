@@ -95,6 +95,31 @@ namespace LumiSoft.Net.IO
         }
 
         /// <summary>
+        /// Decodes specified base64 data.
+        /// </summary>
+        /// <param name="data">Base64 encoded data buffer.</param>
+        /// <param name="offset">Offset in the buffer.</param>
+        /// <param name="count">Number of bytes available in the buffer.</param>
+        /// <param name="ignoreNonBase64Chars">If true all invalid base64 chars ignored. If false, FormatException is raised.</param>
+        /// <returns>Returns decoded data.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>data</b> is null reference.</exception>
+        /// <exception cref="FormatException">Is raised when <b>value</b> contains invalid base64 data.</exception>
+        public byte[] Decode(byte[] data,int offset,int count,bool ignoreNonBase64Chars)
+        {
+            if(data == null){
+                throw new ArgumentNullException("data");
+            }
+
+            byte[] buffer = new byte[data.Length];
+
+            int decodedCount = Decode(data,offset,count,buffer,0,ignoreNonBase64Chars);
+            byte[] retVal = new byte[decodedCount];
+            Array.Copy(buffer,retVal,decodedCount);
+
+            return retVal;
+        }
+
+        /// <summary>
         /// Decodes base64 encoded bytes.
         /// </summary>
         /// <param name="encBuffer">Base64 encoded data buffer.</param>
@@ -168,7 +193,7 @@ namespace LumiSoft.Net.IO
                 // Read 4-byte base64 block.
                 int offsetInBlock = 0;
                 while(offsetInBlock < 4){
-                    // Check that you won't exceed buffer data.
+                    // Check that we won't exceed buffer data.
                     if((decodeOffset - encOffset) >= encCount){
                         if(offsetInBlock == 0){
                             break;
@@ -181,7 +206,7 @@ namespace LumiSoft.Net.IO
 
                     // Read byte.
                     short b = encBuffer[decodeOffset++];
-                                        
+             
                     // Pad char.
                     if(b == '='){
                         // Padding may appear only in last two chars of 4-char block.
@@ -190,12 +215,12 @@ namespace LumiSoft.Net.IO
                         if(offsetInBlock < 2){
                             throw new FormatException("Invalid base64 padding.");
                         }
-
+                                                                        
                         // Skip next padding char.
                         if(offsetInBlock == 2){
-                            offsetInBlock++;
+                            decodeOffset++;
                         }
-
+                        
                         break;
                     }
                     // Non-base64 char.
