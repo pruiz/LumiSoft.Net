@@ -89,6 +89,9 @@ namespace LumiSoft.Net.IMAP.Client
                 // Send LOGOUT command to server.                
                 int countWritten = this.TcpStream.WriteLine("a1 LOGOUT");
                 LogAddWrite(countWritten,"a1 LOGOUT");
+
+                m_pAuthdUserIdentity = null;
+                m_SelectedFolder = "";
 			}
 			catch{
 			}
@@ -222,7 +225,7 @@ namespace LumiSoft.Net.IMAP.Client
             // Ensure that we send right separator to server, we accept both \ and /.
             folderName = folderName.Replace('\\',this.PathSeparator).Replace('/',this.PathSeparator);
 
-            string line = GetNextCmdTag() + " CREATE " + TextUtils.QuoteString(Core.Encode_IMAP_UTF7_String(folderName));
+            string line = GetNextCmdTag() + " CREATE " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folderName));
 			int countWritten = this.TcpStream.WriteLine(line);           
             LogAddWrite(countWritten,line);
 
@@ -261,7 +264,7 @@ namespace LumiSoft.Net.IMAP.Client
 				throw new InvalidOperationException("The DELETE command is only valid in authenticated state.");
 			}
 
-            string line = GetNextCmdTag() + " DELETE " + TextUtils.QuoteString(Core.Encode_IMAP_UTF7_String(folderName));
+            string line = GetNextCmdTag() + " DELETE " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folderName));
 			int countWritten = this.TcpStream.WriteLine(line);           
             LogAddWrite(countWritten,line);
 
@@ -301,7 +304,7 @@ namespace LumiSoft.Net.IMAP.Client
 				throw new InvalidOperationException("The RENAME command is only valid in authenticated state.");
 			}
 
-            string line = GetNextCmdTag() + " RENAME " + TextUtils.QuoteString(Core.Encode_IMAP_UTF7_String(sourceFolderName)) + " " + TextUtils.QuoteString(Core.Encode_IMAP_UTF7_String(destinationFolderName));
+            string line = GetNextCmdTag() + " RENAME " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(sourceFolderName)) + " " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(destinationFolderName));
 			int countWritten = this.TcpStream.WriteLine(line);           
             LogAddWrite(countWritten,line);
 
@@ -356,7 +359,7 @@ namespace LumiSoft.Net.IMAP.Client
 						line = line.Substring(line.IndexOf(")") + 1).Trim(); // Remove * LIST(..)
 						line = line.Substring(line.IndexOf(" ")).Trim(); // Remove Folder separator
 
-                        list.Add(TextUtils.UnQuoteString(Core.Decode_IMAP_UTF7_String(line.Trim())));
+                        list.Add(TextUtils.UnQuoteString(IMAP_Utils.Decode_IMAP_UTF7_String(line.Trim())));
 					}
                 }
                 else{
@@ -410,7 +413,7 @@ namespace LumiSoft.Net.IMAP.Client
 						line = line.Substring(line.IndexOf(")") + 1).Trim(); // Remove * LIST(..)
 						line = line.Substring(line.IndexOf(" ")).Trim(); // Remove Folder separator
 
-                        list.Add(TextUtils.UnQuoteString(Core.Decode_IMAP_UTF7_String(line.Trim())));
+                        list.Add(TextUtils.UnQuoteString(IMAP_Utils.Decode_IMAP_UTF7_String(line.Trim())));
 					}
                 }
                 else{
@@ -451,7 +454,7 @@ namespace LumiSoft.Net.IMAP.Client
             // Ensure that we send right separator to server, we accept both \ and /.
             folderName = folderName.Replace('\\',this.PathSeparator).Replace('/',this.PathSeparator);
 
-            string line = GetNextCmdTag() + " SUBSCRIBE " + TextUtils.QuoteString(Core.Encode_IMAP_UTF7_String(folderName));
+            string line = GetNextCmdTag() + " SUBSCRIBE " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folderName));
 			int countWritten = this.TcpStream.WriteLine(line);           
             LogAddWrite(countWritten,line);
 
@@ -487,7 +490,7 @@ namespace LumiSoft.Net.IMAP.Client
             // Ensure that we send right separator to server, we accept both \ and /.
             folderName = folderName.Replace('\\',this.PathSeparator).Replace('/',this.PathSeparator);
 
-            string line = GetNextCmdTag() + " UNSUBSCRIBE " + TextUtils.QuoteString(Core.Encode_IMAP_UTF7_String(folderName));
+            string line = GetNextCmdTag() + " UNSUBSCRIBE " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folderName));
 			int countWritten = this.TcpStream.WriteLine(line);           
             LogAddWrite(countWritten,line);
 
@@ -523,7 +526,7 @@ namespace LumiSoft.Net.IMAP.Client
             // Ensure that we send right separator to server, we accept both \ and /.
             folderName = folderName.Replace('\\',this.PathSeparator).Replace('/',this.PathSeparator);
 
-            string line = GetNextCmdTag() + " SELECT " + TextUtils.QuoteString(Core.Encode_IMAP_UTF7_String(folderName));
+            string line = GetNextCmdTag() + " SELECT " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folderName));
 			int countWritten = this.TcpStream.WriteLine(line);           
             LogAddWrite(countWritten,line);
 
@@ -610,7 +613,7 @@ namespace LumiSoft.Net.IMAP.Client
             // Ensure that we send right separator to server, we accept both \ and /.
             folder = folder.Replace('\\',this.PathSeparator).Replace('/',this.PathSeparator);
 
-            string line = GetNextCmdTag() + " GETQUOTAROOT " + TextUtils.QuoteString(Core.Encode_IMAP_UTF7_String(folder));
+            string line = GetNextCmdTag() + " GETQUOTAROOT " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folder));
 			int countWritten = this.TcpStream.WriteLine(line);           
             LogAddWrite(countWritten,line);
 
@@ -798,7 +801,7 @@ namespace LumiSoft.Net.IMAP.Client
             // Ensure that we send right separator to server, we accept both \ and /.
             folderName = folderName.Replace('\\',this.PathSeparator).Replace('/',this.PathSeparator);
 
-            string line = GetNextCmdTag() + " GETACL " + TextUtils.QuoteString(Core.Encode_IMAP_UTF7_String(folderName));
+            string line = GetNextCmdTag() + " GETACL " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folderName));
 			int countWritten = this.TcpStream.WriteLine(line);           
             LogAddWrite(countWritten,line);
 
@@ -853,7 +856,7 @@ namespace LumiSoft.Net.IMAP.Client
             // Ensure that we send right separator to server, we accept both \ and /.
             folderName = folderName.Replace('\\',this.PathSeparator).Replace('/',this.PathSeparator);
 
-            string line = GetNextCmdTag() + " SETACL " + TextUtils.QuoteString(Core.Encode_IMAP_UTF7_String(folderName)) + " " + TextUtils.QuoteString(userName) + " " + IMAP_Utils.ACL_to_String(acl);
+            string line = GetNextCmdTag() + " SETACL " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folderName)) + " " + TextUtils.QuoteString(userName) + " " + IMAP_Utils.ACL_to_String(acl);
 			int countWritten = this.TcpStream.WriteLine(line);           
             LogAddWrite(countWritten,line);
 
@@ -890,7 +893,7 @@ namespace LumiSoft.Net.IMAP.Client
             // Ensure that we send right separator to server, we accept both \ and /.
             folderName = folderName.Replace('\\',this.PathSeparator).Replace('/',this.PathSeparator);
 
-            string line = GetNextCmdTag() + " DELETEACL " + TextUtils.QuoteString(Core.Encode_IMAP_UTF7_String(folderName)) + " " + TextUtils.QuoteString(userName);
+            string line = GetNextCmdTag() + " DELETEACL " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folderName)) + " " + TextUtils.QuoteString(userName);
 			int countWritten = this.TcpStream.WriteLine(line);           
             LogAddWrite(countWritten,line);
 
@@ -927,7 +930,7 @@ namespace LumiSoft.Net.IMAP.Client
             // Ensure that we send right separator to server, we accept both \ and /.
             folderName = folderName.Replace('\\',this.PathSeparator).Replace('/',this.PathSeparator);
 
-            string line = GetNextCmdTag() + " MYRIGHTS " + TextUtils.QuoteString(Core.Encode_IMAP_UTF7_String(folderName));
+            string line = GetNextCmdTag() + " MYRIGHTS " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folderName));
 			int countWritten = this.TcpStream.WriteLine(line);           
             LogAddWrite(countWritten,line);
 
@@ -991,10 +994,10 @@ namespace LumiSoft.Net.IMAP.Client
 
             string line = "";
 			if(uidCopy){
-                line = GetNextCmdTag() + " UID COPY " + sequence_set.ToSequenceSetString() + " " + TextUtils.QuoteString(Core.Encode_IMAP_UTF7_String(destFolder));
+                line = GetNextCmdTag() + " UID COPY " + sequence_set.ToSequenceSetString() + " " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(destFolder));
 			}
 			else{
-                line = GetNextCmdTag() + " COPY " + sequence_set.ToSequenceSetString() + " " + TextUtils.QuoteString(Core.Encode_IMAP_UTF7_String(destFolder));
+                line = GetNextCmdTag() + " COPY " + sequence_set.ToSequenceSetString() + " " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(destFolder));
 			}
 			int countWritten = this.TcpStream.WriteLine(line);           
             LogAddWrite(countWritten,line);
@@ -1161,7 +1164,7 @@ namespace LumiSoft.Net.IMAP.Client
             // Ensure that we send right separator to server, we accept both \ and /.
             folderName = folderName.Replace('\\',this.PathSeparator).Replace('/',this.PathSeparator);
 
-            string line = GetNextCmdTag() + " APPEND " + TextUtils.QuoteString(Core.Encode_IMAP_UTF7_String(folderName)) + " (" + IMAP_Utils.MessageFlagsToString(messageFlags) + ") \"" + IMAP_Utils.DateTimeToString(inernalDate) + "\" {" + data.Length + "}";
+            string line = GetNextCmdTag() + " APPEND " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folderName)) + " (" + IMAP_Utils.MessageFlagsToString(messageFlags) + ") \"" + IMAP_Utils.DateTimeToString(inernalDate) + "\" {" + data.Length + "}";
             int countWritten = this.TcpStream.WriteLine(line);           
             LogAddWrite(countWritten,line);
 
