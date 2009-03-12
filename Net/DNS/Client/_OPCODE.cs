@@ -15,7 +15,7 @@ namespace LumiSoft.Net.Dns.Client
 		QUERY = 0,       
 
 		/// <summary>
-		/// An inverse query.
+		/// An inverse query. Obsoleted by RFC 3425.
 		/// </summary>
 		IQUERY = 1,
 
