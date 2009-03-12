@@ -235,7 +235,7 @@ namespace LumiSoft.Net.FTP.Server
 			//---- Parse command --------------------------------------------------//
 			string[] cmdParts = commandTxt.TrimStart().Split(new char[]{' '});
 			string   command  = cmdParts[0].ToUpper().Trim();
-			string   argsText = Core.GetArgsText(commandTxt,command);
+			string   argsText = commandTxt.Substring(command.Length).Trim();
 			//---------------------------------------------------------------------//
 
 
