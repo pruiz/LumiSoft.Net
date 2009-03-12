@@ -10,6 +10,8 @@ namespace LumiSoft.Net.IO
     /// </summary>
     public class Base64Stream : Stream,IDisposable
     {
+        #region BASE64_ENCODE_TABLE
+
         private readonly static byte[] BASE64_ENCODE_TABLE = new byte[]{
 		    (byte)'A',(byte)'B',(byte)'C',(byte)'D',(byte)'E',(byte)'F',(byte)'G',(byte)'H',(byte)'I',(byte)'J',
             (byte)'K',(byte)'L',(byte)'M',(byte)'N',(byte)'O',(byte)'P',(byte)'Q',(byte)'R',(byte)'S',(byte)'T',
@@ -19,6 +21,10 @@ namespace LumiSoft.Net.IO
             (byte)'y',(byte)'z',(byte)'0',(byte)'1',(byte)'2',(byte)'3',(byte)'4',(byte)'5',(byte)'6',(byte)'7',
             (byte)'8',(byte)'9',(byte)'+',(byte)'/'
 		};
+
+        #endregion
+
+        #region BASE64_DECODE_TABLE
 
         private readonly static short[] BASE64_DECODE_TABLE = new short[]{
             -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  // 0 -    9
@@ -36,6 +42,8 @@ namespace LumiSoft.Net.IO
 		    49,50,51,-1,-1,-1,-1,-1         //120 - 127
         };
 
+        #endregion
+
         private bool        m_IsDisposed         = false;
         private bool        m_IsFinished         = false;
         private Stream      m_pStream            = null;
@@ -46,7 +54,10 @@ namespace LumiSoft.Net.IO
         private int         m_OffsetInEncode3x8Block = 0;
         private byte[]      m_pEncode3x8Block    = new byte[3];
         private byte[]      m_pEncodeBuffer      = new byte[78];
-        private Queue<byte> m_pDecodeReminder    = null;
+        private byte[]      m_pDecodedBlock      = null;
+        private int         m_DecodedBlockOffset = 0;
+        private int         m_DecodedBlockCount  = 0;
+        private Base64      m_pBase64            = null;
 
         /// <summary>
         /// Default constructor.
@@ -78,7 +89,8 @@ namespace LumiSoft.Net.IO
             m_AddLineBreaks = addLineBreaks;
             m_AccessMode    = access;
 
-            m_pDecodeReminder = new Queue<byte>();
+            m_pDecodedBlock = new byte[8000];
+            m_pBase64       = new Base64();
         }
 
         #region method Dispose
@@ -172,6 +184,7 @@ namespace LumiSoft.Net.IO
         /// <returns>The total number of bytes read into the buffer. This can be less than the number of bytes requested if that many bytes are not currently available, or zero (0) if the end of the stream has been reached.</returns>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
         /// <exception cref="ArgumentNullException">Is raised when <b>buffer</b> is null reference.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">Is raised when any of the arguments has out of valid range.</exception>
         /// <exception cref="NotSupportedException">Is raised when reading not supported.</exception>
         public override int Read(byte[] buffer,int offset,int count)
         {
@@ -180,146 +193,67 @@ namespace LumiSoft.Net.IO
             }
             if(buffer == null){
                 throw new ArgumentNullException("buffer");
+            }           
+            if(offset < 0){
+                throw new ArgumentOutOfRangeException("offset","Argument 'offset' value must be >= 0.");
+            }
+            if(count < 0){
+                throw new ArgumentOutOfRangeException("count","Argument 'count' value must be >= 0.");
+            }
+            if(offset + count > buffer.Length){
+                throw new ArgumentOutOfRangeException("count","Argument 'count' is bigger than than argument 'buffer' can store.");
             }
             if((m_AccessMode & FileAccess.Read) == 0){
                 throw new NotSupportedException();
             }
 
-            /* RFC 4648.
-			
-				Base64 is processed from left to right by 4 6-bit byte block, 4 6-bit byte block 
-				are converted to 3 8-bit bytes.
-				If base64 4 byte block doesn't have 3 8-bit bytes, missing bytes are marked with =. 
-							
-				Value Encoding  Value Encoding  Value Encoding  Value Encoding
-					0 A            17 R            34 i            51 z
-					1 B            18 S            35 j            52 0
-					2 C            19 T            36 k            53 1
-					3 D            20 U            37 l            54 2
-					4 E            21 V            38 m            55 3
-					5 F            22 W            39 n            56 4
-					6 G            23 X            40 o            57 5
-					7 H            24 Y            41 p            58 6
-					8 I            25 Z            42 q            59 7
-					9 J            26 a            43 r            60 8
-					10 K           27 b            44 s            61 9
-					11 L           28 c            45 t            62 +
-					12 M           29 d            46 u            63 /
-					13 N           30 e            47 v
-					14 O           31 f            48 w         (pad) =
-					15 P           32 g            49 x
-					16 Q           33 h            50 y
-					
-				NOTE: 4 base64 6-bit bytes = 3 8-bit bytes				
-					// |    6-bit    |    6-bit    |    6-bit    |    6-bit    |
-					// | 1 2 3 4 5 6 | 1 2 3 4 5 6 | 1 2 3 4 5 6 | 1 2 3 4 5 6 |
-					// |    8-bit         |    8-bit        |    8-bit         |
-			*/
-
-            int storedInBuffer = 0;
-
-            // If we have decoded-buffered bytes, use them first.
-            while(m_pDecodeReminder.Count > 0){                
-                buffer[offset++] = m_pDecodeReminder.Dequeue();
-                storedInBuffer++;
-                count--;
-
-                // We filled whole "buffer", no more room.
-                if(count == 0){
-                    return storedInBuffer;
-                }
-            }
- 
-            // 1) Calculate as much we can decode to "buffer". !!! We need to read as 4x7-bit blocks.
-            int rawBytesToRead = (int)Math.Ceiling((double)count / 3.0) * 4;
-                        
-            byte[]  readBuffer        = new byte[rawBytesToRead];
-            short[] decodeBlock       = new short[4];
-            byte[]  decodedBlock      = new byte[3];
-            int     decodeBlockOffset = 0;
-            int     paddedCount       = 0;
-            // Decode while we have room in "buffer".
-            while(storedInBuffer < count){
-                int readedCount = m_pStream.Read(readBuffer,0,rawBytesToRead);
+            // We havn't any decoded data left, decode new data block.
+            if((m_DecodedBlockCount - m_DecodedBlockOffset) == 0){
+                byte[] readBuffer = new byte[m_pDecodedBlock.Length + 3];
+                int readedCount = m_pStream.Read(readBuffer,0,readBuffer.Length - 3);
                 // We reached end of stream, no more data.
                 if(readedCount == 0){
-                    // We have last block without padding 1 char.
-                    if(decodeBlockOffset == 3){
-                        buffer[offset + storedInBuffer++] = (byte)(decodeBlock[0] << 2 | decodeBlock[1] >> 4);
-                        // See if "buffer" can accomodate 2 byte.
-                        if(storedInBuffer < count){
-                            buffer[offset + storedInBuffer++] = (byte)((decodeBlock[1] & 0xF) << 4 | decodeBlock[2] >> 2);
-                        }
-                        else{
-                            m_pDecodeReminder.Enqueue((byte)((decodeBlock[1] & 0xF) << 4 | decodeBlock[2] >> 2));
-                        }
-                    }
-                    // We have last block without padding 2 chars.
-                    else if(decodeBlockOffset == 2){
-                        buffer[offset + storedInBuffer++] = (byte)(decodeBlock[0] << 2 | decodeBlock[1] >> 4);
-                    }
-                    // We have invalid base64 data.
-                    else if(decodeBlockOffset == 1){
-                        throw new InvalidDataException("Incomplete base64 data..");
-                    }
-
-                    return storedInBuffer;
+                    return 0;
                 }
 
-                // Process readed bytes.
+                // Decode block must contain only integral 4-byte base64 blocks.
+                // Count base64 chars.
+                int base64Count = 0;
                 for(int i=0;i<readedCount;i++){
                     byte b = readBuffer[i];
-
-                    // If padding char.
-                    if(b == '='){
-                        decodeBlock[decodeBlockOffset++] = (byte)'=';
-                        paddedCount++;
-                        rawBytesToRead--;
-                    }
-                    // If base64 char.
-                    else if(BASE64_DECODE_TABLE[b] != -1){
-                        decodeBlock[decodeBlockOffset++] = BASE64_DECODE_TABLE[b];
-                        rawBytesToRead--;
-                    }
-                    // Non-base64 char, skip it.
-                    else{
-                    }
-
-                    // Decode block full, decode bytes.
-                    if(decodeBlockOffset == 4){
-                        // Decode 3x8-bit block.
-                        decodedBlock[0] = (byte)(decodeBlock[0] << 2         | decodeBlock[1] >> 4);
-					    decodedBlock[1] = (byte)((decodeBlock[1] & 0xF) << 4 | decodeBlock[2] >> 2);
-					    decodedBlock[2] = (byte)((decodeBlock[2] & 0x3) << 6 | decodeBlock[3] >> 0);
-
-                        // Invalid base64 data. Base64 final quantum may have max 2 padding chars.
-                        if(paddedCount > 2){
-                            throw new InvalidDataException("Invalid base64 data, more than 2 padding chars(=).");
-                        }
-
-                        for(int n=0;n<(3 - paddedCount);n++){
-                            // We have room in "buffer", store byte there.
-                            if(storedInBuffer < count){
-                                buffer[offset + storedInBuffer++] = decodedBlock[n];
-                            }
-                            //No room in "buffer", store reminder.
-                            else{
-                                m_pDecodeReminder.Enqueue(decodedBlock[n]);
-                            }
-                        }
-
-                        decodeBlockOffset = 0;
-                        paddedCount = 0;
+                    if(b == '=' || BASE64_DECODE_TABLE[b] != -1){
+                        base64Count++;
                     }
                 }
+                // Read while last block is full 4-byte base64 block.
+                while((base64Count % 4) != 0){
+                    int b = m_pStream.ReadByte();
+                    // End of stream reached.
+                    if(b == -1){
+                        break;
+                    }
+                    else if(b == '=' || BASE64_DECODE_TABLE[b] != -1){
+                        readBuffer[readedCount++] = (byte)b;
+                        base64Count++;
+                    }
+                }
+
+                // Decode block.
+                m_DecodedBlockCount  = m_pBase64.Decode(readBuffer,0,readedCount,m_pDecodedBlock,0,true);
+                m_DecodedBlockOffset = 0;
             }
 
-            return storedInBuffer;
+            int available   = m_DecodedBlockCount - m_DecodedBlockOffset;
+            int countToCopy = Math.Min(count,available);
+            Array.Copy(m_pDecodedBlock,m_DecodedBlockOffset,buffer,offset,countToCopy);
+            m_DecodedBlockOffset += countToCopy;
+
+            return countToCopy;
         }
 
         #endregion
 
-        #region overide method Write
+        #region override method Write
 
         /// <summary>
         /// Encodes a sequence of bytes, writes to the current stream and advances the current position within this stream by the number of bytes written.
