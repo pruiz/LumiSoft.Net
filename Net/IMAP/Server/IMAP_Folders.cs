@@ -45,7 +45,7 @@ namespace LumiSoft.Net.IMAP.Server
                 folderPattern = m_RefName + "/" + m_Mailbox;
             }
 
-			if(FolderMatches(folderPattern,Core.Decode_IMAP_UTF7_String(folder))){
+			if(FolderMatches(folderPattern,IMAP_Utils.Decode_IMAP_UTF7_String(folder))){
 				m_Mailboxes.Add(new IMAP_Folder(folder,selectable));
 			}
 		}

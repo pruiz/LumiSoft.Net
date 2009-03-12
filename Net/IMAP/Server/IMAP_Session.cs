@@ -451,7 +451,7 @@ namespace LumiSoft.Net.IMAP.Server
 			}
 			string commandTag = cmdParts[0].Trim().Trim();
 			string command    = cmdParts[1].ToUpper().Trim();
-			string argsText   = Core.GetArgsText(IMAP_commandTxt,cmdParts[0] + " " + cmdParts[1]);
+			string argsText   = IMAP_commandTxt.Substring((cmdParts[0] + " " + cmdParts[1]).Length).Trim();
 			//---------------------------------------------------------------------//
 
 			bool getNextCmd = true;
@@ -1039,11 +1039,11 @@ namespace LumiSoft.Net.IMAP.Server
 			// Store start time
 			long startTime = DateTime.Now.Ticks;
 
-            IMAP_SelectedFolder selectedFolder = new IMAP_SelectedFolder(Core.Decode_IMAP_UTF7_String(args[0]));
+            IMAP_SelectedFolder selectedFolder = new IMAP_SelectedFolder(IMAP_Utils.Decode_IMAP_UTF7_String(args[0]));
 			IMAP_eArgs_GetMessagesInfo eArgs = m_pServer.OnGetMessagesInfo(this,selectedFolder);
 			if(eArgs.ErrorText == null){
 				m_pSelectedFolder = selectedFolder;
-				m_SelectedMailbox = Core.Decode_IMAP_UTF7_String(args[0]);
+				m_SelectedMailbox = IMAP_Utils.Decode_IMAP_UTF7_String(args[0]);
 
 				string response = "";
 				response += "* FLAGS (\\Answered \\Flagged \\Deleted \\Seen \\Draft)\r\n";
@@ -1114,12 +1114,12 @@ namespace LumiSoft.Net.IMAP.Server
             // Store start time
 			long startTime = DateTime.Now.Ticks;
 
-            IMAP_SelectedFolder selectedFolder = new IMAP_SelectedFolder(Core.Decode_IMAP_UTF7_String(args[0]));
+            IMAP_SelectedFolder selectedFolder = new IMAP_SelectedFolder(IMAP_Utils.Decode_IMAP_UTF7_String(args[0]));
 			IMAP_eArgs_GetMessagesInfo eArgs = m_pServer.OnGetMessagesInfo(this,selectedFolder);
 			if(eArgs.ErrorText == null){
                 m_pSelectedFolder = selectedFolder;
 				m_pSelectedFolder.ReadOnly = true;				
-				m_SelectedMailbox = Core.Decode_IMAP_UTF7_String(args[0]);
+				m_SelectedMailbox = IMAP_Utils.Decode_IMAP_UTF7_String(args[0]);
 
 				string response = "";
 				response += "* FLAGS (\\Answered \\Flagged \\Deleted \\Seen \\Draft)\r\n";
@@ -1201,7 +1201,7 @@ namespace LumiSoft.Net.IMAP.Server
             // Store start time
 			long startTime = DateTime.Now.Ticks;
 
-			string errorText = m_pServer.OnCreateMailbox(this,Core.Decode_IMAP_UTF7_String(args[0]));
+			string errorText = m_pServer.OnCreateMailbox(this,IMAP_Utils.Decode_IMAP_UTF7_String(args[0]));
 			if(errorText == null){
 				this.Socket.WriteLine(cmdTag + " OK CREATE Completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds" );
 			}
@@ -1280,7 +1280,7 @@ namespace LumiSoft.Net.IMAP.Server
 				return;
 			}
 			
-			string errorText = m_pServer.OnDeleteMailbox(this,Core.Decode_IMAP_UTF7_String(args[0]));
+			string errorText = m_pServer.OnDeleteMailbox(this,IMAP_Utils.Decode_IMAP_UTF7_String(args[0]));
 			if(errorText == null){
 				this.Socket.WriteLine(cmdTag + " OK DELETE Completed");
 			}
@@ -1357,8 +1357,8 @@ namespace LumiSoft.Net.IMAP.Server
 				return;
 			}
 
-			string mailbox    = Core.Decode_IMAP_UTF7_String(args[0]);
-			string newMailbox = Core.Decode_IMAP_UTF7_String(args[1]);
+			string mailbox    = IMAP_Utils.Decode_IMAP_UTF7_String(args[0]);
+			string newMailbox = IMAP_Utils.Decode_IMAP_UTF7_String(args[1]);
 			
 			string errorText = m_pServer.OnRenameMailbox(this,mailbox,newMailbox);
 			if(errorText == null){
@@ -1415,7 +1415,7 @@ namespace LumiSoft.Net.IMAP.Server
 				return;
 			}
 
-			string errorText = m_pServer.OnSubscribeMailbox(this,Core.Decode_IMAP_UTF7_String(args[0]));
+			string errorText = m_pServer.OnSubscribeMailbox(this,IMAP_Utils.Decode_IMAP_UTF7_String(args[0]));
 			if(errorText == null){
 				this.Socket.WriteLine(cmdTag + " OK SUBSCRIBE completed");
 			}
@@ -1460,7 +1460,7 @@ namespace LumiSoft.Net.IMAP.Server
 				return;
 			}
 
-			string errorText = m_pServer.OnUnSubscribeMailbox(this,Core.Decode_IMAP_UTF7_String(args[0]));
+			string errorText = m_pServer.OnUnSubscribeMailbox(this,IMAP_Utils.Decode_IMAP_UTF7_String(args[0]));
 			if(errorText == null){
 				this.Socket.WriteLine(cmdTag + " OK UNSUBSCRIBE completed");
 			}
@@ -1528,8 +1528,8 @@ namespace LumiSoft.Net.IMAP.Server
             // Store start time
 			long startTime = DateTime.Now.Ticks;
 
-			string refName = Core.Decode_IMAP_UTF7_String(args[0]);
-			string mailbox = Core.Decode_IMAP_UTF7_String(args[1]);
+			string refName = IMAP_Utils.Decode_IMAP_UTF7_String(args[0]);
+			string mailbox = IMAP_Utils.Decode_IMAP_UTF7_String(args[1]);
 
 			string reply = "";
 
@@ -1542,10 +1542,10 @@ namespace LumiSoft.Net.IMAP.Server
 				IMAP_Folders mailboxes = m_pServer.OnGetMailboxes(this,refName,mailbox);
 				foreach(IMAP_Folder mBox in mailboxes.Folders){
 					if(mBox.Selectable){
-						reply += "* LIST () \"/\" \"" + Core.Encode_IMAP_UTF7_String(mBox.Folder) + "\" \r\n";
+						reply += "* LIST () \"/\" \"" + IMAP_Utils.Encode_IMAP_UTF7_String(mBox.Folder) + "\" \r\n";
 					}
 					else{
-						reply += "* LIST (\\Noselect) \"/\" \"" + Core.Encode_IMAP_UTF7_String(mBox.Folder) + "\" \r\n";
+						reply += "* LIST (\\Noselect) \"/\" \"" + IMAP_Utils.Encode_IMAP_UTF7_String(mBox.Folder) + "\" \r\n";
 					}
 				}
 			}
@@ -1607,14 +1607,14 @@ namespace LumiSoft.Net.IMAP.Server
 				return;
 			}
 
-			string refName = Core.Decode_IMAP_UTF7_String(args[0]);
-			string mailbox = Core.Decode_IMAP_UTF7_String(args[1]);
+			string refName = IMAP_Utils.Decode_IMAP_UTF7_String(args[0]);
+			string mailbox = IMAP_Utils.Decode_IMAP_UTF7_String(args[1]);
 			
 			string reply = "";
 
 			IMAP_Folders mailboxes = m_pServer.OnGetSubscribedMailboxes(this,refName,mailbox);
 			foreach(IMAP_Folder mBox in mailboxes.Folders){
-				reply += "* LSUB () \"/\" \"" + Core.Encode_IMAP_UTF7_String(mBox.Folder) + "\" \r\n";
+				reply += "* LSUB () \"/\" \"" + IMAP_Utils.Encode_IMAP_UTF7_String(mBox.Folder) + "\" \r\n";
 			}
 
 			reply += cmdTag + " OK LSUB Completed\r\n";
@@ -1691,7 +1691,7 @@ namespace LumiSoft.Net.IMAP.Server
 				return;
 			}
 
-			string folder      = Core.Decode_IMAP_UTF7_String(args[0]);
+			string folder      = IMAP_Utils.Decode_IMAP_UTF7_String(args[0]);
 			string wantedItems = args[1].ToUpper();
 
 			// See wanted items are valid.
@@ -1809,7 +1809,7 @@ namespace LumiSoft.Net.IMAP.Server
 				return true;
 			}
 
-			string            mailbox = Core.Decode_IMAP_UTF7_String(args[0]);			
+			string            mailbox = IMAP_Utils.Decode_IMAP_UTF7_String(args[0]);			
 			IMAP_MessageFlags mFlags  = 0;
 			DateTime          date    = DateTime.Now;
 			long              msgLen  = Convert.ToInt64(args[args.Length - 1].Replace("{","").Replace("}",""));
@@ -2021,7 +2021,7 @@ namespace LumiSoft.Net.IMAP.Server
 				return;
 			}
 
-			IMAP_GETACL_eArgs eArgs = m_pServer.OnGetFolderACL(this,Core.Decode_IMAP_UTF7_String(IMAP_Utils.NormalizeFolder(args[0])));
+			IMAP_GETACL_eArgs eArgs = m_pServer.OnGetFolderACL(this,IMAP_Utils.Decode_IMAP_UTF7_String(IMAP_Utils.NormalizeFolder(args[0])));
 			if(eArgs.ErrorText.Length > 0){
 				this.Socket.WriteLine(cmdTag + " NO GETACL " + eArgs.ErrorText);
 			}
@@ -3301,7 +3301,7 @@ namespace LumiSoft.Net.IMAP.Server
 								
 								string[] sectionParts = section.Split('.');
 								foreach(string sectionPart in sectionParts){
-									if(!Core.IsNumber(sectionPart)){
+									if(!Net_Utils.IsInteger(sectionPart)){
 										this.Socket.WriteLine(cmdTag + " BAD Invalid BODY[<section>] argument. Invalid <section>: " + section);
 										return;
 									}
@@ -3335,7 +3335,7 @@ namespace LumiSoft.Net.IMAP.Server
 							string[] start_length = partial.Split('.');
 
 							// Validate <partial>
-							if(start_length.Length == 0 || start_length.Length > 2 || !Core.IsNumber(start_length[0]) || (start_length.Length == 2 && !Core.IsNumber(start_length[1]))){
+							if(start_length.Length == 0 || start_length.Length > 2 || !Net_Utils.IsInteger(start_length[0]) || (start_length.Length == 2 && !Net_Utils.IsInteger(start_length[1]))){
 								this.Socket.WriteLine(cmdTag + " BAD Invalid BODY[]<partial> argument. Invalid <partial>: " + partial);
 								return;
 							}
@@ -4144,7 +4144,7 @@ namespace LumiSoft.Net.IMAP.Server
 				}
 
 				if(sequenceSetContains){
-					errorText = m_pServer.OnCopyMessage(this,msg,Core.Decode_IMAP_UTF7_String(args[1]));
+					errorText = m_pServer.OnCopyMessage(this,msg,IMAP_Utils.Decode_IMAP_UTF7_String(args[1]));
 					if(errorText != null){
 						break; // Errors return error text, don't try to copy other messages
 					}
@@ -4225,7 +4225,7 @@ namespace LumiSoft.Net.IMAP.Server
 			}
 
 			// Get commands args text, we just remove COMMAND
-			string cmdArgs = Core.GetArgsText(argsText,args[0]);
+			string cmdArgs = argsText.Substring(args[0].Length).Trim();
 
 			// See if valid command specified with UID command
 			switch(args[0].ToUpper())

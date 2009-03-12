@@ -579,7 +579,7 @@ namespace LumiSoft.Net.IMAP.Server
 		/// <returns></returns>
 		internal string OnDeleteMessage(IMAP_Session session,IMAP_Message message)
 		{
-			Message_EventArgs eArgs = new Message_EventArgs(Core.Decode_IMAP_UTF7_String(session.SelectedMailbox),message);
+			Message_EventArgs eArgs = new Message_EventArgs(IMAP_Utils.Decode_IMAP_UTF7_String(session.SelectedMailbox),message);
 			if(this.DeleteMessage != null){
 				this.DeleteMessage(session,eArgs);
 			}
@@ -600,7 +600,7 @@ namespace LumiSoft.Net.IMAP.Server
 		/// <returns></returns>
 		internal string OnCopyMessage(IMAP_Session session,IMAP_Message msg,string location)
 		{
-			Message_EventArgs eArgs = new Message_EventArgs(Core.Decode_IMAP_UTF7_String(session.SelectedMailbox),msg,location);
+			Message_EventArgs eArgs = new Message_EventArgs(IMAP_Utils.Decode_IMAP_UTF7_String(session.SelectedMailbox),msg,location);
 			if(this.CopyMessage != null){
 				this.CopyMessage(session,eArgs);
 			}
@@ -664,7 +664,7 @@ namespace LumiSoft.Net.IMAP.Server
 		/// <returns></returns>
 		internal string OnStoreMessageFlags(IMAP_Session session,IMAP_Message msg)
 		{
-			Message_EventArgs eArgs = new Message_EventArgs(Core.Decode_IMAP_UTF7_String(session.SelectedMailbox),msg);
+			Message_EventArgs eArgs = new Message_EventArgs(IMAP_Utils.Decode_IMAP_UTF7_String(session.SelectedMailbox),msg);
 			if(this.StoreMessageFlags != null){
 				this.StoreMessageFlags(session,eArgs);
 			}
