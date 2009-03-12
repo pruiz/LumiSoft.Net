@@ -190,7 +190,7 @@ namespace LumiSoft.Net.AUTH
                 a1 = userName + ":" + this.Realm + ":" + password;
             }
             else if(this.Algorithm.ToLower() == "md5-sess"){
-                a1 = Core.ComputeMd5(userName + ":" + this.Realm + ":" + password,false) + ":" + this.Nonce + ":" + this.CNonce;
+                a1 = Net_Utils.ComputeMd5(userName + ":" + this.Realm + ":" + password,false) + ":" + this.Nonce + ":" + this.CNonce;
             }
             else{
                 throw new ArgumentException("Invalid Algorithm value '" + this.Algorithm + "' !");
@@ -206,11 +206,11 @@ namespace LumiSoft.Net.AUTH
             // Calculate response value.
             // qop present
             if(!string.IsNullOrEmpty(this.Qop)){
-                return Core.ComputeMd5(Core.ComputeMd5(a1,true) + ":" + this.Nonce + ":" + this.NonceCount.ToString("x8") + ":" + this.CNonce + ":" + this.Qop + ":" + Core.ComputeMd5(a2,true),true);
+                return Net_Utils.ComputeMd5(Net_Utils.ComputeMd5(a1,true) + ":" + this.Nonce + ":" + this.NonceCount.ToString("x8") + ":" + this.CNonce + ":" + this.Qop + ":" + Net_Utils.ComputeMd5(a2,true),true);
             }
             // qop not present
             else{                
-                return Core.ComputeMd5(Core.ComputeMd5(a1,true) + ":" + this.Nonce + ":" + Core.ComputeMd5(a2,true),true);
+                return Net_Utils.ComputeMd5(Net_Utils.ComputeMd5(a1,true) + ":" + this.Nonce + ":" + Net_Utils.ComputeMd5(a2,true),true);
             }
         }
 
@@ -226,55 +226,93 @@ namespace LumiSoft.Net.AUTH
         /// <returns>Returns calculated rsponse value.</returns>
         public string CalculateResponse(string userName,string password)
         {
-            /*
-                MD5
-                    A1 = username-value ":" realm-value ":" passwd
-            
-                MD5-sess
-                    A1 = md5(username-value ":" realm-value ":" passwd) ":" nonce-value ":" cnonce-value
-                                         
-                qop not peresent or auth
-                    A2 = Method ":" digest-uri-value
+            /* RFC 2617.
              
-                qop auth-int
-                    A2 = Method ":" digest-uri-value ":" md5h(entity-body)
-              
-                qop present
-                    response = md5h(md5h(A1) ":" nonce-value ":" nc-value ":" cnonce-value ":" qop-value ":" md5h(A2))
-                          
-                qop not present
-                    response = md5h(md5h(A1) ":" nonce-value ":" md5h(A2))
-                        
-            */
+                3.2.2.1 Request-Digest
             
-            string a1 = "";
-            string a2 = "";
-            // Create A1
-            if(this.Algorithm == "" || this.Algorithm.ToLower() == "md5"){
-                a1 = userName + ":" + this.Realm + ":" + password;
+                    If the "qop" value is "auth" or "auth-int":
+
+                        request-digest  = <"> < KD ( H(A1),unq(nonce-value) ":" nc-value ":" unq(cnonce-value) ":" unq(qop-value) ":" H(A2) )> <">
+
+                    If the "qop" directive is not present (this construction is for
+                    compatibility with RFC 2069):
+
+                        request-digest = <"> < KD ( H(A1), unq(nonce-value) ":" H(A2) ) > <">
+
+                3.2.2.2 A1
+
+                    If the "algorithm" directive's value is "MD5" or is unspecified, then A1 is:
+
+                        A1 = unq(username-value) ":" unq(realm-value) ":" passwd
+
+                    If the "algorithm" directive's value is "MD5-sess", then A1 is
+                    calculated only once - on the first request by the client following
+                    receipt of a WWW-Authenticate challenge from the server.  It uses the
+                    server nonce from that challenge, and the first client nonce value to
+                    construct A1 as follows:
+
+                        A1 = H( unq(username-value) ":" unq(realm-value) ":" passwd ) ":" unq(nonce-value) ":" unq(cnonce-value)
+
+                    This creates a 'session key' for the authentication of subsequent
+                    requests and responses which is different for each "authentication
+                    session", thus limiting the amount of material hashed with any one
+                    key.  (Note: see further discussion of the authentication session in
+                    section 3.3.) Because the server need only use the hash of the user
+                    credentials in order to create the A1 value, this construction could
+                    be used in conjunction with a third party authentication service so
+                    that the web server would not need the actual password value.  The
+                    specification of such a protocol is beyond the scope of this
+                    specification.
+            
+                3.2.2.3 A2
+
+                    If the "qop" directive's value is "auth" or is unspecified, then A2 is:
+
+                        A2 = Method ":" digest-uri-value
+
+                    If the "qop" value is "auth-int", then A2 is:
+
+                        A2 = Method ":" digest-uri-value ":" H(entity-body)
+              
+            
+                H(data) = MD5(data)
+                KD(secret, data) = H(concat(secret, ":", data))
+                unc = unqoute string
+            */
+
+            string A1 = "";
+            if(string.IsNullOrEmpty(this.Algorithm) || this.Algorithm.ToLower() == "md5"){
+                A1 = userName + ":" + this.Realm + ":" + password;
             }
             else if(this.Algorithm.ToLower() == "md5-sess"){
-                a1 = Core.ComputeMd5(userName + ":" + this.Realm + ":" + password,false) + ":" + this.Nonce + ":" + this.CNonce;
+                A1 = H(userName + ":" + this.Realm + ":" + password) + ":" + this.Nonce + ":" + this.CNonce;
             }
             else{
-                throw new ArgumentException("Invalid Algorithm value '" + this.Algorithm + "' !");
-            }
-            // Create A2            
-            if(this.Qop == "" || this.Qop.ToLower() == "auth"){
-                a2 = m_Method.ToUpper() + ":" + this.Uri;
-            }
-            else{
-                throw new ArgumentException("Invalid qop value '" + this.Qop + "' !");
+                throw new ArgumentException("Invalid 'algorithm' value '" + this.Algorithm + "'.");
             }
 
-            // Calculate response value.
-            // qop present
-            if(!string.IsNullOrEmpty(this.Qop)){
-                return Core.ComputeMd5(Core.ComputeMd5(a1,true) + ":" + this.Nonce + ":" + this.NonceCount.ToString("x8") + ":" + this.CNonce + ":" + this.Qop + ":" + Core.ComputeMd5(a2,true),true);
+            string A2 = "";
+            if(string.IsNullOrEmpty(this.Qop) || this.Qop.ToLower() == "auth"){
+                A2 = this.RequestMethod + ":" + this.Uri;
             }
-            // qop not present
-            else{                
-                return Core.ComputeMd5(Core.ComputeMd5(a1,true) + ":" + this.Nonce + ":" + Core.ComputeMd5(a2,true),true);
+            else{
+                throw new ArgumentException("Invalid 'qop' value '" + this.Qop + "'.");
+            }
+
+            if(this.Qop.ToLower() == "auth" || this.Qop.ToLower() == "auth-int"){
+                // request-digest  = <"> < KD ( H(A1),unq(nonce-value) ":" nc-value ":" unq(cnonce-value) ":" unq(qop-value) ":" H(A2) )> <">
+                // We don't add quoutes here.
+
+                return KD(H(A1),this.Nonce + ":" + this.NonceCount.ToString("x8") + ":" + this.CNonce + ":" + this.Qop + ":" + H(A2));
+            }
+            else if(string.IsNullOrEmpty(this.Qop)){
+                // request-digest = <"> < KD ( H(A1), unq(nonce-value) ":" H(A2) ) > <">
+                // We don't add quoutes here.
+
+                return KD(H(A1),this.Nonce + ":" + H(A2));
+            }
+            else{
+                throw new ArgumentException("Invalid 'qop' value '" + this.Qop + "'.");
             }
         }
 
@@ -395,7 +433,7 @@ namespace LumiSoft.Net.AUTH
             if(!string.IsNullOrEmpty(m_Cnonce)){
                 authData.Append("cnonce=\"" + m_Cnonce + "\",");
             }
-            authData.Append("response=" + response + ",");
+            authData.Append("response=\"" + response + "\",");
             if(!string.IsNullOrEmpty(m_Opaque)){
                 authData.Append("opaque=\"" + m_Opaque + "\",");
             }
@@ -409,6 +447,27 @@ namespace LumiSoft.Net.AUTH
             }
 
             return retVal;
+        }
+
+        #endregion
+
+
+        #region method H
+
+        private string H(string value)
+        {
+            return Net_Utils.ComputeMd5(value,true);
+        }
+
+        #endregion
+
+        #region method KD
+
+        private string KD(string key,string data)
+        {
+            // KD(secret, data) = H(concat(secret, ":", data))
+
+            return H(key + ":" + data);
         }
 
         #endregion
@@ -605,13 +664,15 @@ namespace LumiSoft.Net.AUTH
         }
 
         /// <summary>
-        /// Gets nonce count. This MUST be specified if a qop directive is sent (see above), and
+        /// Gets or stets nonce count. This MUST be specified if a qop directive is sent (see above), and
         /// MUST NOT be specified if the server did not send a qop directive in the WWW-Authenticate 
         /// header field.  The nc-value is the hexadecimal count of the number of requests.
         /// </summary>
         public int NonceCount
         {
             get{ return m_NonceCount;}
+
+            set{ m_NonceCount = value; }
         }
                 
         #endregion
