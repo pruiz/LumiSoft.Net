@@ -80,28 +80,20 @@ namespace LumiSoft.Net
                 throw new ArgumentException("Argument 'value' value must be specified.");
             }
 
-            // We have IP address without a port.
-            try{
-                IPAddress.Parse(value);
+            // We have host name with port.
+            if(value.IndexOf(':') > -1){
+                string[] host_port = value.Split(new char[]{':'},2);
 
-                return new HostEndPoint(value,defaultPort);
-            }
-            catch{
-                // We have host name with port.
-                if(value.IndexOf(':') > -1){
-                    string[] host_port = value.Split(new char[]{':'},2);
-
-                    try{
-                        return new HostEndPoint(host_port[0],Convert.ToInt32(host_port[1]));
-                    }
-                    catch{
-                        throw new ArgumentException("Argument 'value' has invalid value.");
-                    }
+                try{
+                    return new HostEndPoint(host_port[0],Convert.ToInt32(host_port[1]));
                 }
-                // We have host name without port.
-                else{
-                    return new HostEndPoint(value,defaultPort);
-                }                
+                catch{
+                    throw new ArgumentException("Argument 'value' has invalid value.");
+                }
+            }
+            // We have host name without port.
+            else{
+                return new HostEndPoint(value,defaultPort);
             }
         }
 
