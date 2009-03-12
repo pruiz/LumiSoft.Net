@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
+using LumiSoft.Net.MIME;
+
 namespace LumiSoft.Net.Mime.vCard
 {
     /// <summary>
@@ -52,7 +54,7 @@ namespace LumiSoft.Net.Mime.vCard
             //value = TextUtils.EscapeString(value,new char[]{',',';'});
 
             bool needEncode = false;
-            if(!Core.IsAscii(value)){
+            if(!Net_Utils.IsAscii(value)){
                 needEncode = true;
             }
 
@@ -221,10 +223,10 @@ namespace LumiSoft.Net.Mime.vCard
                 // Encoding specified, decode data.
                 if(encoding != null){
                     if(encoding == "quoted-printable"){
-                        data = System.Text.Encoding.Default.GetString(Core.QuotedPrintableDecode(System.Text.Encoding.Default.GetBytes(data)));
+                        data = System.Text.Encoding.Default.GetString(MIME_Utils.QuotedPrintableDecode(System.Text.Encoding.Default.GetBytes(data)));
                     }
                     else if(encoding == "b"){
-                        data = System.Text.Encoding.Default.GetString(Core.Base64Decode(System.Text.Encoding.Default.GetBytes(data)));
+                        data = System.Text.Encoding.Default.GetString(Net_Utils.FromBase64(System.Text.Encoding.Default.GetBytes(data)));
                     }
                     else{
                         throw new Exception("Unknown data encoding '" + encoding + "' !");
