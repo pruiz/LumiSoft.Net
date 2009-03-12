@@ -137,11 +137,6 @@ namespace LumiSoft.Net.ABNF
             }
             values.Add(Convert.ToInt32(b.ToString()));
 
-            //Console.WriteLine(valueType.ToString());
-            //foreach(int v in values){
-            //    Console.WriteLine(v);
-           // }
-
             if(valueType == ValueType.Single){
                 return new ABNF_DecVal(values[0],values[0]);
             }
