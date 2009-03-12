@@ -120,7 +120,7 @@ namespace LumiSoft.Net.AUTH
                     AUTH_e_UserInfo result = OnGetUserInfo(user_hash[0]);
                     if(result.UserExists){
                         // hash = Hex(HmacMd5(hashKey,password))
-                        string hash = Net_Utils.Hex(HmacMd5(m_Key,result.Password));
+                        string hash = Net_Utils.ToHex(HmacMd5(m_Key,result.Password));
                         if(hash == user_hash[1]){
                             m_IsAuthenticated = true;
                         }
