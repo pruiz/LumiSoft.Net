@@ -84,10 +84,5 @@ namespace LumiSoft.Net.Dns.Client
         /// All records what server returns.
         /// </summary>
         ANY = 255,
-
-	/*	/// <summary>
-		/// UnKnown
-		/// </summary>
-		UnKnown = 9999, */
 	}
 }
