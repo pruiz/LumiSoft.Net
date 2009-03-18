@@ -542,7 +542,7 @@ namespace LumiSoft.Net.SMTP.Client
 				}
                  								
 				HMACMD5 kMd5         = new HMACMD5(Encoding.ASCII.GetBytes(password));
-				string  passwordHash = Core.ToHexString(kMd5.ComputeHash(Convert.FromBase64String(line.Split(' ')[1]))).ToLower();
+				string  passwordHash = Net_Utils.ToHex(kMd5.ComputeHash(Convert.FromBase64String(line.Split(' ')[1]))).ToLower();
 				
                 // Send authentication info to server.
 				WriteLine(Convert.ToBase64String(Encoding.ASCII.GetBytes(userName + " " + passwordHash)));

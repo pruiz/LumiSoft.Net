@@ -1465,6 +1465,7 @@ namespace LumiSoft.Net.SMTP.Server
 
         #endregion
 
+
         #region method LogAddText
 
         /// <summary>
@@ -1472,7 +1473,7 @@ namespace LumiSoft.Net.SMTP.Server
         /// </summary>
         /// <param name="text">text to log.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>text</b> is null reference.</exception>
-        private void LogAddText(string text)
+        public void LogAddText(string text)
         {
             if(text == null){
                 throw new ArgumentNullException("text");

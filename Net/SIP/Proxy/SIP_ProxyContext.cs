@@ -611,7 +611,7 @@ namespace LumiSoft.Net.SIP.Proxy
                               sender-flow = from-tag ":" flowID
                               target-flow = flowID                        
                 */
-                if(m_AddRecordRoute && request.From.Tag != null){
+                if(m_AddRecordRoute && request.From.Tag != null && request.RecordRoute.GetAllValues().Length > 0){
                     string flowInfo = request.From.Tag + ":" + m_pOwner.ServerTransaction.Flow.ID + "/" + flow.ID;
                     ((SIP_Uri)request.RecordRoute.GetTopMostValue().Address.Uri).Parameters.Add("flowInfo",flowInfo);
                 }

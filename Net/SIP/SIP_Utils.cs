@@ -84,6 +84,7 @@ namespace LumiSoft.Net.SIP
         {
             try{
                 SIP_Uri.Parse(value);
+
                 return true;
             }
             catch{

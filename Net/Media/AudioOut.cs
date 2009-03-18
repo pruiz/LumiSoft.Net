@@ -830,7 +830,7 @@ namespace LumiSoft.Net.Media
         /// <summary>
         /// Default constructor.
         /// </summary>
-        /// <param name="device">Audio aoutput device.</param>
+        /// <param name="device">Audio output device.</param>
         /// <param name="samplesPerSec">Sample rate, in samples per second (hertz).</param>
         /// <param name="bitsPerSample">Bits per sample. For PCM 8 or 16 are the only valid values.</param>
         /// <param name="channels">Number of channels.</param>

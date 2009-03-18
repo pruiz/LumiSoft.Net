@@ -752,8 +752,8 @@ namespace LumiSoft.Net.SIP.Stack
 
             if(localEP == null){
                 if(transport == SIP_Transport.UDP){
-                    //  Get load-balanched local endpoint.
-                    localEP = m_pUdpServer.GetLocalEndPoint(remoteEP);
+                    // Get load-balanched local endpoint.
+                    localEP = m_pUdpServer.GetLocalEndPoint(remoteEP);                    
                 }
                 else if(transport == SIP_Transport.TCP){
                     // Get load-balanched local IP for TCP and create random port.
@@ -1525,9 +1525,9 @@ namespace LumiSoft.Net.SIP.Stack
 
         #endregion
 
-
+// REMOVE ME:
         #region method Resolve
-
+        /*
         /// <summary>
         /// Resolves data flow local NATed IP end point to public IP end point.
         /// </summary>
@@ -1544,6 +1544,7 @@ namespace LumiSoft.Net.SIP.Stack
             AutoResetEvent completionWaiter = new AutoResetEvent(false);
             // Create OPTIONS request
             SIP_Request optionsRequest = m_pStack.CreateRequest(SIP_Methods.OPTIONS,new SIP_t_NameAddress("sip:ping@publicIP.com"),new SIP_t_NameAddress("sip:ping@publicIP.com"));
+            optionsRequest.MaxForwards = 0;
             SIP_ClientTransaction optionsTransaction = m_pStack.TransactionLayer.CreateClientTransaction(flow,optionsRequest,true);
             optionsTransaction.ResponseReceived += new EventHandler<SIP_ResponseReceivedEventArgs>(delegate(object s,SIP_ResponseReceivedEventArgs e){
                 SIP_t_ViaParm via = e.Response.Via.GetTopMostValue();       
@@ -1569,7 +1570,7 @@ namespace LumiSoft.Net.SIP.Stack
                 return flow.LocalEP;
             }
         }
-
+*/
         #endregion
 
         #region method GetContactHost
@@ -1632,8 +1633,8 @@ namespace LumiSoft.Net.SIP.Stack
             }
 
             // If flow remoteEP is public IP and our localEP is private IP, resolve localEP to public.
-            if(retVal.IsIPAddress && Core.IsPrivateIP(IPAddress.Parse(retVal.Host)) && !Core.IsPrivateIP(flow.RemoteEP.Address)){
-                retVal = new HostEndPoint(Resolve(flow));
+            if(retVal.IsIPAddress && Net_Utils.IsPrivateIP(IPAddress.Parse(retVal.Host)) && !Net_Utils.IsPrivateIP(flow.RemoteEP.Address)){
+                retVal = new HostEndPoint(flow.LocalPublicEP);
             }
 
             return retVal;

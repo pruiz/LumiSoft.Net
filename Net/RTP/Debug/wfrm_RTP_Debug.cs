@@ -6,6 +6,7 @@ using System.Windows.Forms;
 using System.Net;
 
 using LumiSoft.Net;
+using LumiSoft.Net.Media.Codec;
 using LumiSoft.Net.RTP;
 
 namespace LumiSoft.Net.RTP.Debug
@@ -285,6 +286,50 @@ namespace LumiSoft.Net.RTP.Debug
             {
                 get{
                     return m_pSession.RemotePacketsLooped; 
+                }
+            }
+
+            /// <summary>
+            /// Gets RTP payload.
+            /// </summary>
+            public string Payload
+            {
+                get{
+                    int paylaod = m_pSession.Payload;
+                    Codec codec = null;
+                    m_pSession.Payloads.TryGetValue(paylaod,out codec);
+
+                    if(codec == null){
+                        return paylaod.ToString();
+                    }
+                    else{
+                        return paylaod.ToString() + " - " + codec.Name; 
+                    }
+                }
+            }
+
+            /// <summary>
+            /// Gets RTP session targets.
+            /// </summary>
+            public string[] Targets
+            {
+                get{
+                    List<string> retVal = new List<string>();
+                    foreach(RTP_Address target in m_pSession.Targets){
+                        retVal.Add(target.IP + ":" + target.DataPort + "/" + target.ControlPort);
+                    }
+
+                    return retVal.ToArray();
+                }
+            }
+
+            /// <summary>
+            /// Gets RTP local end point.
+            /// </summary>
+            public string LocalEP
+            {
+                get{
+                    return m_pSession.LocalEP.IP + ":" + m_pSession.LocalEP.DataPort + "/" + m_pSession.LocalEP.ControlPort;
                 }
             }
 
@@ -777,21 +822,28 @@ namespace LumiSoft.Net.RTP.Debug
 
             InitUI();
 
+            // Windows must be visible, otherwise we may get "window handle not created" if RTP session rises events before window gets visible.
+            this.Visible = true;
+
             m_pSession.Error += new EventHandler<LumiSoft.Net.ExceptionEventArgs>(m_pSession_Error);
             m_pSession.SessionCreated += new EventHandler<LumiSoft.Net.EventArgs<RTP_Session>>(m_pSession_SessionCreated);
             m_pSession.NewParticipant += new EventHandler<RTP_ParticipantEventArgs>(m_pSession_NewParticipant);
             m_pSession.LocalParticipant.SourceAdded += new EventHandler<RTP_SourceEventArgs>(Participant_SourceAdded);
             m_pSession.LocalParticipant.SourceRemoved += new EventHandler<RTP_SourceEventArgs>(Participant_SourceRemoved);
+            //m_pSession.Disposed
 
             m_pTimer = new Timer();
             m_pTimer.Interval = 1000;
             m_pTimer.Tick += new EventHandler(m_pTimer_Tick);
             m_pTimer.Enabled = true;
 
-            TreeNode nodeParticipant = new TreeNode(session.LocalParticipant.CNAME);
-            nodeParticipant.Tag = new RTP_ParticipantInfo(session.LocalParticipant);
-            nodeParticipant.Nodes.Add("Sources");
-            m_pParticipants.Nodes.Add(nodeParticipant);
+            foreach(RTP_Session s in m_pSession.Sessions){
+                ComboBoxItem item = new ComboBoxItem("Session: " + s.GetHashCode(),new RTP_SessionStatistics(s));
+                m_pSessions.Items.Add(item);
+            }
+            if(m_pSessions.Items.Count > 0){
+                m_pSessions.SelectedIndex = 0;
+            }
         }
 
                                                 
@@ -802,7 +854,7 @@ namespace LumiSoft.Net.RTP.Debug
         /// </summary>
         private void InitUI()
         {
-            this.ClientSize = new Size(400,450);
+            this.ClientSize = new Size(400,470);
             this.Text = "RTP debug";
             //this.Icon = ; TODO:
             this.FormClosing += new FormClosingEventHandler(wfrm_RTP_Debug_FormClosing);
@@ -824,6 +876,10 @@ namespace LumiSoft.Net.RTP.Debug
             m_pParticipants.FullRowSelect = true;
             m_pParticipants.HideSelection = false;
             m_pParticipants.AfterSelect += new TreeViewEventHandler(m_pParticipants_AfterSelect);
+            TreeNode nodeParticipant = new TreeNode(m_pSession.LocalParticipant.CNAME);
+            nodeParticipant.Tag = new RTP_ParticipantInfo(m_pSession.LocalParticipant);
+            nodeParticipant.Nodes.Add("Sources");
+            m_pParticipants.Nodes.Add(nodeParticipant);
             m_pParticipantsSplitter.Panel1.Controls.Add(m_pParticipants);
 
             m_pParticipantData = new PropertyGrid();
@@ -934,7 +990,7 @@ namespace LumiSoft.Net.RTP.Debug
                 ComboBoxItem item = new ComboBoxItem("Session: " + e.Value.GetHashCode(),new RTP_SessionStatistics(e.Value));
                 m_pSessions.Items.Add(item);
 
-                if(m_pSessions.SelectedIndex == -1){
+                if(m_pSessions.Items.Count > 0){
                     m_pSessions.SelectedIndex = 0;
                 }
             }));
@@ -1120,6 +1176,14 @@ namespace LumiSoft.Net.RTP.Debug
 
         private void m_pTimer_Tick(object sender,EventArgs e)
         {
+            if(m_IsDisposed){
+                return;
+            }
+            if(m_pSession.IsDisposed){
+                this.Visible = false;
+                return;
+            }
+
             m_pParticipantData.Refresh();
             m_pGlobalSessionInfo.Refresh();
         }
@@ -1137,6 +1201,8 @@ namespace LumiSoft.Net.RTP.Debug
             m_pSession.NewParticipant -= new EventHandler<RTP_ParticipantEventArgs>(m_pSession_NewParticipant);
             m_pSession.LocalParticipant.SourceAdded -= new EventHandler<RTP_SourceEventArgs>(Participant_SourceAdded);
             m_pSession.LocalParticipant.SourceRemoved -= new EventHandler<RTP_SourceEventArgs>(Participant_SourceRemoved);
+
+            m_pTimer.Dispose();
         }
 
         #endregion

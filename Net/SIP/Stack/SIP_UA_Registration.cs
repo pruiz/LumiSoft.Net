@@ -19,6 +19,7 @@ namespace LumiSoft.Net.SIP.Stack
         private SIP_Uri                  m_pServer           = null;
         private string                   m_AOR               = "";
         private AbsoluteUri              m_pContact          = null;
+        private List<AbsoluteUri>        m_pContacts         = null;
         private int                      m_RefreshInterval   = 300;
         private TimerEx                  m_pTimer            = null;
         private SIP_RequestSender        m_pRegisterSender   = null;
@@ -60,6 +61,8 @@ namespace LumiSoft.Net.SIP.Stack
             m_AOR             = aor;
             m_pContact        = contact;
             m_RefreshInterval = expires;
+
+            m_pContacts = new List<AbsoluteUri>();
 
             m_pTimer = new TimerEx((m_RefreshInterval - 15) * 1000);
             m_pTimer.AutoReset = false;
@@ -125,8 +128,13 @@ namespace LumiSoft.Net.SIP.Stack
             m_pFlow = e.ClientTransaction.Flow;
        
             if(e.Response.StatusCodeType == SIP_StatusCodeType.Success){
+                m_pContacts.Clear();
+                foreach(SIP_t_ContactParam c in e.Response.Contact.GetAllValues()){
+                    m_pContacts.Add(c.Address.Uri);
+                }
+
                 SetState(SIP_UA_RegistrationState.Registered);
-             
+                                             
                 OnRegistered();
 
                 m_pFlow.SendKeepAlives = true;
@@ -366,6 +374,20 @@ namespace LumiSoft.Net.SIP.Stack
             }
         }
 
+        /// <summary>
+        /// Gets registrar server all contacts registered for this AOR.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+        public AbsoluteUri[] Contacts
+        {
+            get{ 
+                if(m_IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return m_pContacts.ToArray(); 
+            }
+        }
         
         /// <summary>
         /// If true and contact is different than received or rport, received and rport is used as contact.

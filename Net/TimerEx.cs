@@ -35,7 +35,7 @@ namespace LumiSoft.Net
             this.AutoReset = autoReset;
         }
 
-        // TODO: We need to do this class CF compatible.
+        // TODO: We need to do this class .NET CF compatible.
 
     }
 }

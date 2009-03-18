@@ -535,7 +535,7 @@ namespace LumiSoft.Net.SIP.Stack
         #endregion
 
 
-        #region ovveride method Terminate
+        #region overide method Terminate
 
         /// <summary>
         /// Starts terminating dialog.

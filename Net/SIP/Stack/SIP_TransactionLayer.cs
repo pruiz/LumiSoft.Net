@@ -403,18 +403,22 @@ namespace LumiSoft.Net.SIP.Stack
                 // Dialog doesn't exist, create it.
                 if(dialog == null){
                     if(response.CSeq.RequestMethod.ToUpper() == SIP_Methods.INVITE){
-                        dialog = new SIP_Dialog_Invite();
-                        dialog.Init(m_pStack,transaction,response);
-                        dialog.StateChanged += delegate(object s,EventArgs a){
-                            if(dialog.State == SIP_DialogState.Terminated){
-                                m_pDialogs.Remove(dialog.ID);
-                            }
-                        };
-                        m_pDialogs.Add(dialog.ID,dialog);
+                        dialog = new SIP_Dialog_Invite();                        
+                    }
+                    else if(response.CSeq.RequestMethod.ToUpper() == SIP_Methods.REFER){
+                        dialog = new SIP_Dialog_Refer();
                     }
                     else{
                         throw new ArgumentException("Method '" + response.CSeq.RequestMethod + "' has no dialog handler.");
                     }
+
+                    dialog.Init(m_pStack,transaction,response);
+                    dialog.StateChanged += delegate(object s,EventArgs a){
+                        if(dialog.State == SIP_DialogState.Terminated){
+                            m_pDialogs.Remove(dialog.ID);
+                        }
+                    };
+                    m_pDialogs.Add(dialog.ID,dialog);
                 }
 
                 return dialog;
@@ -504,7 +508,6 @@ namespace LumiSoft.Net.SIP.Stack
         }
 
         #endregion
-
 
 
         #region Properties Implementation

@@ -19,6 +19,7 @@ namespace LumiSoft.Net.SIP.Stack
         private bool                         m_IsDisposed         = false;     
         private SIP_TransportLayer           m_pTransportLayer    = null;
         private SIP_TransactionLayer         m_pTransactionLayer  = null;
+        private string                       m_UserAgent          = null;
         private Auth_HttpDigest_NonceManager m_pNonceManager      = null;
         private List<SIP_Uri>                m_pProxyServers      = null;
         private string                       m_Realm              = "";
@@ -71,6 +72,10 @@ namespace LumiSoft.Net.SIP.Stack
             m_IsDisposed = true;
 
             // TODO: "clean" clean up with disposing state, wait some time transaction/dialogs to die, block new ones.
+
+            // TODO: Currently stack switched Disposed state before all transactions has disposed, so some active 
+            // transaction which accesses stack will get disposed exception.
+            // DO stack state: Running,Stoped,Disposed
                         
             // Release events.
             this.RequestReceived = null;
@@ -309,7 +314,15 @@ namespace LumiSoft.Net.SIP.Stack
 
             // TODO: Subscribe special headers.
             // Expires is mandatory header.
-                        
+
+            #region User-Agent
+
+            if(!string.IsNullOrEmpty(m_UserAgent)){
+                request.UserAgent = m_UserAgent;
+            }
+
+            #endregion
+
             return request;
         }
 
@@ -456,7 +469,7 @@ namespace LumiSoft.Net.SIP.Stack
                 if(response.StatusCodeType == SIP_StatusCodeType.Success && response.Contact.GetTopMostValue() ==  null && flow != null){
                     try{
                         string user = ((SIP_Uri)response.To.Address.Uri).User;
-                        response.Contact.Add((flow.IsSecure ? "sips:" : "sip:") + user + "@" + this.TransportLayer.Resolve(flow).ToString());
+                        response.Contact.Add((flow.IsSecure ? "sips:" : "sip:") + user + "@" + flow.LocalPublicEP.ToString());
                     }
                     catch{
                         // TODO: Log
@@ -979,6 +992,28 @@ namespace LumiSoft.Net.SIP.Stack
                 }
 
                 return m_pTransactionLayer; 
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets User-Agent value. Value null menas not specified.
+        /// </summary>
+        public string UserAgent
+        {
+            get{ 
+                if(m_IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return m_UserAgent; 
+            }
+
+            set{
+                if(m_IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                m_UserAgent = value;
             }
         }
 

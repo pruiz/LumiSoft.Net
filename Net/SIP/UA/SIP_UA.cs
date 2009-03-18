@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Net;
 
+using LumiSoft.Net.Media.Codec.Audio;
 using LumiSoft.Net.SIP;
 using LumiSoft.Net.SIP.Stack;
 using LumiSoft.Net.SIP.Message;
@@ -17,7 +18,7 @@ namespace LumiSoft.Net.SIP.UA
         private bool              m_IsDisposed = false;
         private SIP_Stack         m_pStack     = null;
         private List<SIP_UA_Call> m_pCalls     = null;
-        private object            m_pLock     = new object();
+        private object            m_pLock      = new object();
 
         /// <summary>
         /// Default constructor.
@@ -27,7 +28,7 @@ namespace LumiSoft.Net.SIP.UA
             m_pStack = new SIP_Stack();
             m_pStack.RequestReceived += new EventHandler<SIP_RequestReceivedEventArgs>(m_pStack_RequestReceived);
 
-            m_pCalls = new List<SIP_UA_Call>();           
+            m_pCalls = new List<SIP_UA_Call>();
         }
                         
         #region method Dispose
@@ -121,13 +122,11 @@ namespace LumiSoft.Net.SIP.UA
                 }
             }
             else if(e.Request.RequestLine.Method == SIP_Methods.INVITE){
-                SIP_ServerTransaction transaction = e.ServerTransaction;
-                transaction.SendResponse(m_pStack.CreateResponse(SIP_ResponseCodes.x180_Ringing,e.Request));
-
-                // TODO: See if we support SDP media.
+                // Supress INVITE retransmissions.
+                e.ServerTransaction.SendResponse(m_pStack.CreateResponse(SIP_ResponseCodes.x100_Trying,e.Request));
          
                 // Create call.
-                SIP_UA_Call call = new SIP_UA_Call(this,transaction);
+                SIP_UA_Call call = new SIP_UA_Call(this,e.ServerTransaction);
                 call.StateChanged += new EventHandler(Call_StateChanged);
                 m_pCalls.Add(call);
 
@@ -229,17 +228,7 @@ namespace LumiSoft.Net.SIP.UA
                 return m_pCalls.ToArray();
             }
         }
-
-        /*
-        /// <summary>
-        /// Gets or sets 
-        /// </summary>
-        public string[] Codecs
-        {
-            get{ return null; }
-        }
-        */
-        
+                
         #endregion
 
         #region Events implementation

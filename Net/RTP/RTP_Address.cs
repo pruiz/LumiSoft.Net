@@ -103,21 +103,13 @@ namespace LumiSoft.Net.RTP
 
             if(obj is RTP_Address){
                 RTP_Address a = (RTP_Address)obj;
-                if(!a.IP.Equals(this.IP)){
-                    return false;
+
+                if(a.IP.Equals(this.IP) && a.ControlPort == this.ControlPort && a.DataPort == this.DataPort){
+                    return true;
                 }
-                if(a.DataPort != this.DataPort){
-                    return false;
-                }
-                if(a.ControlPort != this.ControlPort){
-                    return false;
-                }
-            }
-            else{
-                return false;
             }
 
-            return true;
+            return false;
         }
 
         #endregion

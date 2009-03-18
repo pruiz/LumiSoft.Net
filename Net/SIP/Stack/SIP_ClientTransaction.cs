@@ -292,15 +292,23 @@ namespace LumiSoft.Net.SIP.Stack
                     }
 
                     OnTimedOut();
-                    SetState(SIP_TransactionState.Terminated);
 
-                    if(m_pTimerE != null){
-                         m_pTimerE.Dispose();
-                         m_pTimerE = null;
+                    // User Disposed this transaction in TimedOut
+                    if(this.State == SIP_TransactionState.Disposed){
+                        // Do nothing.
                     }
-                    if(m_pTimerF != null){
-                         m_pTimerF.Dispose();
-                         m_pTimerF = null;
+                    // Switch to terminated state.
+                    else{
+                        SetState(SIP_TransactionState.Terminated);
+
+                        if(m_pTimerE != null){
+                             m_pTimerE.Dispose();
+                            m_pTimerE = null;
+                        }
+                        if(m_pTimerF != null){
+                             m_pTimerF.Dispose();
+                            m_pTimerF = null;
+                        }
                     }
                 }
             }

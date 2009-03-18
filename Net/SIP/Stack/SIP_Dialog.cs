@@ -99,7 +99,7 @@ namespace LumiSoft.Net.SIP.Stack
                 // TODO: Validate request or client transaction must do it ?
 
                 m_IsSecure = ((SIP_Uri)transaction.Request.RequestLine.Uri).IsSecure;
-                m_pRouteSet = (SIP_t_AddressParam[])Core.ReverseArray(transaction.Request.RecordRoute.GetAllValues());
+                m_pRouteSet = (SIP_t_AddressParam[])Net_Utils.ReverseArray(transaction.Request.RecordRoute.GetAllValues());
                 m_pRemoteTarget = (SIP_Uri)transaction.Request.Contact.GetTopMostValue().Address.Uri;
                 m_RemoteSeqNo = transaction.Request.CSeq.SequenceNumber;
                 m_LocalSeqNo = 0;
@@ -153,7 +153,7 @@ namespace LumiSoft.Net.SIP.Stack
                 // TODO: Validate request or client transaction must do it ?
 
                 m_IsSecure  = ((SIP_Uri)transaction.Request.RequestLine.Uri).IsSecure;
-                m_pRouteSet = (SIP_t_AddressParam[])Core.ReverseArray(response.RecordRoute.GetAllValues());
+                m_pRouteSet = (SIP_t_AddressParam[])Net_Utils.ReverseArray(response.RecordRoute.GetAllValues());
                 m_pRemoteTarget = (SIP_Uri)response.Contact.GetTopMostValue().Address.Uri;                
                 m_LocalSeqNo = transaction.Request.CSeq.SequenceNumber;
                 m_RemoteSeqNo = 0;

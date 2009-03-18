@@ -104,6 +104,9 @@ namespace LumiSoft.Net.SIP.Proxy
 
         #region method GetRegistrarContacts
 
+        /// <summary>
+        /// 
+        /// </summary>
         public void GetRegistrarContacts()
         {
         }

@@ -166,9 +166,9 @@ namespace LumiSoft.Net.UDP
 
                 // Create sockets.
                 m_pSockets = new List<Socket>();
-                foreach(IPEndPoint ep in listeningEPs){
+                foreach(IPEndPoint ep in listeningEPs){                    
                     try{
-                        m_pSockets.Add(Core.CreateSocket(ep,ProtocolType.Udp));
+                        m_pSockets.Add(Net_Utils.CreateSocket(ep,ProtocolType.Udp));
                     }
                     catch(Exception x){
                         OnError(x);
@@ -181,7 +181,7 @@ namespace LumiSoft.Net.UDP
                 m_pSendSocketsIPv6 = new CircleCollection<Socket>();
                 foreach(Socket socket in m_pSockets){
                     if(((IPEndPoint)socket.LocalEndPoint).AddressFamily == AddressFamily.InterNetwork){
-                        if(!((IPEndPoint)socket.LocalEndPoint).Address.Equals(IPAddress.Loopback)){
+                        if(!((IPEndPoint)socket.LocalEndPoint).Address.Equals(IPAddress.Loopback)){                            
                             m_pSendSocketsIPv4.Add(socket);
                         }
                     }

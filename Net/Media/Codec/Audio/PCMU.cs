@@ -5,9 +5,9 @@ using System.Text;
 namespace LumiSoft.Net.Media.Codec.Audio
 {
     /// <summary>
-    /// Implements G711 ulaw codec.
+    /// Implements PCMU(G711 ulaw) codec.
     /// </summary>
-    public class G711_ulaw : AudioCodec
+    public class PCMU : AudioCodec
     {
         #region byte[] MuLawCompressTable
 
@@ -74,7 +74,7 @@ namespace LumiSoft.Net.Media.Codec.Audio
         /// <summary>
         /// Default constructor.
         /// </summary>
-        public G711_ulaw()
+        public PCMU()
         {
         }
 

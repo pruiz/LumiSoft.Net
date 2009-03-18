@@ -339,7 +339,7 @@ namespace LumiSoft.Net.POP3.Client
             
 			// Supports APOP, use it.
 			if(tryApop && m_ApopHashKey.Length > 0){
-                string hexHash = Core.ComputeMd5(m_ApopHashKey + password,true);
+                string hexHash = Net_Utils.ComputeMd5(m_ApopHashKey + password,true);
                                 
 				int countWritten = this.TcpStream.WriteLine("APOP " + userName + " " + hexHash);
                 LogAddWrite(countWritten,"APOP " + userName + " " + hexHash);

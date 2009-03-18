@@ -347,22 +347,52 @@ namespace LumiSoft.Net.SIP.Proxy
                 value from the Route header field, and remove that value from the
                 Route header field.  The proxy MUST then proceed as if it received
                 this modified request.
-             
+
+                    This will only happen when the element sending the request to the
+                    proxy (which may have been an endpoint) is a strict router.  This
+                    rewrite on receive is necessary to enable backwards compatibility
+                    with those elements.  It also allows elements following this
+                    specification to preserve the Request-URI through strict-routing
+                    proxies (see Section 12.2.1.1).
+
+                    This requirement does not obligate a proxy to keep state in order
+                    to detect URIs it previously placed in Record-Route header fields.
+                    Instead, a proxy need only place enough information in those URIs
+                    to recognize them as values it provided when they later appear.
+
+                If the Request-URI contains a maddr parameter, the proxy MUST check
+                to see if its value is in the set of addresses or domains the proxy
+                is configured to be responsible for.  If the Request-URI has a maddr
+                parameter with a value the proxy is responsible for, and the request
+                was received using the port and transport indicated (explicitly or by
+                default) in the Request-URI, the proxy MUST strip the maddr and any
+                non-default port or transport parameter and continue processing as if
+                those values had not been present in the request.
+
+                    A request may arrive with a maddr matching the proxy, but on a
+                    port or transport different from that indicated in the URI.  Such
+                    a request needs to be forwarded to the proxy using the indicated
+                    port and transport.
+
                 If the first value in the Route header field indicates this proxy,
                 the proxy MUST remove that value from the request.
             */
                         
             // Strict route.
-            if(SIP_Utils.IsSipOrSipsUri(request.RequestLine.Uri.ToString()) && IsLocalRoute(((SIP_Uri)request.RequestLine.Uri))){
+            if(SIP_Utils.IsSipOrSipsUri(request.RequestLine.Uri.ToString()) && IsLocalRoute(((SIP_Uri)request.RequestLine.Uri))){        
                 request.RequestLine.Uri = request.Route.GetAllValues()[request.Route.GetAllValues().Length - 1].Address.Uri;
                 SIP_t_AddressParam[] routes = request.Route.GetAllValues();
                 route = (SIP_Uri)routes[routes.Length - 1].Address.Uri;
                 request.Route.RemoveLastValue();
             }
-            // Loose route.
-            else if(request.Route.GetAllValues().Length > 0 && IsLocalRoute(SIP_Uri.Parse(request.Route.GetTopMostValue().Address.Uri.ToString()))){
+            // Our proxy route.
+            else if(request.Route.GetAllValues().Length > 0){
                 route = (SIP_Uri)request.Route.GetTopMostValue().Address.Uri;
-                request.Route.RemoveTopMostValue();
+
+                // If our proxy route or loose-route, consider route as this proxy route.
+                if(IsLocalRoute(SIP_Uri.Parse(request.Route.GetTopMostValue().Address.Uri.ToString())) || route.Param_Lr){
+                    request.Route.RemoveTopMostValue();
+                }
             }
 
             #endregion
@@ -704,7 +734,7 @@ namespace LumiSoft.Net.SIP.Proxy
 
                 #region 8.  Add a Via header field value
                                 
-                forwardRequest.Via.AddToTop("SIP/2.0/transport-tl-addign sentBy-tl-assign-it;branch=z9hG4bK-" + Core.ComputeMd5(request.Via.GetTopMostValue().Branch,true));
+                forwardRequest.Via.AddToTop("SIP/2.0/transport-tl-addign sentBy-tl-assign-it;branch=z9hG4bK-" + Net_Utils.ComputeMd5(request.Via.GetTopMostValue().Branch,true));
                 
                 // Add 'flowID' what received request, you should use the same flow to send response back.
                 // For more info see RFC 3261 18.2.2.
@@ -885,7 +915,7 @@ namespace LumiSoft.Net.SIP.Proxy
             );
             m_pProxyContexts.Add(proxyContext);
 
-            return null;
+            return proxyContext;
         }
 
         #endregion

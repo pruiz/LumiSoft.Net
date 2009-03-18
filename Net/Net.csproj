@@ -118,8 +118,15 @@
     <Compile Include="AUTH\AUTH_SASL_ServerMechanism_DigestMd5.cs" />
     <Compile Include="AUTH\AUTH_SASL_ServerMechanism_Login.cs" />
     <Compile Include="AUTH\AUTH_SASL_ServerMechanism_Plain.cs" />
+    <Compile Include="DNS\DNS_Query.cs" />
+    <Compile Include="DNS\DNS_QClass.cs" />
+    <Compile Include="DNS\DNS_QType.cs" />
+    <Compile Include="DNS\DNS_RCode.cs" />
+    <Compile Include="IO\Base64.cs" />
+    <Compile Include="IO\FifoBuffer.cs" />
     <Compile Include="IO\QuotedPrintableStream.cs" />
     <Compile Include="IO\ReadWriteControlledStream.cs" />
+    <Compile Include="KeyValueCollection.cs" />
     <Compile Include="Mail\Mail_h_AddressList.cs" />
     <Compile Include="Mail\Mail_h_DispositionNotificationOptions.cs" />
     <Compile Include="Mail\Mail_h_Mailbox.cs" />
@@ -131,6 +138,7 @@
     <Compile Include="Mail\Mail_t_Mailbox.cs" />
     <Compile Include="Mail\Mail_t_MailboxList.cs" />
     <Compile Include="Mail\Mail_Utils.cs" />
+    <None Include="Media\AudioFormat.cs" />
     <Compile Include="MIME\MIME_b.cs" />
     <Compile Include="MIME\MIME_b_Application.cs" />
     <Compile Include="MIME\MIME_b_Audio.cs" />
@@ -163,11 +171,18 @@
     <Compile Include="MIME\MIME_h_Unparsed.cs" />
     <Compile Include="MIME\MIME_h_Unstructured.cs" />
     <Compile Include="ParseException.cs" />
+    <Compile Include="SDP\SDP_MediaTypes.cs" />
+    <Compile Include="SDP\SDP_Origin.cs" />
+    <Compile Include="SIP\Debug\wfrm_SIP_Debug.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="SIP\Proxy\SIP_ProxyHandler.cs" />
     <Compile Include="SIP\Proxy\SIP_RequestContext.cs" />
     <Compile Include="SIP\Stack\SIP_Dialog_Refer.cs" />
     <Compile Include="SMTP\SMTP_DSN_Ret.cs" />
     <Compile Include="SMTP\SMTP_t_Mailbox.cs" />
+    <Compile Include="UPnP\Client\UPnP_Client.cs" />
+    <Compile Include="UPnP\UPnP_Device.cs" />
     <Compile Include="WebDav\Client\WebDav_Client.cs" />
     <Compile Include="WebDav\WebDav_MultiStatus.cs" />
     <Compile Include="WebDav\WebDav_p.cs" />
@@ -210,8 +225,8 @@
     <Compile Include="IO\PartialStream.cs" />
     <Compile Include="IO\SmartStream.cs" />
     <Compile Include="Log\WriteLogEventArgs.cs" />
-    <Compile Include="Media\Codec\Audio\G711_alaw.cs" />
-    <Compile Include="Media\Codec\Audio\G711_ulaw.cs" />
+    <Compile Include="Media\Codec\Audio\PCMA.cs" />
+    <Compile Include="Media\Codec\Audio\PCMU.cs" />
     <None Include="Media\MultimediaSession.cs" />
     <None Include="Media\MediaStream.cs" />
     <Compile Include="MIME\MIME_DispositionTypes .cs" />
@@ -280,7 +295,6 @@
     <Compile Include="SIP\Stack\SIP_Dialog_Subscribe.cs" />
     <Compile Include="SIP\Stack\SIP_Flow.cs" />
     <Compile Include="SIP\Stack\SIP_Hop.cs" />
-    <None Include="_Obsolete\SIP_RequestSender.cs" />
     <Compile Include="SIP\Stack\SIP_ClientTransaction.cs" />
     <Compile Include="SIP\Stack\SIP_RequestLine.cs" />
     <Compile Include="SIP\Stack\SIP_ResponseSentEventArgs.cs" />
@@ -495,7 +509,7 @@
     <Compile Include="IMAP\Server\IMAP_Session.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="IMAP\Server\IMAP_Utils.cs">
+    <Compile Include="IMAP\IMAP_Utils.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="IMAP\Server\Message_EventArgs.cs">
@@ -517,7 +531,7 @@
     <Compile Include="IO\SizeExceededAction.cs" />
     <Compile Include="_Obsolete\WriteStream_EventArgs.cs" />
     <Compile Include="_Obsolete\Write_EventArgs.cs" />
-    <Compile Include="JunkingStream.cs" />
+    <Compile Include="IO\JunkingStream.cs" />
     <Compile Include="Log\LogEntry.cs" />
     <Compile Include="Log\LogEntryType.cs" />
     <Compile Include="Log\Logger.cs" />
@@ -585,7 +599,7 @@
     <Compile Include="vCard\PhoneNumberCollection.cs" />
     <Compile Include="vCard\PhoneNumberType_enum.cs" />
     <Compile Include="vCard\vCard.cs" />
-    <Compile Include="Net_Core.cs">
+    <Compile Include="_Obsolete\Net_Core.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="NNTP\Client\NNTP_Client.cs" />
@@ -640,7 +654,6 @@
     <Compile Include="SIP\Message\SIP_WarningCodes.cs" />
     <Compile Include="SIP\Proxy\SIP_AuthenticateEventArgs.cs" />
     <Compile Include="SIP\Proxy\SIP_Registrar.cs" />
-    <None Include="_Obsolete\SIP_Target.cs" />
     <Compile Include="SIP\Proxy\SIP_Presence.cs" />
     <Compile Include="SIP\Proxy\SIP_ProxyContext.cs" />
     <Compile Include="SIP\Stack\SIP_Methods.cs" />
@@ -727,9 +740,8 @@
     <Compile Include="SIP\Message\SIP_HeaderField.cs" />
     <Compile Include="SIP\Message\SIP_HeaderFieldCollection.cs" />
     <Compile Include="SDP\SDP_Attribute.cs" />
-    <Compile Include="SDP\SDP_ConnectionData.cs" />
+    <Compile Include="SDP\SDP_Connection.cs" />
     <Compile Include="SDP\SDP_MediaDescription.cs" />
-    <Compile Include="SDP\SDP_Media.cs" />
     <Compile Include="SDP\SDP_Message.cs" />
     <Compile Include="SDP\SDP_Time.cs" />
     <Compile Include="SIP\Proxy\SIP_RegistrationCollection.cs" />

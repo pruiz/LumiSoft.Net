@@ -276,10 +276,10 @@ namespace LumiSoft.Net.MIME
                 try{
                     string[] parts = encodedWord.Split('?');
                     if(parts[2].ToUpper() == "Q"){
-                        retVal.Append(Core.QDecode(Encoding.GetEncoding(parts[1]),parts[3]));
+                        retVal.Append(MIME_Utils.QDecode(Encoding.GetEncoding(parts[1]),parts[3]));
                     }
                     else if(parts[2].ToUpper() == "B"){                        
-                        retVal.Append(Encoding.GetEncoding(parts[1]).GetString(Core.Base64Decode(Encoding.Default.GetBytes(parts[3]))));
+                        retVal.Append(Encoding.GetEncoding(parts[1]).GetString(Net_Utils.FromBase64(Encoding.Default.GetBytes(parts[3]))));
                     }
                     else{
                         throw new Exception("");

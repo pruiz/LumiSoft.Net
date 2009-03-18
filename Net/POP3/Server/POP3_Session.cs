@@ -268,7 +268,7 @@ namespace LumiSoft.Net.POP3.Server
 			//---- Parse command --------------------------------------------------//
 			string[] cmdParts = POP3_commandTxt.TrimStart().Split(new char[]{' '});
 			string POP3_command = cmdParts[0].ToUpper().Trim();
-			string argsText = Core.GetArgsText(POP3_commandTxt,POP3_command);
+			string argsText = POP3_commandTxt.Substring(POP3_command.Length).Trim();
 			//---------------------------------------------------------------------//
 
 			bool getNextCmd = true;
@@ -594,7 +594,7 @@ namespace LumiSoft.Net.POP3.Server
 				// If parameters specified,there may be only one parameter - messageNr
 				if(param.Length == 1){
 					// Check if messageNr is valid
-					if(Core.IsNumber(param[0])){
+					if(Net_Utils.IsInteger(param[0])){
 						int messageNr = Convert.ToInt32(param[0]);
 						if(m_POP3_Messages.MessageExists(messageNr)){
 							POP3_Message msg = m_POP3_Messages[messageNr - 1];
@@ -650,7 +650,7 @@ namespace LumiSoft.Net.POP3.Server
 			// There must be only one parameter - messageNr
 			if(argsText.Length > 0 && param.Length == 1){
 				// Check if messageNr is valid
-				if(Core.IsNumber(param[0])){
+				if(Net_Utils.IsInteger(param[0])){
 					int messageNr = Convert.ToInt32(param[0]);					
 					if(m_POP3_Messages.MessageExists(messageNr)){
 						POP3_Message msg = m_POP3_Messages[messageNr - 1];
@@ -709,7 +709,7 @@ namespace LumiSoft.Net.POP3.Server
 			// There must be only one parameter - messageNr
 			if(argsText.Length > 0 && param.Length == 1){
 				// Check if messageNr is valid
-				if(Core.IsNumber(param[0])){
+				if(Net_Utils.IsInteger(param[0])){
 					int nr = Convert.ToInt32(param[0]);					
 					if(m_POP3_Messages.MessageExists(nr)){
 						POP3_Message msg = m_POP3_Messages[nr - 1];
@@ -847,7 +847,7 @@ namespace LumiSoft.Net.POP3.Server
 			// There must be at two parameters - messageNr and nrLines
 			if(param.Length == 2){
 				// Check if messageNr and nrLines is valid
-				if(Core.IsNumber(param[0]) && Core.IsNumber(param[1])){
+				if(Net_Utils.IsInteger(param[0]) && Net_Utils.IsInteger(param[1])){
 					int messageNr = Convert.ToInt32(param[0]);
 					if(m_POP3_Messages.MessageExists(messageNr)){
 						POP3_Message msg = m_POP3_Messages[messageNr - 1];
@@ -939,7 +939,7 @@ namespace LumiSoft.Net.POP3.Server
 				// If parameters specified,there may be only one parameter - messageID
 				if(param.Length == 1){
 					// Check if messageNr is valid
-					if(Core.IsNumber(param[0])){
+					if(Net_Utils.IsInteger(param[0])){
 						int messageNr = Convert.ToInt32(param[0]);
 						if(m_POP3_Messages.MessageExists(messageNr)){
 							POP3_Message msg = m_POP3_Messages[messageNr - 1];

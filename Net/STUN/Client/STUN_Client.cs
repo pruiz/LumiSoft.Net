@@ -38,6 +38,31 @@ namespace LumiSoft.Net.STUN.Client
         /// </summary>
         /// <param name="host">STUN server name or IP.</param>
         /// <param name="port">STUN server port. Default port is 3478.</param>
+        /// <param name="localEP">Local IP end point.</param>
+        /// <returns>Returns UDP netwrok info.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>host</b> or <b>localEP</b> is null reference.</exception>
+        /// <exception cref="Exception">Throws exception if unexpected error happens.</exception>
+        public static STUN_Result Query(string host,int port,IPEndPoint localEP)
+        {
+            if(host == null){
+                throw new ArgumentNullException("host");
+            }
+            if(localEP == null){
+                throw new ArgumentNullException("localEP");
+            }
+
+            using(Socket s = new Socket(AddressFamily.InterNetwork,SocketType.Dgram,ProtocolType.Udp)){
+                s.Bind(localEP);
+
+                return Query(host,port,s);
+            }
+        }
+
+        /// <summary>
+        /// Gets NAT info from STUN server.
+        /// </summary>
+        /// <param name="host">STUN server name or IP.</param>
+        /// <param name="port">STUN server port. Default port is 3478.</param>
         /// <param name="socket">UDP socket to use.</param>
         /// <returns>Returns UDP netwrok info.</returns>
         /// <exception cref="Exception">Throws exception if unexpected error happens.</exception>
@@ -220,11 +245,11 @@ namespace LumiSoft.Net.STUN.Client
                 throw new ArgumentNullException("localIP");
             }
 
-            if(!Core.IsPrivateIP(localIP)){
+            if(!Net_Utils.IsPrivateIP(localIP)){
                 return localIP;
             }
                         
-            STUN_Result result = Query(stunServer,port,Core.CreateSocket(new IPEndPoint(localIP,0),ProtocolType.Udp));
+            STUN_Result result = Query(stunServer,port,Net_Utils.CreateSocket(new IPEndPoint(localIP,0),ProtocolType.Udp));
             if(result.PublicEndPoint != null){
                 return result.PublicEndPoint.Address;
             }
@@ -318,6 +343,9 @@ namespace LumiSoft.Net.STUN.Client
         }
 
         #endregion
+
+
+        // TODO: Update to RFC 5389
 
     }
 }

@@ -8,6 +8,7 @@ using System.Threading;
 using LumiSoft.Net.IO;
 using LumiSoft.Net.TCP;
 using LumiSoft.Net.UDP;
+using LumiSoft.Net.SIP.Message;
 
 namespace LumiSoft.Net.SIP.Stack
 {
@@ -23,21 +24,22 @@ namespace LumiSoft.Net.SIP.Stack
     /// </remarks>
     public class SIP_Flow : IDisposable
     {
-        private bool            m_IsDisposed      = false;
-        private bool            m_IsServer        = false;
-        private SIP_Stack       m_pStack          = null;
-        private TCP_Session     m_pTcpSession     = null;
-        private DateTime        m_CreateTime;
-        private string          m_ID              = "";
-        private IPEndPoint      m_pLocalEP        = null;
-        private IPEndPoint      m_pRemoteEP       = null;
-        private string          m_Transport       = "";
-        private DateTime        m_LastActivity;
-        private long            m_BytesWritten    = 0;
-        private MemoryStream    m_pMessage        = null;
-        private bool            m_LastCRLF        = false;
-        private TimerEx         m_pKeepAliveTimer = null;
-        private object          m_pLock           = new object();
+        private bool         m_IsDisposed      = false;
+        private bool         m_IsServer        = false;
+        private SIP_Stack    m_pStack          = null;
+        private TCP_Session  m_pTcpSession     = null;
+        private DateTime     m_CreateTime;
+        private string       m_ID              = "";
+        private IPEndPoint   m_pLocalEP        = null;
+        private IPEndPoint   m_pLocalPublicEP  = null;
+        private IPEndPoint   m_pRemoteEP       = null;
+        private string       m_Transport       = "";
+        private DateTime     m_LastActivity;
+        private long         m_BytesWritten    = 0;
+        private MemoryStream m_pMessage        = null;
+        private bool         m_LastCRLF        = false;
+        private TimerEx      m_pKeepAliveTimer = null;
+        private object       m_pLock           = new object();
 
         /// <summary>
         /// Default constructor.
@@ -461,6 +463,60 @@ namespace LumiSoft.Net.SIP.Stack
                 }
 
                 return m_pLocalEP; 
+            }
+        }
+
+        /// <summary>
+        /// Gets local EP what actually visible to <b>RemoteEP</b>. This value is different from <b>LocalEP</b> when stack is behind NAT.
+        /// </summary>
+        public IPEndPoint LocalPublicEP
+        {
+            get{
+                if(m_IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                // We may not lock here, because dead lock will happen. Client transaction runs on thread pool threads.
+                //lock(m_pLock){
+                    if(m_pLocalPublicEP != null){
+                        return m_pLocalPublicEP;
+                    }
+                    else{
+                        m_pLocalPublicEP = this.LocalEP;
+
+                        try{
+                            AutoResetEvent completionWaiter = new AutoResetEvent(false);
+                            // Create OPTIONS request
+                            SIP_Request optionsRequest = m_pStack.CreateRequest(SIP_Methods.OPTIONS,new SIP_t_NameAddress("sip:ping@publicIP.com"),new SIP_t_NameAddress("sip:ping@publicIP.com"));
+                            optionsRequest.MaxForwards = 0;
+                            SIP_ClientTransaction optionsTransaction = m_pStack.TransactionLayer.CreateClientTransaction(this,optionsRequest,true);
+                            optionsTransaction.ResponseReceived += new EventHandler<SIP_ResponseReceivedEventArgs>(delegate(object s,SIP_ResponseReceivedEventArgs e){
+                                SIP_t_ViaParm via = e.Response.Via.GetTopMostValue();       
+                
+                                IPEndPoint publicEP = new IPEndPoint(via.Received == null ? this.LocalEP.Address : via.Received,via.RPort > 0 ? via.RPort : this.LocalEP.Port);
+                                // Set public EP port only if public IP is also different from local EP.
+                                if(!this.LocalEP.Address.Equals(publicEP.Address)){
+                                    m_pLocalPublicEP = publicEP;
+                                }
+
+                                completionWaiter.Set();
+                            });
+                            optionsTransaction.StateChanged += new EventHandler(delegate(object s,EventArgs e){
+                                if(optionsTransaction.State == SIP_TransactionState.Terminated){                 
+                                    completionWaiter.Set();
+                                }
+                            });
+                            optionsTransaction.Start();
+                 
+                            // Wait OPTIONS request to complete.
+                            completionWaiter.WaitOne();
+                        }
+                        catch{
+                        }
+
+                        return m_pLocalPublicEP;
+                    }
+               // }
             }
         }
 

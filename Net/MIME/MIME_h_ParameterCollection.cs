@@ -115,7 +115,7 @@ namespace LumiSoft.Net.MIME
                     retVal.Append(";\r\n\t" + parameter.Name);
                 }
                 // We don't need to encode or split value.
-                else if((charset == null || Core.IsAscii(parameter.Value)) && parameter.Value.Length < 76){
+                else if((charset == null || Net_Utils.IsAscii(parameter.Value)) && parameter.Value.Length < 76){
                     retVal.Append(";\r\n\t" + parameter.Name + "=" + TextUtils.QuoteString(parameter.Value));
                 }
                 // We need to encode/split value.

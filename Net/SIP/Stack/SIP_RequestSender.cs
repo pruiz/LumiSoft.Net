@@ -322,7 +322,6 @@ namespace LumiSoft.Net.SIP.Stack
                         else{
                             uri = (SIP_Uri)m_pRequest.RequestLine.Uri;
                         }
-                        //uri.Param_Transport = "TCP";
 
                         // Queue hops.
                         foreach(SIP_Hop hop in m_pStack.GetHops(uri,m_pRequest.ToByteData().Length,((SIP_Uri)m_pRequest.RequestLine.Uri).IsSecure)){
@@ -437,6 +436,7 @@ namespace LumiSoft.Net.SIP.Stack
                     authDigest.UserName = credential.UserName;
                     authDigest.Password = credential.Password;
                     authDigest.CNonce   = Auth_HttpDigest.CreateNonce();
+                    authDigest.Uri      = request.RequestLine.Uri.ToString();
 
                     request.Authorization.Add(authDigest.ToAuthorization());
                 }
@@ -466,6 +466,7 @@ namespace LumiSoft.Net.SIP.Stack
                     authDigest.UserName = credential.UserName;
                     authDigest.Password = credential.Password;
                     authDigest.CNonce   = Auth_HttpDigest.CreateNonce();
+                    authDigest.Uri      = request.RequestLine.Uri.ToString();
 
                     request.ProxyAuthorization.Add(authDigest.ToAuthorization());                    
                 }
@@ -490,7 +491,7 @@ namespace LumiSoft.Net.SIP.Stack
                 throw new InvalidOperationException("No more hop(s).");
             }
 
-            SIP_Hop hop = m_pHops.Dequeue();
+            SIP_Hop hop = m_pHops.Dequeue();        
             SendToFlow(m_pStack.TransportLayer.GetOrCreateFlow(hop.Transport,null,hop.EndPoint),m_pRequest.Copy());
         }
 

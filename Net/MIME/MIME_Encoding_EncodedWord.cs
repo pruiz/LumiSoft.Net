@@ -225,10 +225,10 @@ namespace LumiSoft.Net.MIME
                     return word;
                 }
                 else if(parts[2].ToUpper() == "Q"){
-                    return Core.QDecode(Encoding.GetEncoding(parts[1].Split('*')[0]),parts[3]);
+                    return MIME_Utils.QDecode(Encoding.GetEncoding(parts[1].Split('*')[0]),parts[3]);
                 }
                 else if(parts[2].ToUpper() == "B"){                        
-                    return Encoding.GetEncoding(parts[1].Split('*')[0]).GetString(Core.Base64Decode(Encoding.Default.GetBytes(parts[3])));
+                    return Encoding.GetEncoding(parts[1].Split('*')[0]).GetString(Net_Utils.FromBase64(Encoding.Default.GetBytes(parts[3])));
                 }
                 // Unknown encoding.
                 else{

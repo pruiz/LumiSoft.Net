@@ -548,5 +548,146 @@ namespace LumiSoft.Net.MIME
 		}
 
 		#endregion
+
+
+        #region static method QDecode
+
+		/// <summary>
+		/// "Q" decoder. This is same as quoted-printable, except '_' is converted to ' '.
+        /// Defined in RFC 2047 4.2.
+		/// </summary>
+		/// <param name="encoding">Input string encoding.</param>
+		/// <param name="data">String which to encode.</param>
+		/// <returns>Returns decoded string.</returns>		
+        /// <exception cref="ArgumentNullException">Is raised when <b>encoding</b> or <b>data</b> is null reference.</exception>
+		public static string QDecode(Encoding encoding,string data)
+		{
+            if(encoding == null){
+                throw new ArgumentNullException("encoding");
+            }
+            if(data == null){
+                throw new ArgumentNullException("data");
+            }
+
+			return encoding.GetString(QuotedPrintableDecode(Encoding.ASCII.GetBytes(data.Replace("_"," "))));
+		}
+
+		#endregion
+
+        #region static method QuotedPrintableDecode
+
+		/// <summary>
+		/// quoted-printable decoder. Defined in RFC 2045 6.7.
+		/// </summary>
+		/// <param name="data">Data which to encode.</param>
+		/// <returns>Returns decoded data.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>data</b> is null reference.</exception>
+		public static byte[] QuotedPrintableDecode(byte[] data)
+		{
+            if(data == null){
+                throw new ArgumentNullException("data");
+            }
+
+			/* RFC 2045 6.7. Quoted-Printable Content-Transfer-Encoding
+			 
+				(1)	(General 8bit representation) Any octet, except a CR or
+					LF that is part of a CRLF line break of the canonical
+					(standard) form of the data being encoded, may be
+					represented by an "=" followed by a two digit
+					hexadecimal representation of the octet's value.  The
+					digits of the hexadecimal alphabet, for this purpose,
+					are "0123456789ABCDEF".  Uppercase letters must be
+					used; lowercase letters are not allowed.
+
+				(2) (Literal representation) Octets with decimal values of
+					33 through 60 inclusive, and 62 through 126, inclusive,
+					MAY be represented as the US-ASCII characters which
+					correspond to those octets (EXCLAMATION POINT through
+					LESS THAN, and GREATER THAN through TILDE, respectively).
+					
+				(3) (White Space) Octets with values of 9 and 32 MAY be
+					represented as US-ASCII TAB (HT) and SPACE characters,
+					respectively, but MUST NOT be so represented at the end
+					of an encoded line.  Any TAB (HT) or SPACE characters
+					on an encoded line MUST thus be followed on that line
+					by a printable character.  In particular, an "=" at the
+					end of an encoded line, indicating a soft line break
+					(see rule #5) may follow one or more TAB (HT) or SPACE
+					characters.  It follows that an octet with decimal
+					value 9 or 32 appearing at the end of an encoded line
+					must be represented according to Rule #1.  This rule is
+					necessary because some MTAs (Message Transport Agents,
+					programs which transport messages from one user to
+					another, or perform a portion of such transfers) are
+					known to pad lines of text with SPACEs, and others are
+					known to remove "white space" characters from the end
+					of a line.  Therefore, when decoding a Quoted-Printable
+					body, any trailing white space on a line must be
+					deleted, as it will necessarily have been added by
+					intermediate transport agents.
+					
+				(4) (Line Breaks) A line break in a text body, represented
+				    as a CRLF sequence in the text canonical form, must be
+					represented by a (RFC 822) line break, which is also a
+					CRLF sequence, in the Quoted-Printable encoding.  Since
+					the canonical representation of media types other than
+					text do not generally include the representation of
+					line breaks as CRLF sequences, no hard line breaks
+					(i.e. line breaks that are intended to be meaningful
+					and to be displayed to the user) can occur in the
+					quoted-printable encoding of such types.  Sequences
+					like "=0D", "=0A", "=0A=0D" and "=0D=0A" will routinely
+					appear in non-text data represented in quoted-
+					printable, of course.
+
+				(5) (Soft Line Breaks) The Quoted-Printable encoding
+					REQUIRES that encoded lines be no more than 76
+					characters long.  If longer lines are to be encoded
+					with the Quoted-Printable encoding, "soft" line breaks
+			*/
+
+			MemoryStream msRetVal = new MemoryStream();
+			MemoryStream msSourceStream = new MemoryStream(data);
+
+			int b = msSourceStream.ReadByte();
+			while(b > -1){
+				// Encoded 8-bit byte(=XX) or soft line break(=CRLF)
+				if(b == '='){
+					byte[] buffer = new byte[2];
+					int nCount = msSourceStream.Read(buffer,0,2);
+					if(nCount == 2){
+						// Soft line break, line splitted, just skip CRLF
+						if(buffer[0] == '\r' && buffer[1] == '\n'){
+						}
+						// This must be encoded 8-bit byte
+						else{
+							try{
+								msRetVal.Write(Net_Utils.FromHex(buffer),0,1);
+							}
+							catch{
+								// Illegal value after =, just leave it as is
+								msRetVal.WriteByte((byte)'=');
+								msRetVal.Write(buffer,0,2);
+							}
+						}
+					}
+					// Illegal =, just leave as it is
+					else{
+						msRetVal.Write(buffer,0,nCount);
+					}
+				}
+				// Just write back all other bytes
+				else{
+					msRetVal.WriteByte((byte)b);
+				}
+
+				// Read next byte
+				b = msSourceStream.ReadByte();
+			}
+
+			return msRetVal.ToArray();
+		}
+
+		#endregion
     }
 }

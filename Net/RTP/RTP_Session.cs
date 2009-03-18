@@ -5,6 +5,8 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 
+using LumiSoft.Net.Media.Codec;
+
 namespace LumiSoft.Net.RTP
 {
     /// <summary>
@@ -52,6 +54,7 @@ namespace LumiSoft.Net.RTP
         private int                                m_MTU                        = 1400;
         private TimerEx                            m_pRtcpTimer                 = null;
         private object                             m_pLock                      = new object();
+        private KeyValueCollection<int,Codec>      m_pPayloads                  = null;
 
         /// <summary>
         /// Default constructor.
@@ -84,6 +87,7 @@ namespace LumiSoft.Net.RTP
             m_pMembers = new Dictionary<uint,RTP_Source>();
             m_pSenders = new Dictionary<uint,RTP_Source>();
             m_pConflictingEPs = new Dictionary<string,DateTime>();
+            m_pPayloads = new KeyValueCollection<int,Codec>();
 
             m_pRtpSocket = new Socket(localEP.IP.AddressFamily,SocketType.Dgram,ProtocolType.Udp);
             m_pRtpSocket.Bind(localEP.RtpEP);
@@ -1831,6 +1835,7 @@ namespace LumiSoft.Net.RTP
         /// <summary>
         /// Gets number of times local SSRC collision dedected.
         /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this property is accessed.</exception>
         public long LocalCollisions
         {
             get{
@@ -1845,6 +1850,7 @@ namespace LumiSoft.Net.RTP
         /// <summary>
         /// Gets number of times remote SSRC collision dedected.
         /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this property is accessed.</exception>
         public long RemoteCollisions
         {
             get{
@@ -1859,6 +1865,7 @@ namespace LumiSoft.Net.RTP
         /// <summary>
         /// Gets number of times local packets loop dedected.
         /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this property is accessed.</exception>
         public long LocalPacketsLooped
         {
             get{
@@ -1873,6 +1880,7 @@ namespace LumiSoft.Net.RTP
         /// <summary>
         /// Gets number of times remote packets loop dedected.
         /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this property is accessed.</exception>
         public long RemotePacketsLooped
         {
             get{
@@ -1881,6 +1889,21 @@ namespace LumiSoft.Net.RTP
                 }
 
                 return m_RemotePacketsLooped; 
+            }
+        }
+
+        /// <summary>
+        /// Gets RTP payloads.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this property is accessed.</exception>
+        public KeyValueCollection<int,Codec> Payloads
+        {
+            get{ 
+                if(m_IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return m_pPayloads; 
             }
         }
                 

@@ -15,8 +15,21 @@ namespace LumiSoft.Net.SDP
         /// <summary>
         /// Default constructor.
         /// </summary>
-        public SDP_Time()
+        /// <param name="startTime">Start time when session must start. Network Time Protocol (NTP) time values in 
+        /// seconds since 1900, 0 value means not specified.</param>
+        /// <param name="stopTime">Stop time when session must end.Network Time Protocol (NTP) time values in 
+        /// seconds since 1900, 0 value means not specified.</param>
+        public SDP_Time(long startTime,long stopTime)
         {
+            if(startTime < 0){
+                throw new ArgumentException("Argument 'startTime' value must be >= 0.");
+            }
+            if(stopTime < 0){
+                throw new ArgumentException("Argument 'stopTime' value must be >= 0.");
+            }
+
+            m_StartTime = startTime;
+            m_StopTime  = stopTime;
         }
 
 
@@ -30,9 +43,10 @@ namespace LumiSoft.Net.SDP
         public static SDP_Time Parse(string tValue)
         {
             // t=<start-time> <stop-time>
-
-            SDP_Time time = new SDP_Time();
-
+            
+            long startTime = 0;
+            long endTime   = 0;
+ 
             // Remove t=
             StringReader r = new StringReader(tValue);
             r.QuotedReadToDelimiter('=');
@@ -42,16 +56,16 @@ namespace LumiSoft.Net.SDP
             if(word == null){
                 throw new Exception("SDP message \"t\" field <start-time> value is missing !");
             }
-            time.m_StartTime = Convert.ToInt64(word);
+            startTime = Convert.ToInt64(word);
 
             //--- <stop-time> -------------------------------------------------------------
             word = r.ReadWord();
             if(word == null){
                 throw new Exception("SDP message \"t\" field <stop-time> value is missing !");
             }
-            time.m_StopTime = Convert.ToInt64(word);
+            endTime = Convert.ToInt64(word);
 
-            return time;
+            return new SDP_Time(startTime,endTime);
         }
 
         #endregion
