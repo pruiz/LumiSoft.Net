@@ -813,6 +813,14 @@ namespace LumiSoft.Net.Media
                 }
             }
 
+            /// <summary>
+            /// Gets number of bytes buffered for playing.
+            /// </summary>
+            public int BytesBuffered
+            {
+                get{ return m_BytesBuffered; }
+            }
+
             #endregion
         }
 
@@ -1019,6 +1027,21 @@ namespace LumiSoft.Net.Media
                 }
 
                 m_pWaveOut.Volume = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets number of bytes buffered for playing.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this property is accessed.</exception>
+        public int BytesBuffered
+        {
+            get{ 
+                if(m_IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return m_pWaveOut.BytesBuffered; 
             }
         }
 
