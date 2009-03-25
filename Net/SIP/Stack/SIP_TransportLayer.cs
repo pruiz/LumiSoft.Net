@@ -751,11 +751,11 @@ namespace LumiSoft.Net.SIP.Stack
             }
 
             if(localEP == null){
-                if(transport == SIP_Transport.UDP){
+                if(string.Equals(transport,SIP_Transport.UDP,StringComparison.InvariantCultureIgnoreCase)){
                     // Get load-balanched local endpoint.
-                    localEP = m_pUdpServer.GetLocalEndPoint(remoteEP);                    
+                    localEP = m_pUdpServer.GetLocalEndPoint(remoteEP);
                 }
-                else if(transport == SIP_Transport.TCP){
+                else if(string.Equals(transport,SIP_Transport.TCP,StringComparison.InvariantCultureIgnoreCase)){
                     // Get load-balanched local IP for TCP and create random port.
                     if(remoteEP.AddressFamily == AddressFamily.InterNetwork){
                         localEP = new IPEndPoint(m_pLocalIPv4.Next(),m_pRandom.Next(10000,65000));
@@ -764,7 +764,7 @@ namespace LumiSoft.Net.SIP.Stack
                         localEP = new IPEndPoint(m_pLocalIPv4.Next(),m_pRandom.Next(10000,65000));
                     }
                 }
-                else if(transport == SIP_Transport.TLS){
+                else if(string.Equals(transport,SIP_Transport.TLS,StringComparison.InvariantCultureIgnoreCase)){
                     // Get load-balanched local IP for TLS and create random port.
                     if(remoteEP.AddressFamily == AddressFamily.InterNetwork){
                         localEP = new IPEndPoint(m_pLocalIPv4.Next(),m_pRandom.Next(10000,65000));
@@ -772,6 +772,9 @@ namespace LumiSoft.Net.SIP.Stack
                     else{
                         localEP = new IPEndPoint(m_pLocalIPv4.Next(),m_pRandom.Next(10000,65000));
                     }
+                }
+                else{
+                    throw new ArgumentException("Not supported transoprt '" + transport + "'.");
                 }
             }
 

@@ -109,7 +109,7 @@ namespace LumiSoft.Net.SIP.Stack
         /// <param name="e">Event data.</param>
         private void m_pTimer_Elapsed(object sender,System.Timers.ElapsedEventArgs e)
         {   
-            if(m_pStack.IsRunning){
+            if(m_pStack.State == SIP_StackState.Started){
                 BeginRegister(m_AutoRefresh);
             }
         }
@@ -222,7 +222,7 @@ namespace LumiSoft.Net.SIP.Stack
 
             // Fix ME: Stack not running, try register on next step.
             // In ideal solution we need to start registering when stack starts.
-            if(!m_pStack.IsRunning){
+            if(m_pStack.State != SIP_StackState.Started){
                 m_pTimer.Enabled = true;
                 return;
             }

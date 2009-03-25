@@ -196,12 +196,12 @@ namespace LumiSoft.Net.Dns.Client
 		/// Gets IPv6 host addess records.
 		/// </summary>
 		/// <returns></returns>
-		public DNS_rr_A[] GetAAAARecords()
+		public DNS_rr_AAAA[] GetAAAARecords()
 		{
-            List<DNS_rr_A> retVal = new List<DNS_rr_A>();
+            List<DNS_rr_AAAA> retVal = new List<DNS_rr_AAAA>();
             foreach(DNS_rr_base record in m_pAnswers){
                 if(record.RecordType == QTYPE.AAAA){
-                    retVal.Add((DNS_rr_A)record);
+                    retVal.Add((DNS_rr_AAAA)record);
                 }
             }
 

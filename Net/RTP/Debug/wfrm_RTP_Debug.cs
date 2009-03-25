@@ -333,6 +333,16 @@ namespace LumiSoft.Net.RTP.Debug
                 }
             }
 
+            /// <summary>
+            /// Gets RTP stream mode.
+            /// </summary>
+            public string StreamMode
+            {
+                get{
+                    return m_pSession.StreamMode.ToString();
+                }
+            }
+
             #endregion
 
         }
@@ -854,7 +864,7 @@ namespace LumiSoft.Net.RTP.Debug
         /// </summary>
         private void InitUI()
         {
-            this.ClientSize = new Size(400,470);
+            this.ClientSize = new Size(400,500);
             this.Text = "RTP debug";
             //this.Icon = ; TODO:
             this.FormClosing += new FormClosingEventHandler(wfrm_RTP_Debug_FormClosing);

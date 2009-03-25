@@ -99,8 +99,11 @@ namespace LumiSoft.Net.IO
                 if(freeSpace < count){
                     TrimStart();
 
+                    // Recalculate free space.
+                    freeSpace = m_pBuffer.Length - m_WriteOffset;
+
                     // After trim we can store data.
-                    if((freeSpace + m_ReadOffset) >= count){
+                    if(freeSpace >= count){
                         Array.Copy(buffer,offset,m_pBuffer,m_WriteOffset,count);
                         m_WriteOffset += count;
                     }

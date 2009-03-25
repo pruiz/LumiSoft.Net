@@ -21,6 +21,7 @@ namespace LumiSoft.Net.RTP
         private RTP_MultimediaSession              m_pSession                   = null;
         private RTP_Address                        m_pLocalEP                   = null;
         private RTP_Clock                          m_pRtpClock                  = null;
+        private RTP_StreamMode                     m_StreamMode                 = RTP_StreamMode.SendReceive;
         private List<RTP_Address>                  m_pTargets                   = null;
         private int                                m_Payload                    = 0;
         private int                                m_Bandwidth                  = 64000;
@@ -1480,6 +1481,29 @@ namespace LumiSoft.Net.RTP
                 }
 
                 return m_pRtpClock; 
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets stream mode.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this property is accessed.</exception>
+        public RTP_StreamMode StreamMode
+        {
+            get{
+                if(m_IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return m_StreamMode; 
+            }
+
+            set{
+                if(m_IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                m_StreamMode = value;
             }
         }
 

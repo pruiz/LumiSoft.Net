@@ -156,7 +156,7 @@ namespace LumiSoft.Net.Dns.Client
                     throw new DNS_ClientException(response.ResponseCode);
                 }
 
-                foreach(DNS_rr_A record in response.GetARecords()){
+                foreach(DNS_rr_AAAA record in response.GetAAAARecords()){
                     retVal.Add(record.IP);
                 }
             }
@@ -282,7 +282,7 @@ namespace LumiSoft.Net.Dns.Client
                     }
 
                     // Wait 10 ms response to arrive, if no response, retransmit query.
-                    if(udpClient.Poll(10,SelectMode.SelectRead)){
+                    if(udpClient.Poll(50,SelectMode.SelectRead)){
                         try{
                             byte[] retVal = new byte[1024];
 					        int countRecieved = udpClient.Receive(retVal);

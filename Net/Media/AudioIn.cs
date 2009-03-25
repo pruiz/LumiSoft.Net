@@ -719,7 +719,7 @@ namespace LumiSoft.Net.Media
             /// </summary>
             private void CreateBuffers()
             {               
-                while(m_pBuffers.Count < 6){
+                while(m_pBuffers.Count < 3){
                     byte[]   data       = new byte[m_BufferSize];
                     GCHandle dataHandle = GCHandle.Alloc(data,GCHandleType.Pinned);
 
@@ -734,8 +734,11 @@ namespace LumiSoft.Net.Media
                     wavHeader.reserved        = 0;
                     GCHandle headerHandle = GCHandle.Alloc(wavHeader,GCHandleType.Pinned);
                     int result = 0;        
-                    result = waveInPrepareHeader(m_pWavDevHandle,headerHandle.AddrOfPinnedObject(),Marshal.SizeOf(wavHeader));
-                    if(result == MMSYSERR.NOERROR){
+                    result = waveInPrepareHeader(m_pWavDevHandle,headerHandle.AddrOfPinnedObject(),Marshal.SizeOf(wavHeader));                    
+                    if(result != MMSYSERR.NOERROR){
+                        throw new Exception("Error preparing wave in buffer, error: " + result + ".");
+                    }
+                    else{
                         m_pBuffers.Add(new BufferItem(ref headerHandle,ref dataHandle,m_BufferSize));
 
                         result = waveInAddBuffer(m_pWavDevHandle,headerHandle.AddrOfPinnedObject(),Marshal.SizeOf(wavHeader));
@@ -858,7 +861,7 @@ namespace LumiSoft.Net.Media
             }
 
             /// <summary>
-            /// Gets one smaple block size in bytes.
+            /// Gets one sample block size in bytes.
             /// </summary>
             /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
             public int BlockSize

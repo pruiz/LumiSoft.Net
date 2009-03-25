@@ -139,6 +139,7 @@
     <Compile Include="Mail\Mail_t_MailboxList.cs" />
     <Compile Include="Mail\Mail_Utils.cs" />
     <None Include="Media\AudioFormat.cs" />
+    <Compile Include="Media\WavePlayer.cs" />
     <Compile Include="MIME\MIME_b.cs" />
     <Compile Include="MIME\MIME_b_Application.cs" />
     <Compile Include="MIME\MIME_b_Audio.cs" />
@@ -171,6 +172,7 @@
     <Compile Include="MIME\MIME_h_Unparsed.cs" />
     <Compile Include="MIME\MIME_h_Unstructured.cs" />
     <Compile Include="ParseException.cs" />
+    <Compile Include="RTP\RTP_StreamMode.cs" />
     <Compile Include="SDP\SDP_MediaTypes.cs" />
     <Compile Include="SDP\SDP_Origin.cs" />
     <Compile Include="SIP\Debug\wfrm_SIP_Debug.cs">
@@ -179,6 +181,7 @@
     <Compile Include="SIP\Proxy\SIP_ProxyHandler.cs" />
     <Compile Include="SIP\Proxy\SIP_RequestContext.cs" />
     <Compile Include="SIP\Stack\SIP_Dialog_Refer.cs" />
+    <Compile Include="SIP\Stack\SIP_StackState.cs" />
     <Compile Include="SMTP\SMTP_DSN_Ret.cs" />
     <Compile Include="SMTP\SMTP_t_Mailbox.cs" />
     <Compile Include="UPnP\Client\UPnP_Client.cs" />
@@ -777,6 +780,9 @@
     <Compile Include="_Obsolete\SocketServerSession.cs">
       <SubType>Code</SubType>
     </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="license.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
