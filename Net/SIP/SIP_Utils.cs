@@ -265,5 +265,35 @@ namespace LumiSoft.Net.SIP
 
         #endregion
 
+
+        #region static method ListToString
+
+        /// <summary>
+        /// Returns list elements as comma separated string.
+        /// </summary>
+        /// <param name="list">List.</param>
+        /// <returns>Returns list elements as comma separated string.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>list</b> is null reference value.</exception>
+        public static string ListToString(List<string> list)
+        {
+            if(list == null){
+                throw new ArgumentNullException("list");
+            }
+
+            StringBuilder retVal = new StringBuilder();
+            for(int i=0;i<list.Count;i++){
+                if(i == 0){
+                    retVal.Append(list[i]);
+                }
+                else{
+                    retVal.Append("," + list[i]);
+                }
+            }
+
+            return retVal.ToString();
+        }
+
+        #endregion
+
     }
 }

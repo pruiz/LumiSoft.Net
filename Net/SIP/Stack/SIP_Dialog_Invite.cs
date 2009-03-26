@@ -611,7 +611,7 @@ namespace LumiSoft.Net.SIP.Stack
 
         #endregion
 
-
+// Is it needed ?
         #region method ReInvite
 
         /// <summary>

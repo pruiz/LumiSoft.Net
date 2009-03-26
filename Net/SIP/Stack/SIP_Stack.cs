@@ -26,6 +26,8 @@ namespace LumiSoft.Net.SIP.Stack
         private int                          m_CSeq               = 1;
         private int                          m_MaxForwards        = 70;
         private int                          m_MinExpireTime      = 1800;
+        private List<string>                 m_pAllow             = null;
+        private List<string>                 m_pSupported         = null;
         private int                          m_MaximumConnections = 0;
         private int                          m_MaximumMessageSize = 1000000;
         private int                          m_MinSessionExpires  = 90;
@@ -49,6 +51,11 @@ namespace LumiSoft.Net.SIP.Stack
             m_pRegistrations = new List<SIP_UA_Registration>();
             m_pCredentials = new List<NetworkCredential>();
             m_RegisterCallID = SIP_t_CallID.CreateCallID();
+            
+            m_pAllow = new List<string>();
+            m_pAllow.AddRange(new string[]{"INVITE","ACK","CANCEL","BYE","MESSAGE"});
+
+            m_pSupported = new List<string>();
                        
             m_pLogger = new Logger();
 
@@ -295,6 +302,19 @@ namespace LumiSoft.Net.SIP.Stack
 
             #endregion
 
+            #region Allow,Supported (section 13.2.1)
+
+            // RFC requires these headers for dialog establishing requests only.
+            // We just add these to every request - this is won't violate RFC.
+
+            request.Allow.Add(SIP_Utils.ListToString(m_pAllow));
+
+            if(m_pSupported.Count > 0){
+                request.Supported.Add(SIP_Utils.ListToString(m_pAllow));
+            }
+
+            #endregion
+
 
             #region Pre-configured route (proxy server)
 
@@ -305,11 +325,7 @@ namespace LumiSoft.Net.SIP.Stack
             }
 
             #endregion
-
-
-            // TODO: RFC 3261 13.2.1 INVITE special headers
-            // INVITE should have
-            // Allow,Supported
+                                    
 
             // TODO: Subscribe special headers.
             // Expires is mandatory header.
@@ -1129,6 +1145,38 @@ namespace LumiSoft.Net.SIP.Stack
                 }
 
                 m_MinExpireTime = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets stack supported methods list.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this property is accessed.</exception>
+        /// <remarks>This value is appended to <see cref="CreateRequest"/> created request <b>Allow:</b> header.</remarks>
+        public List<string> Allow
+        {
+            get{
+                if(m_State == SIP_StackState.Disposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return m_pAllow; 
+            }
+        }
+
+        /// <summary>
+        /// Gets stack supported extentions list.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this property is accessed.</exception>
+        /// <remarks>This value is appended to <see cref="CreateRequest"/> created request <b>Supported:</b> header.</remarks>
+        public List<string> Supported
+        {
+            get{
+                if(m_State == SIP_StackState.Disposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return m_pSupported; 
             }
         }
 
