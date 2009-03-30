@@ -66,7 +66,37 @@ namespace LumiSoft.Net.MIME
             }
 
             retVal.m_Name  = name_value[0];
-            retVal.m_Value = MIME_Encoding_EncodedWord.DecodeS(MIME_Utils.UnfoldHeader(name_value.Length == 2 ? name_value[1].TrimStart() : ""));
+    
+            // There may be multiple encoded-words and they can be mixed with atom/quoted-string ... .
+            try{
+                StringBuilder v = new StringBuilder();
+                MIME_Reader r = new MIME_Reader(MIME_Utils.UnfoldHeader(name_value.Length == 2 ? name_value[1].TrimStart() : ""));
+                while(true){
+                    string whiteSpaces = r.ToFirstChar();
+                    if(!string.IsNullOrEmpty(whiteSpaces)){
+                        v.Append(whiteSpaces);
+                    }
+
+                    string phrase = r.Phrase();
+                    if(phrase == null){
+                        if(r.Available == 0){
+                            retVal.m_Value = v.ToString().TrimStart();
+                        }
+                        // Parsing failed, leave raw unparsed value.
+                        else{
+                            retVal.m_Value = MIME_Utils.UnfoldHeader(name_value.Length == 2 ? name_value[1].TrimStart() : "");
+                        }                        
+                        break;
+                    }
+                    else{
+                        v.Append(phrase);
+                    }
+                }                
+            }
+            catch{
+                // Parsing failed, leave raw unparsed value.
+                retVal.m_Value = MIME_Utils.UnfoldHeader(name_value.Length == 2 ? name_value[1].TrimStart() : "");
+            }
 
             retVal.m_ParseValue = value;
 
