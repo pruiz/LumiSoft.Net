@@ -277,7 +277,7 @@ namespace LumiSoft.Net.MIME
                     }
                     // Regular parameter.
                     else{
-                        this[name] = value;
+                        this[name] = MIME_Encoding_EncodedWord.DecodeS(value);
                     }
                 }
             }
