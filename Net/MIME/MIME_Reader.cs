@@ -255,13 +255,17 @@ namespace LumiSoft.Net.MIME
         public string EncodedWord()
         {
             /* RFC 2047 2.
-             *  encoded-word = "=?" charset "?" encoding "?" encoded-text "?="
-             *
-             *  An 'encoded-word' may not be more than 75 characters long, including
-             *  'charset', 'encoding', 'encoded-text', and delimiters.  If it is
-             *  desirable to encode more text than will fit in an 'encoded-word' of
-             *  75 characters, multiple 'encoded-word's (separated by CRLF SPACE) may
-             *  be used.
+                encoded-word = "=?" charset "?" encoding "?" encoded-text "?="
+             
+                encoded-text = 1*<Any printable ASCII character other than "?" or SPACE>
+                               ; (but see "Use of encoded-words in message
+                               ; headers", section 5)
+            
+                An 'encoded-word' may not be more than 75 characters long, including
+                'charset', 'encoding', 'encoded-text', and delimiters.  If it is
+                desirable to encode more text than will fit in an 'encoded-word' of
+                75 characters, multiple 'encoded-word's (separated by CRLF SPACE) may
+                be used.
             */
 
             ToFirstChar();
@@ -272,22 +276,34 @@ namespace LumiSoft.Net.MIME
 
             StringBuilder retVal = new StringBuilder();
             while(true){
-                string encodedWord = Atom();
-                try{
-                    string[] parts = encodedWord.Split('?');
-                    if(parts[2].ToUpper() == "Q"){
-                        retVal.Append(MIME_Utils.QDecode(Encoding.GetEncoding(parts[1]),parts[3]));
-                    }
-                    else if(parts[2].ToUpper() == "B"){                        
-                        retVal.Append(Encoding.GetEncoding(parts[1]).GetString(Net_Utils.FromBase64(Encoding.Default.GetBytes(parts[3]))));
-                    }
-                    else{
-                        throw new Exception("");
-                    }
+                int index = m_Source.IndexOf("?=",m_Offset);
+                // Invalid or not enoded-word.
+                if(index == -1){
+                    retVal.Append(ToEnd());
                 }
-                catch{
-                    // Failed to parse encoded-word, leave it as is. RFC 2047 6.3.
-                    retVal.Append(encodedWord);
+                else{
+                    string encodedWord = m_Source.Substring(m_Offset,index - m_Offset + 2);
+  
+                    // Move index over encoded-word.
+                    m_Offset += encodedWord.Length;
+
+                    try{
+                        string[] encodedWordParts = encodedWord.Split('?');
+                        if(encodedWordParts[2].ToUpper() == "Q"){ 
+                            retVal.Append(MIME_Utils.QDecode(Encoding.GetEncoding(encodedWordParts[1]),encodedWordParts[3]));
+                        }
+                        else if(encodedWordParts[2].ToUpper() == "B"){                        
+                            retVal.Append(Encoding.GetEncoding(encodedWordParts[1]).GetString(Net_Utils.FromBase64(Encoding.Default.GetBytes(encodedWordParts[3]))));
+                        }
+                        // Failed to parse encoded-word, leave it as is. RFC 2047 6.3.
+                        else{
+                            retVal.Append(encodedWord);
+                        }
+                    }
+                    catch{
+                        // Failed to parse encoded-word, leave it as is. RFC 2047 6.3.
+                        retVal.Append(encodedWord);
+                    }
                 }
 
                 ToFirstChar();
@@ -398,11 +414,8 @@ namespace LumiSoft.Net.MIME
              *  phrase = 1*( encoded-word / word )        
              *  word   = atom / quoted-string
             */
-
-            throw new NotImplementedException();
-
-            /*
-            int peek = m_pStringReader.Peek();
+                        
+            int peek = Peek(true);
             if(peek == '"'){
                 return QuotedString();
             }
@@ -411,9 +424,7 @@ namespace LumiSoft.Net.MIME
             }
             else{
                 return Atom();
-            }*/
-
-            //return "";
+            }
         }
 
         #endregion
