@@ -12,6 +12,7 @@ namespace LumiSoft.Net.SIP.UA
     /// <summary>
     /// This class represent SIP UA call.
     /// </summary>
+    [Obsolete("Use SIP stack instead.")]
     public class SIP_UA_Call : IDisposable
     {
         private SIP_UA_CallState          m_State                     = SIP_UA_CallState.WaitingForStart;

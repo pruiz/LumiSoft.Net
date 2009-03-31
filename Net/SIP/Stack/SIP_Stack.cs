@@ -81,7 +81,6 @@ namespace LumiSoft.Net.SIP.Stack
 
             // TODO: Currently stack switched Disposed state before all transactions has disposed, so some active 
             // transaction which accesses stack will get disposed exception.
-            // DO stack state: Running,Stoped,Disposed
                         
             // Release events.
             this.RequestReceived = null;
@@ -132,26 +131,38 @@ namespace LumiSoft.Net.SIP.Stack
             if(m_State != SIP_StackState.Started){
                 return;
             }
+            m_State = SIP_StackState.Stopping;
+
+            /* Cleanup order:             
+                *) Unregister registrations.
+                *) Terminate dialogs.
+                *) Wait while all active transactions has terminated.
+            */
 
             // Unregister registrations.
             foreach(SIP_UA_Registration reg in m_pRegistrations.ToArray()){
                 reg.BeginUnregister(true);
             }
 
-            // Wait till all registrations disposed or wait timeout reached.
+            // Terminate dialogs.
+            foreach(SIP_Dialog dialog in m_pTransactionLayer.Dialogs){
+                dialog.Terminate("SIP Shutting Down",true);
+            }
+
+            // Wait while all active transactions has terminated.
             DateTime start = DateTime.Now;
-            while(m_pRegistrations.Count > 0){
+            while(m_pTransactionLayer.Transactions.Length > 0){
                 System.Threading.Thread.Sleep(500);
 
-                // Timeout, just kill all UA.
-                if(((TimeSpan)(DateTime.Now - start)).Seconds > 15){
+                // Timeout.
+                if(((TimeSpan)(DateTime.Now - start)).Seconds > 31){
                     break;
                 }
             }
 
-            m_State = SIP_StackState.Stopped;
-
             m_pTransportLayer.Stop();
+
+            m_State = SIP_StackState.Stopped;            
         }
 
         #endregion
@@ -327,9 +338,6 @@ namespace LumiSoft.Net.SIP.Stack
             #endregion
                                     
 
-            // TODO: Subscribe special headers.
-            // Expires is mandatory header.
-
             #region User-Agent
 
             if(!string.IsNullOrEmpty(m_UserAgent)){
@@ -474,7 +482,26 @@ namespace LumiSoft.Net.SIP.Stack
             response.CallID = request.CallID;
             response.CSeq   = request.CSeq;
 
-            // TODO: Allow: / Supported:
+            #region Allow,Supported (section 13.2.1)
+
+            // RFC requires these headers for dialog establishing requests only.
+            // We just add these to every request - this is won't violate RFC.
+
+            response.Allow.Add(SIP_Utils.ListToString(m_pAllow));
+
+            if(m_pSupported.Count > 0){
+                response.Supported.Add(SIP_Utils.ListToString(m_pAllow));
+            }
+
+            #endregion
+
+            #region User-Agent
+
+            if(!string.IsNullOrEmpty(m_UserAgent)){
+                request.UserAgent = m_UserAgent;
+            }
+
+            #endregion
 
             if(SIP_Utils.MethodCanEstablishDialog(request.RequestLine.Method)){
                 foreach(SIP_t_AddressParam route in request.RecordRoute.GetAllValues()){
@@ -936,35 +963,6 @@ namespace LumiSoft.Net.SIP.Stack
 
 
         #region Properties Implementation
-// REMOVE ME:
-        /// <summary>
-        /// Gets or sets if SIP stack is running.
-        /// </summary>
-        /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this property is accessed.</exception>
-        [Obsolete("Use Start/Stop method instead.")]
-        public bool Enabled
-        {
-            get{ 
-                if(m_State == SIP_StackState.Disposed){
-                    throw new ObjectDisposedException(this.GetType().Name);
-                }
-                
-                return m_State == SIP_StackState.Started; 
-            }
-
-            set{
-                if(m_State == SIP_StackState.Disposed){
-                    throw new ObjectDisposedException(this.GetType().Name);
-                }
-
-                if(value){
-                    Start();
-                }
-                else{
-                    Stop();
-                }
-            }
-        }
 
         /// <summary>
         /// Gets stack state.

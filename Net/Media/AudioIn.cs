@@ -941,7 +941,7 @@ namespace LumiSoft.Net.Media
         /// <summary>
         /// Cleans up any resources being used.
         /// </summary>
-        public void Dispose()
+        public new void Dispose()
         {
             if(m_IsDisposed){
                 return;

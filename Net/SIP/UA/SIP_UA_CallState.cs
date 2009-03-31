@@ -7,6 +7,7 @@ namespace LumiSoft.Net.SIP.UA
     /// <summary>
     /// This enum specifies SIP UA call states.
     /// </summary>
+    [Obsolete("Use SIP stack instead.")]
     public enum SIP_UA_CallState
     {
         /// <summary>

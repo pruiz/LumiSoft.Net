@@ -26,6 +26,8 @@ namespace LumiSoft.Net.SIP.Stack
         private SIP_Uri              m_pRemoteTarget             = null;
         private bool                 m_IsSecure                  = false;
         private SIP_t_AddressParam[] m_pRouteSet                 = null;
+        private string[]             m_pRemoteAllow              = null;
+        private string[]             m_pRemoteSupported          = null;
         private bool                 m_IsTerminatedByRemoteParty = false;
         private SIP_Flow             m_pFlow                     = null;
         private object               m_pLock                     = new object();
@@ -109,6 +111,18 @@ namespace LumiSoft.Net.SIP.Stack
                 m_pRemoteUri = transaction.Request.From.Address.Uri;
                 m_pLocalUri = transaction.Request.To.Address.Uri;
                 m_pLocalContact = (SIP_Uri)response.Contact.GetTopMostValue().Address.Uri;
+
+                List<string> allow = new List<string>();
+                foreach(SIP_t_Method m in response.Allow.GetAllValues()){
+                    allow.Add(m.Method);
+                }
+                m_pRemoteAllow = allow.ToArray();
+
+                List<string> supported = new List<string>();
+                foreach(SIP_t_OptionTag s in response.Supported.GetAllValues()){
+                    supported.Add(s.OptionTag);
+                }
+                m_pRemoteSupported = supported.ToArray();
             }
 
             #endregion
@@ -163,6 +177,18 @@ namespace LumiSoft.Net.SIP.Stack
                 m_pRemoteUri = transaction.Request.To.Address.Uri;
                 m_pLocalUri = transaction.Request.From.Address.Uri;
                 m_pLocalContact = (SIP_Uri)transaction.Request.Contact.GetTopMostValue().Address.Uri;
+                
+                List<string> allow = new List<string>();
+                foreach(SIP_t_Method m in response.Allow.GetAllValues()){
+                    allow.Add(m.Method);
+                }
+                m_pRemoteAllow = allow.ToArray();
+
+                List<string> supported = new List<string>();
+                foreach(SIP_t_OptionTag s in response.Supported.GetAllValues()){
+                    supported.Add(s.OptionTag);
+                }
+                m_pRemoteSupported = supported.ToArray();
             }
 
             #endregion            
@@ -781,6 +807,33 @@ namespace LumiSoft.Net.SIP.Stack
             }
         }
 
+        /// <summary>
+        /// Gets remote party supported SIP methods.
+        /// </summary>
+        public string[] RemoteAllow
+        {
+            get{
+                if(this.State == SIP_DialogState.Disposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return m_pRemoteAllow;
+            }
+        }
+
+        /// <summary>
+        /// Gets remote party supported SIP extentions.
+        /// </summary>
+        public string[] RemoteSupported
+        {
+            get{
+                if(this.State == SIP_DialogState.Disposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return m_pRemoteSupported;
+            }
+        }
         
         /// <summary>
         /// Gets if dialog was terminated by remote-party.

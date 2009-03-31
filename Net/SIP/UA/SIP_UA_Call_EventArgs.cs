@@ -7,6 +7,7 @@ namespace LumiSoft.Net.SIP.UA
     /// <summary>
     /// This class provides data for <b>SIP_UA.IncomingCall</b> event.
     /// </summary>
+    [Obsolete("Use SIP stack instead.")]
     public class SIP_UA_Call_EventArgs : EventArgs
     {
         private SIP_UA_Call m_pCall = null;

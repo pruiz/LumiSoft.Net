@@ -513,6 +513,20 @@ namespace LumiSoft.Net.SIP.Stack
         #region Properties Implementation
 
         /// <summary>
+        /// Gets all(clinet + server) active transactions.
+        /// </summary>
+        public SIP_Transaction[] Transactions
+        {
+            get{
+                List<SIP_Transaction> retVal = new List<SIP_Transaction>();
+                retVal.AddRange(this.ClientTransactions);
+                retVal.AddRange(this.ServerTransactions);
+
+                return retVal.ToArray();
+            }
+        }
+
+        /// <summary>
         /// Gets all available client transactions. This method is thread-safe.
         /// </summary>
         public SIP_ClientTransaction[] ClientTransactions

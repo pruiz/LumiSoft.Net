@@ -13,6 +13,7 @@ namespace LumiSoft.Net.SIP.UA
     /// <summary>
     /// This class implements SIP UA. Defined in RFC 3261 8.1.
     /// </summary>
+    [Obsolete("Use SIP stack instead.")]
     public class SIP_UA : IDisposable
     {
         private bool              m_IsDisposed = false;

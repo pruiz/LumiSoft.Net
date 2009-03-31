@@ -720,7 +720,7 @@ namespace LumiSoft.Net.SIP.Stack
                     }
                 };
 
-                OnReinvite(((SIP_ServerTransaction)m_pActiveInvite));
+                OnReinvite(e);
 
                 return true;
             }
@@ -831,18 +831,18 @@ namespace LumiSoft.Net.SIP.Stack
         /// Is raised when re-INVITE is received.
         /// </summary>
         /// <remarks>INVITE dialog consumer always should respond to this event(accept or decline it).</remarks>
-        public event EventHandler Reinvite = null;
+        public event EventHandler<SIP_RequestReceivedEventArgs> Reinvite = null;
 
         #region method OnReinvite
 
         /// <summary>
         /// Raises <b>Reinvite</b> event.
         /// </summary>
-        /// <param name="reinvite">Re-INVITE server transaction.</param>
-        private void OnReinvite(SIP_ServerTransaction reinvite)
+        /// <param name="e">Event data.</param>
+        private void OnReinvite(SIP_RequestReceivedEventArgs e)
         {
             if(this.Reinvite != null){
-                this.Reinvite(this,new EventArgs());
+                this.Reinvite(this,e);
             }
         }
 
