@@ -109,7 +109,7 @@ namespace LumiSoft.Net.MIME
         {
             // RFC 2046 4.1.2. The default character set, US-ASCII.
             
-            if(string.IsNullOrEmpty(this.Entity.ContentType.Param_Charset)){
+            if(this.Entity.ContentType == null || string.IsNullOrEmpty(this.Entity.ContentType.Param_Charset)){
                 return Encoding.ASCII;
             }
             else{
