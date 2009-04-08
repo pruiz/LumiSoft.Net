@@ -95,21 +95,30 @@ namespace LumiSoft.Net.SIP.Message
                 m_pUri = AbsoluteUri.Parse(reader.ReadParenthesized());
             }
             else{
-                string word = reader.ReadWord();
-                if(word == null){
-                    throw new SIP_ParseException("Invalid 'name-addr' or 'addr-spec' value !");
+                // Read while we get "<","," or EOF.
+                StringBuilder buf = new StringBuilder();
+                while(true){
+                    buf.Append(reader.ReadToFirstChar());
+
+                    string word = reader.ReadWord();
+                    if(string.IsNullOrEmpty(word)){
+                        break;
+                    }
+                    else{
+                        buf.Append(word);
+                    }
                 }
 
                 reader.ReadToFirstChar();
 
                 // name-addr
                 if(reader.StartsWith("<")){
-                    m_DisplayName = word;
+                    m_DisplayName = buf.ToString().Trim();
                     m_pUri        = AbsoluteUri.Parse(reader.ReadParenthesized());
                 }
                 // addr-spec
                 else{
-                    m_pUri = AbsoluteUri.Parse(word);
+                    m_pUri = AbsoluteUri.Parse(buf.ToString());
                 }
             }            
         }
