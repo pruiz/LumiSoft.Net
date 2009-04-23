@@ -94,7 +94,7 @@ namespace LumiSoft.Net.MIME
                     bodyType = typeof(MIME_b_Video);
                 }
                 else{
-                    throw new ParseException("Invalid media-type '" + mediaType + "'.");
+                    bodyType = typeof(MIME_b_Unknown);
                 }
             }
 
