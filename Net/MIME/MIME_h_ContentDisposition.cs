@@ -127,7 +127,7 @@ namespace LumiSoft.Net.MIME
         public override string ToString(MIME_Encoding_EncodedWord wordEncoder,Encoding parmetersCharset)
         {
             if(this.IsModified){
-                return "Content-Dispostition: " + m_DispositionType + m_pParameters.ToString(parmetersCharset) + "\r\n";
+                return "Content-Disposition: " + m_DispositionType + m_pParameters.ToString(parmetersCharset) + "\r\n";
             }
             else{
                 return m_ParseValue;
