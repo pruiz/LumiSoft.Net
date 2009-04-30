@@ -232,14 +232,16 @@ namespace LumiSoft.Net.MIME
         public string Word()
         {
             /* RFC 2822 3.2.6.
-             *  word = atom / quoted-string
+                word = atom / quoted-string
+            
+                Consider dot-atom as word too.
             */
 
             if(Peek(true) == '"'){
                 return QuotedString();
             }
             else{
-                return Atom();
+                return DotAtom();
             }
         }
 
