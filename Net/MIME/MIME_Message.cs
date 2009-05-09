@@ -40,7 +40,9 @@ namespace LumiSoft.Net.MIME
                 throw new ArgumentException("Argument 'file' value must be specified.");
             }
 
-            return ParseFromStream(File.OpenRead(file));
+            using(FileStream fs = File.OpenRead(file)){
+                return ParseFromStream(fs);
+            }
         }
 
         #endregion
