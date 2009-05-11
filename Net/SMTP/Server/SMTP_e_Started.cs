@@ -5,7 +5,7 @@ using System.Text;
 namespace LumiSoft.Net.SMTP.Server
 {
     /// <summary>
-    /// This class provided data for <b cref="SMTP_Session.Started">SMTP_Session.Started</b> event.
+    /// This class provides data for <b cref="SMTP_Session.Started">SMTP_Session.Started</b> event.
     /// </summary>
     public class SMTP_e_Started : EventArgs
     {
