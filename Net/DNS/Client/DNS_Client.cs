@@ -74,13 +74,25 @@ namespace LumiSoft.Net.Dns.Client
 
 		#region method Query
 
+        /// <summary>
+		/// Queries server with specified query.
+		/// </summary>
+		/// <param name="queryText">Query text. It depends on queryType.</param>
+		/// <param name="queryType">Query type.</param>
+		/// <returns>Returns DSN server response.</returns>
+		public DnsServerResponse Query(string queryText,QTYPE queryType)
+		{
+            return Query(queryText,queryType,2000);
+        }
+
 		/// <summary>
 		/// Queries server with specified query.
 		/// </summary>
 		/// <param name="queryText">Query text. It depends on queryType.</param>
 		/// <param name="queryType">Query type.</param>
-		/// <returns></returns>
-		public DnsServerResponse Query(string queryText,QTYPE queryType)
+        /// <param name="timeout">Query timeout in milli seconds.</param>
+		/// <returns>Returns DSN server response.</returns>
+		public DnsServerResponse Query(string queryText,QTYPE queryType,int timeout)
 		{
 			if(queryType == QTYPE.PTR){
 				string ip = queryText;
@@ -116,7 +128,7 @@ namespace LumiSoft.Net.Dns.Client
 				}
 			}
 
-			return QueryServer(2000,queryText,queryType,1);
+			return QueryServer(timeout,queryText,queryType,1);
 		}
 
 		#endregion
