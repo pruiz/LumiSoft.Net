@@ -6,6 +6,7 @@ namespace LumiSoft.Net
 	/// <summary>
 	/// This is base class for SocketServer sessions.
 	/// </summary>
+    [Obsolete("Use TCP_Server class instead")]
 	public abstract class SocketServerSession
 	{
         private string       m_SessionID = "";
