@@ -217,7 +217,7 @@ namespace LumiSoft.Net.MIME
             }
 
             if(transferEncoding == MIME_TransferEncodings.QuotedPrintable){
-                using(FileStream fs = File.Create(Path.GetTempFileName())){
+                using(FileStream fs = File.Create(Path.GetTempFileName(),32000,FileOptions.DeleteOnClose)){
                     QuotedPrintableStream encoder = new QuotedPrintableStream(new SmartStream(fs,false),FileAccess.ReadWrite);
                     Net_Utils.StreamCopy(stream,encoder,32000);
                     encoder.Flush();
@@ -226,7 +226,7 @@ namespace LumiSoft.Net.MIME
                 }
             }
             else if(transferEncoding == MIME_TransferEncodings.Base64){
-                using(FileStream fs = File.Create(Path.GetTempFileName())){
+                using(FileStream fs = File.Create(Path.GetTempFileName(),32000,FileOptions.DeleteOnClose)){
                     Base64Stream encoder = new Base64Stream(fs,false,true,FileAccess.ReadWrite);                                     
                     Net_Utils.StreamCopy(stream,encoder,32000);
                     encoder.Finish();
