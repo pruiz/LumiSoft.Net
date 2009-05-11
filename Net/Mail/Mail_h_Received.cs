@@ -240,6 +240,31 @@ namespace LumiSoft.Net.Mail
                 StringBuilder retVal = new StringBuilder();
 
                 retVal.Append("Received: ");
+                retVal.Append("from " + m_From);
+                if(m_pFrom_TcpInfo != null){
+                    retVal.Append(" (" + m_pFrom_TcpInfo.ToString() + ")");
+                }
+                retVal.Append(" by " + m_By);
+                if(m_pBy_TcpInfo != null){
+                    retVal.Append(" (" + m_pBy_TcpInfo.ToString() + ")");
+                }
+                if(!string.IsNullOrEmpty(m_Via)){
+                    retVal.Append(" via " + m_Via);
+                }
+                if(!string.IsNullOrEmpty(m_With)){
+                    retVal.Append(" with " + m_With);
+                }
+                if(!string.IsNullOrEmpty(m_ID)){
+                    retVal.Append(" id " + m_ID);
+                }
+                if(!string.IsNullOrEmpty(m_For)){
+                    retVal.Append(" for " + m_For);
+                }
+                retVal.Append("; " + MIME_Utils.DateTimeToRfc2822(m_Time));
+                retVal.Append("\r\n");
+
+                /* Some servers doesnt like uppercase.
+                retVal.Append("Received: ");
                 retVal.Append("FROM " + m_From);
                 if(m_pFrom_TcpInfo != null){
                     retVal.Append(" (" + m_pFrom_TcpInfo.ToString() + ")");
@@ -261,7 +286,7 @@ namespace LumiSoft.Net.Mail
                     retVal.Append(" FOR " + m_For);
                 }
                 retVal.Append("; " + MIME_Utils.DateTimeToRfc2822(m_Time));
-                retVal.Append("\r\n");
+                retVal.Append("\r\n");*/
 
                 return retVal.ToString();
             }
