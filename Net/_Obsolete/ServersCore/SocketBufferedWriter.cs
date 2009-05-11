@@ -8,6 +8,7 @@ namespace LumiSoft.Net
     /// <summary>
     /// Implements buffered writer for socket.
     /// </summary>
+    [Obsolete("Get rid of it.")]
     public class SocketBufferedWriter
     {
         private SocketEx     m_pSocket           = null;
