@@ -468,7 +468,7 @@ namespace LumiSoft.Net.Media
                                 string chunkID = wavReader.Read_ChunkID();
 
                                 // EOS reached.
-                                if(chunkID == null){
+                                if(chunkID == null || (waveFile.BaseStream.Length - waveFile.BaseStream.Position) < 4){
                                     break;
                                 }
                                 // Wave data chunk.
