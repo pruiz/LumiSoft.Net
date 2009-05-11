@@ -12,6 +12,7 @@ namespace LumiSoft.Net
 	/// <summary>
 	/// This is base class for Socket and Session based servers.
 	/// </summary>
+    [Obsolete("Use TCP_Server class instead")]
 	public abstract class SocketServer : System.ComponentModel.Component 
 	{
         private List<SocketServerSession> m_pSessions           = null;
