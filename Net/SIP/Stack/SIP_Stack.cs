@@ -136,7 +136,7 @@ namespace LumiSoft.Net.SIP.Stack
             /* Cleanup order:             
                 *) Unregister registrations.
                 *) Terminate dialogs.
-                *) Wait while all active transactions has terminated.
+                *) Wait while all active transactions has terminated or timeout reaches.
             */
 
             // Unregister registrations.
@@ -149,17 +149,41 @@ namespace LumiSoft.Net.SIP.Stack
                 dialog.Terminate("SIP Shutting Down",true);
             }
 
-            // Wait while all active transactions has terminated.
+            // Wait while all active transactions has "completed","terminated" or "Disposed".
             DateTime start = DateTime.Now;
-            while(m_pTransactionLayer.Transactions.Length > 0){
-                System.Threading.Thread.Sleep(500);
+            while(true){
+                bool activeTransactions = false;
+                foreach(SIP_Transaction tr in m_pTransactionLayer.Transactions){
+                    // We have active transactions.
+                    if(!(tr.State == SIP_TransactionState.Completed || tr.State == SIP_TransactionState.Terminated || tr.State == SIP_TransactionState.Disposed)){
+                        activeTransactions = true;
+                        break;
+                    }
+                }
 
-                // Timeout.
-                if(((TimeSpan)(DateTime.Now - start)).Seconds > 31){
+                if(activeTransactions){
+                    System.Threading.Thread.Sleep(500);
+
+                    // Timeout.
+                    if(((TimeSpan)(DateTime.Now - start)).Seconds > 10){
+                        break;
+                    }
+                }
+                else{
                     break;
                 }
             }
+            
+            // REMOVE ME: Dispose Transaction layer instead.
+            foreach(SIP_Transaction tr in m_pTransactionLayer.Transactions){
+                try{
+                    tr.Dispose();
+                }
+                catch{
+                }
+            }
 
+            
             m_pTransportLayer.Stop();
 
             m_State = SIP_StackState.Stopped;            
