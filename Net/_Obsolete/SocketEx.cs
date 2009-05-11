@@ -13,6 +13,7 @@ namespace LumiSoft.Net
     /// <summary>
     /// This class implements extended socket, provides usefull methods for reading and writing data to socket.
     /// </summary>
+    [Obsolete("Use TCP_Client or TCP_Server instead.")]
     public class SocketEx : IDisposable
     {
         private delegate void BufferDataBlockCompleted(Exception x,object tag);
