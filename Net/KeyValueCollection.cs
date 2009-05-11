@@ -103,6 +103,29 @@ namespace LumiSoft.Net
 
         #endregion
 
+        #region method TryGetValueAt
+
+        /// <summary>
+        /// Gets the value at the specified index.
+        /// </summary>
+        /// <param name="index">Zero based item index.</param>
+        /// <param name="value">When this method returns, contains the value associated with the specified key, if the key is found.</param>
+        /// <returns>Returns true if the collection contains specified key and value stored to <b>value</b> argument.</returns>
+        public bool TryGetValueAt(int index,out V value)
+        {
+            value = default(V);
+
+            if(m_pList.Count > 0 && index >= 0 && index < m_pList.Count){
+                value = m_pList[index];
+
+                return true;
+            }
+
+            return false;
+        }
+
+        #endregion
+
 
         #region interface IEnumerator
 
