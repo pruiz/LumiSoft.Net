@@ -60,7 +60,7 @@ namespace LumiSoft.Net.SMTP.Server
         #endregion
     
 
-        #region method override Start
+        #region override method Start
 
         /// <summary>
         /// Starts session processing.
@@ -110,7 +110,7 @@ namespace LumiSoft.Net.SMTP.Server
 
         #endregion
 
-        #region method OnError
+        #region override method OnError
 
         /// <summary>
         /// Is called when session has processing error.
@@ -157,7 +157,7 @@ namespace LumiSoft.Net.SMTP.Server
 
         #endregion
 
-        #region method OnTimeout
+        #region override method OnTimeout
 
         /// <summary>
         /// This method is called when specified session times out.
@@ -1506,7 +1506,7 @@ namespace LumiSoft.Net.SMTP.Server
         }
 
         /// <summary>
-        /// Gets supported authentications collection.
+        /// Gets supported SASL authentication methods collection.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
         public Dictionary<string,AUTH_SASL_ServerMechanism> Authentications
