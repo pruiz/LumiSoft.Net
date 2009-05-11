@@ -184,13 +184,13 @@ namespace LumiSoft.Net.IMAP.Server
 			// Example:
 			//		header
 			//		multipart/mixed
-			//			entity1  -> 1
-			//			entity2  -> 2
+			//			text/plain  -> 1
+			//			application/pdf  -> 2
 			//          ...
 
 			// Single part
-			if(message.ContentType.Type.ToLower() != "multipart"){
-				if(mimeEntitySpecifier.Length == 1 && Convert.ToInt32(mimeEntitySpecifier) == 1){
+			if(message.ContentType == null || message.ContentType.Type.ToLower() != "multipart"){
+				if(Convert.ToInt32(mimeEntitySpecifier) == 1){
 					return message;
 				}
 				else{
@@ -199,6 +199,23 @@ namespace LumiSoft.Net.IMAP.Server
 			}
 			// multipart
 			else{
+                /*
+                MIME_Entity currentEntity = message;
+
+                string[] parts = mimeEntitySpecifier.Split('.');
+                for(int i=0;i<parts.Length;i++){
+                    int partSpecifier = Convert.ToInt32(parts[i]) - 1; // Enitites are zero base, mimeEntitySpecifier is 1 based.
+
+                    currentEntity
+
+                    // Last mime part.
+                    if(i == (parts.Length - 1)){
+                    }
+                    // Not a last mime part.
+                    else{
+                    }
+                }*/
+                
 				MIME_Entity entity = message;
 				string[] parts = mimeEntitySpecifier.Split('.');
 				foreach(string part in parts){
@@ -208,9 +225,13 @@ namespace LumiSoft.Net.IMAP.Server
                         if(mEntryNo > -1 && mEntryNo < multipart.BodyParts.Count){
 						    entity = multipart.BodyParts[mEntryNo];
 					    }
+                        else{
+                            return null;
+                        }
                     }
-					
-			        return null;
+			        else{
+                        return null;
+                    }
 				}
 
 				return entity;
@@ -229,7 +250,7 @@ namespace LumiSoft.Net.IMAP.Server
 		/// <returns></returns>
 		public static byte[] GetMimeEntityHeader(MIME_Entity entity)
 		{
-			return System.Text.Encoding.ASCII.GetBytes(entity.ToString() + "\r\n");
+			return System.Text.Encoding.ASCII.GetBytes(entity.Header.ToString() + "\r\n");
 		}
 
 		/// <summary>
