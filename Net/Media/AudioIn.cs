@@ -506,6 +506,7 @@ namespace LumiSoft.Net.Media
 
             #endregion
 
+            private bool                         m_IsDisposed     = false;
             private AudioInDevice                m_pInDevice      = null;
             private int                          m_SamplesPerSec  = 8000;
             private int                          m_BitsPerSample  = 8;
@@ -518,8 +519,9 @@ namespace LumiSoft.Net.Media
             private waveInProc                   m_pWaveInProc    = null;
             private bool                         m_IsRecording    = false;
             private FifoBuffer                   m_pReadBuffer    = null;
-            private bool                         m_IsDisposed     = false;
-
+            //private Thread                       m_pBufferThread  = null;
+            private object                       m_pLock          = new object();
+            
             /// <summary>
             /// Default constructor.
             /// </summary>
@@ -659,7 +661,7 @@ namespace LumiSoft.Net.Media
 
 
             #region method OnWaveInProc
-
+int lastTicks = Environment.TickCount;
             /// <summary>
             /// This method is called when wav device generates some event.
             /// </summary>
@@ -673,12 +675,31 @@ namespace LumiSoft.Net.Media
                 // NOTE: MSDN warns, we may not call any wav related methods here.
                 // This will cause deadlock.
 
-                try{
-                    if(uMsg == WavConstants.MM_WIM_DATA){                         
-                        ThreadPool.QueueUserWorkItem(new WaitCallback(this.ProcessActiveBuffer));
+                // Do we need to lock here ? OnWaveInProc may be called for another buffer same time when we are here ?
+//Console.WriteLine((Environment.TickCount - lastTicks));lastTicks = Environment.TickCount;
+                lock(m_pLock){
+                    try{
+                        if(uMsg == WavConstants.MM_WIM_DATA){
+                            // Queue data for reading.
+                            m_pReadBuffer.Write(m_pCurrentBuffer.Data,0,m_pCurrentBuffer.Data.Length,true);
+
+                            BufferItem buffer = m_pCurrentBuffer;
+
+                            m_pCurrentBuffer = m_pBuffers.Next();
+
+                            // Free buffer and queue it for reuse.
+                            ThreadPool.QueueUserWorkItem(new WaitCallback(delegate(object state){
+                                // Prepare buffer for reuse.
+                                waveInUnprepareHeader(m_pWavDevHandle,buffer.HeaderHandle.AddrOfPinnedObject(),Marshal.SizeOf(buffer.Header));
+                                // Prepare new buffer.
+                                waveInPrepareHeader(m_pWavDevHandle,buffer.HeaderHandle.AddrOfPinnedObject(),Marshal.SizeOf(buffer.Header));
+                                // Append buffer for recording.
+                                waveInAddBuffer(m_pWavDevHandle,buffer.HeaderHandle.AddrOfPinnedObject(),Marshal.SizeOf(buffer.Header));
+                            }));
+                        }
                     }
-                }
-                catch{
+                    catch{
+                    }
                 }
             }
 
@@ -695,7 +716,7 @@ namespace LumiSoft.Net.Media
                 try{            
                     lock(m_pBuffers){
                         // Queue data for reading.
-                        m_pReadBuffer.Write(m_pCurrentBuffer.Data,0,m_pCurrentBuffer.Data.Length,true);
+                        //m_pReadBuffer.Write(m_pCurrentBuffer.Data,0,m_pCurrentBuffer.Data.Length,true);
 
                         // Prepare buffer for reuse.
                         waveInUnprepareHeader(m_pWavDevHandle,m_pCurrentBuffer.HeaderHandle.AddrOfPinnedObject(),Marshal.SizeOf(m_pCurrentBuffer.Header));
@@ -704,7 +725,7 @@ namespace LumiSoft.Net.Media
                         // Append buffer for recording.
                         waveInAddBuffer(m_pWavDevHandle,m_pCurrentBuffer.HeaderHandle.AddrOfPinnedObject(),Marshal.SizeOf(m_pCurrentBuffer.Header));
                                           
-                        m_pCurrentBuffer = m_pBuffers.Next();
+                        //m_pCurrentBuffer = m_pBuffers.Next();
                     }
                 }
                 catch{                    
@@ -720,7 +741,7 @@ namespace LumiSoft.Net.Media
             /// </summary>
             private void CreateBuffers()
             {               
-                while(m_pBuffers.Count < 3){
+                while(m_pBuffers.Count < 10){
                     byte[]   data       = new byte[m_BufferSize];
                     GCHandle dataHandle = GCHandle.Alloc(data,GCHandleType.Pinned);
 
@@ -1021,6 +1042,7 @@ namespace LumiSoft.Net.Media
         /// <returns>Returns number of bytes readed. Returns 0 if no data in the buffer.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>buffer</b> is null reference.</exception>
         /// <exception cref="ArgumentOutOfRangeException">Is raised when any of the arguments has out of allowed range.</exception>
+        /// <remarks>The implementation will block until at least one audio sample block can be read.</remarks>
         public override int Read(byte[] buffer,int offset,int count)
         {
             if(buffer == null){
@@ -1034,6 +1056,11 @@ namespace LumiSoft.Net.Media
             }
             if(offset + count > buffer.Length){
                 throw new ArgumentOutOfRangeException("count","Argument 'count' is bigger than than argument 'buffer' can store.");
+            }
+
+            // Wait while data available.
+            while(m_pWaveIn.ReadBuffer.Available == 0){
+                Thread.Sleep(1);
             }
 
             return m_pWaveIn.ReadBuffer.Read(buffer,offset,count - (count % m_pWaveIn.BlockSize));
