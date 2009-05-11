@@ -12,25 +12,26 @@ namespace LumiSoft.Net.SIP.Stack
     /// </summary>
     public class SIP_Dialog
     {
-        private SIP_DialogState      m_State                     = SIP_DialogState.Early;
-        private SIP_Stack            m_pStack                    = null;
-        private DateTime             m_CreateTime;
-        private string               m_CallID                    = "";
-        private string               m_LocalTag                  = "";
-        private string               m_RemoteTag                 = "";
-        private int                  m_LocalSeqNo                = 0;
-        private int                  m_RemoteSeqNo               = 0;
-        private AbsoluteUri          m_pLocalUri                 = null;
-        private AbsoluteUri          m_pRemoteUri                = null;
-        private SIP_Uri              m_pLocalContact             = null;
-        private SIP_Uri              m_pRemoteTarget             = null;
-        private bool                 m_IsSecure                  = false;
-        private SIP_t_AddressParam[] m_pRouteSet                 = null;
-        private string[]             m_pRemoteAllow              = null;
-        private string[]             m_pRemoteSupported          = null;
-        private bool                 m_IsTerminatedByRemoteParty = false;
-        private SIP_Flow             m_pFlow                     = null;
-        private object               m_pLock                     = new object();
+        private SIP_DialogState        m_State                     = SIP_DialogState.Early;
+        private SIP_Stack              m_pStack                    = null;
+        private DateTime               m_CreateTime;
+        private string                 m_CallID                    = "";
+        private string                 m_LocalTag                  = "";
+        private string                 m_RemoteTag                 = "";
+        private int                    m_LocalSeqNo                = 0;
+        private int                    m_RemoteSeqNo               = 0;
+        private AbsoluteUri            m_pLocalUri                 = null;
+        private AbsoluteUri            m_pRemoteUri                = null;
+        private SIP_Uri                m_pLocalContact             = null;
+        private SIP_Uri                m_pRemoteTarget             = null;
+        private bool                   m_IsSecure                  = false;
+        private SIP_t_AddressParam[]   m_pRouteSet                 = null;
+        private string[]               m_pRemoteAllow              = null;
+        private string[]               m_pRemoteSupported          = null;
+        private bool                   m_IsTerminatedByRemoteParty = false;
+        private SIP_Flow               m_pFlow                     = null;
+        private List<SIP_Dialog_Usage> m_pUsages                   = null;
+        private object                 m_pLock                     = new object();
 
         /// <summary>
         /// Default constructor.
@@ -61,6 +62,8 @@ namespace LumiSoft.Net.SIP.Stack
             }
 
             m_pStack = stack;
+
+            m_pUsages = new List<SIP_Dialog_Usage>();
                         
             #region UAS
 
@@ -409,6 +412,8 @@ namespace LumiSoft.Net.SIP.Stack
             */
 
             lock(m_pLock){
+                // TODO: We should use Route from dialog not from stack.
+
                 SIP_Request request = m_pStack.CreateRequest(method,new SIP_t_NameAddress("",m_pRemoteUri),new SIP_t_NameAddress("",m_pLocalUri));
                 if(m_pRouteSet.Length == 0){
                     request.RequestLine.Uri = m_pRemoteTarget;
