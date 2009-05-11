@@ -8,7 +8,7 @@ using LumiSoft.Net.AUTH;
 namespace LumiSoft.Net.SMTP.Server
 {
     /// <summary>
-    /// This class implements SMTP server.  Defined RFC 5321.
+    /// This class implements SMTP server. Defined RFC 5321.
     /// </summary>
     public class SMTP_Server : TCP_Server<SMTP_Session>
     {
