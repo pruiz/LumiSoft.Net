@@ -137,15 +137,6 @@ namespace LumiSoft.Net.MIME
             m_pEncodedDataStream.SetLength(0);
             Net_Utils.StreamCopy(stream,m_pEncodedDataStream,32000);
             
-            // If body won't end with CRLF, add CRLF.
-            if(m_pEncodedDataStream.Length >= 2){
-                m_pEncodedDataStream.Position = m_pEncodedDataStream.Length - 2;
-            }
-            if(!(m_pEncodedDataStream.ReadByte() == '\r' && m_pEncodedDataStream.ReadByte() == '\n')){
-                m_pEncodedDataStream.Position = m_pEncodedDataStream.Length;
-                m_pEncodedDataStream.Write(new byte[]{(byte)'\r',(byte)'\n'},0,2);
-            }
-            
             m_IsModified = true;
         }
 
