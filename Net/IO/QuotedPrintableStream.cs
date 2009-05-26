@@ -152,7 +152,8 @@ namespace LumiSoft.Net.IO
                             }
                         }
 
-                        if(!softLineBreak){
+                        // Add hard line break only if there was one in original data.
+                        if(readLineOP.LineBytesInBuffer != readLineOP.BytesInBuffer && !softLineBreak){
                             m_pDecodedBuffer[m_DecodedCount++] = (byte)'\r';
                             m_pDecodedBuffer[m_DecodedCount++] = (byte)'\n';
                         }
