@@ -597,6 +597,7 @@ namespace LumiSoft.Net.POP3.Server
             */
             if(string.IsNullOrEmpty(mechanism)){
                 StringBuilder resp = new StringBuilder();
+                resp.Append("+OK\r\n");
                 foreach(AUTH_SASL_ServerMechanism m in m_pAuthentications.Values){
                     resp.Append(m.Name + "\r\n");
                 }
