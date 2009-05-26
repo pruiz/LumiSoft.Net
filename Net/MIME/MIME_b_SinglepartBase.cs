@@ -136,7 +136,7 @@ namespace LumiSoft.Net.MIME
 
             m_pEncodedDataStream.SetLength(0);
             Net_Utils.StreamCopy(stream,m_pEncodedDataStream,32000);
-            
+       
             m_IsModified = true;
         }
 
