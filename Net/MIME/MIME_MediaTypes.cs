@@ -41,6 +41,11 @@ namespace LumiSoft.Net.MIME
             /// "application/zip". Defined in RFC 4566.
             /// </summary>
             public static readonly string zip = "application/zip";
+
+            /// <summary>
+            /// "application/x-pkcs7-signature". Defined in RFC 2311,2633.
+            /// </summary>
+            public static readonly string x_pkcs7_signature = "application/x-pkcs7-signature";
         }
 
         #endregion
