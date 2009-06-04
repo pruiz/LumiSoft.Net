@@ -89,8 +89,8 @@ namespace LumiSoft.Net.Mail
                     break;
                 }
                 // name-addr
-                else if(r.Peek(true) == '<'){
-                    retVal.m_pAddresses.Add(new Mail_t_Mailbox(word != null ? MIME_Encoding_EncodedWord.DecodeS(TextUtils.UnQuoteString(word)) : null,r.ReadParenthesized()));                    
+                else if(r.Peek(true) == '<'){//Console.WriteLine("aaa:'" + r.ReadParenthesized() + "'");
+                    retVal.m_pAddresses.Add(new Mail_t_Mailbox(word != null ? MIME_Encoding_EncodedWord.DecodeS(TextUtils.UnQuoteString(word.Trim())) : null,r.ReadParenthesized()));                    
                 }
                 // addr-spec
                 else{
