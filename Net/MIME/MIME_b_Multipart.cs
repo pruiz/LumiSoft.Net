@@ -196,7 +196,9 @@ namespace LumiSoft.Net.MIME
                                     m_State = State.InBoundary;
 
                                     // Last CRLF is no part of preamble, but is part of boundary-tag.
-                                    m_pTextPreamble.Remove(m_pTextPreamble.Length - 2,2);
+                                    if(m_pTextPreamble.Length >= 2){
+                                        m_pTextPreamble.Remove(m_pTextPreamble.Length - 2,2);
+                                    }
 
                                     return true;
                                 }
