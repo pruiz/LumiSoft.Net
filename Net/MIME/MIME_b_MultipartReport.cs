@@ -26,9 +26,9 @@ namespace LumiSoft.Net.MIME
             if(!string.Equals(contentType.TypeWithSubype,"multipart/report",StringComparison.CurrentCultureIgnoreCase)){
                 throw new ArgumentException("Argument 'contentType.TypeWithSubype' value must be 'multipart/report'.");
             }
-            if(contentType.Parameters["report-type"] == null){
-                throw new ArgumentException("Argument 'contentType' does not contain required 'report-type' paramter.");
-            }
+            //if(contentType.Parameters["report-type"] == null){
+            //    throw new ArgumentException("Argument 'contentType' does not contain required 'report-type' paramter.");
+            //}
         }
 
         #region static method Parse
