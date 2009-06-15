@@ -102,12 +102,16 @@ namespace LumiSoft.Net.Mail
                     Mail_t_Group group = new Mail_t_Group(word != null ? MIME_Encoding_EncodedWord.DecodeS(TextUtils.UnQuoteString(word)) : null);
                     // Consume ':'
                     r.Char(true);
-                 
+           
                     while(true){
                         word = r.QuotedReadToDelimiter(new char[]{',','<',':',';'});
                         // We processed all data.
-                        if(word == null && r.Available == 0){
+                        if((word == null && r.Available == 0) || r.Peek(false) == ';'){
                             break;
+                        }
+                        // In valid address list value.
+                        else if(word == string.Empty){
+                            throw new ParseException("Invalid address-list value '" + value + "'.");
                         }
                         // name-addr
                         else if(r.Peek(true) == '<'){  
