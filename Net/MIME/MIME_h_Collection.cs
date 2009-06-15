@@ -409,7 +409,7 @@ namespace LumiSoft.Net.MIME
                 }
                 else{
                     string line = Encoding.UTF8.GetString(readLineOP.Buffer,0,readLineOP.BytesInBuffer);
-
+ 
                     // New header field starts.
                     if(currentHeader.Length == 0){
                          currentHeader.Append(line);

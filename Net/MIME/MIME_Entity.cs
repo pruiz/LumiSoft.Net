@@ -163,7 +163,7 @@ namespace LumiSoft.Net.MIME
             }
             
             m_pHeader.Parse(stream); 
-           
+          
             m_pBody = m_pBodyProvider.Parse(this,stream,defaultContentType);
             m_pBody.SetParent(this,false);         
         }

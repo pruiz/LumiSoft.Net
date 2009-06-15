@@ -168,7 +168,7 @@ namespace LumiSoft.Net.MIME
                 }
                 else if(m_State == State.SeekFirst){
                     while(true){
-                        m_pStream.ReadLine(m_pReadLineOP,false);
+                        m_pStream.ReadLine(m_pReadLineOP,false);                                                
                         if(m_pReadLineOP.Error != null){
                             throw m_pReadLineOP.Error;
                         }
