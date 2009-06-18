@@ -1511,9 +1511,18 @@ namespace LumiSoft.Net.IO
                 // Normal line.
                 else{
                     if(m_MaxCount < 1 || m_BytesStored < m_MaxCount){
-                        m_pStream.Write(m_pReadLineOP.Buffer,0,m_pReadLineOP.BytesInBuffer);
-                        m_BytesStored += m_pReadLineOP.BytesInBuffer;
-                        m_LinesStored++;
+                        // Period handling: If line starts with '.', it must be removed.
+                        if(m_pReadLineOP.Buffer[0] == '.'){
+                            m_pStream.Write(m_pReadLineOP.Buffer,1,m_pReadLineOP.BytesInBuffer - 1);
+                            m_BytesStored += m_pReadLineOP.BytesInBuffer - 1;
+                            m_LinesStored++;
+                        }
+                        // Nomrmal line.
+                        else{
+                            m_pStream.Write(m_pReadLineOP.Buffer,0,m_pReadLineOP.BytesInBuffer);
+                            m_BytesStored += m_pReadLineOP.BytesInBuffer;
+                            m_LinesStored++;
+                        }                        
                     }
                 }
 
