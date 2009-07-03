@@ -6,6 +6,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using System.Net.NetworkInformation;
+using System.Threading;
 
 namespace LumiSoft.Net.Dns.Client
 {
@@ -32,11 +33,227 @@ namespace LumiSoft.Net.Dns.Client
 	/// 
 	/// </code>
 	/// </example>
-	public class Dns_Client
-	{
-		private static IPAddress[] m_DnsServers  = null;
+	public class Dns_Client : IDisposable
+    {        
+        #region class DnsTransaction
+
+        /// <summary>
+        /// This class represents DNS client transaction.
+        /// </summary>
+        private class DnsTransaction : IDisposable
+        {
+            private DateTime          m_CreateTime;
+            private Dns_Client        m_pOwner        = null;
+            private int               m_ID            = 1;
+            private string            m_QName         = "";
+            private int               m_QType         = 0;
+            private byte[]            m_pQuery        = null;
+            private TimerEx           m_pTimeoutTimer = null;
+            private DnsServerResponse m_pResponse     = null;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="owner">Owner DNS client.</param>
+            /// <param name="id">Transaction ID.</param>
+            /// <param name="qname">QNAME value.</param>
+            /// <param name="qtype">QTYPE value.</param>
+            /// <param name="timeout">Timeout in milliseconds.</param>
+            /// <param name="query">Raw DNS query.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> or <b>query</b> is null reference.</exception>
+            public DnsTransaction(Dns_Client owner,int id,string qname,int qtype,int timeout,byte[] query)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+                if(query == null){
+                    throw new ArgumentNullException("query");
+                }
+
+                m_pOwner = owner;
+                m_ID     = id;
+                m_pQuery = query;
+                m_QName  = qname;
+                m_QType  = qtype;
+
+                m_CreateTime    = DateTime.Now;
+                m_pTimeoutTimer = new TimerEx(timeout);
+                m_pTimeoutTimer.Elapsed += new System.Timers.ElapsedEventHandler(m_pTimeoutTimer_Elapsed);
+            }
+                        
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resource being used.
+            /// </summary>
+            public void Dispose()
+            {
+                m_pTimeoutTimer.Dispose();
+                m_pTimeoutTimer = null;
+
+                m_pOwner.m_pTransactions.Remove(this.ID);
+                m_pOwner = null;
+
+                m_pQuery = null;
+                m_pResponse = null;
+            }
+
+            #endregion
+
+
+            #region Evants handling
+
+            #region method m_pTimeoutTimer_Elapsed
+
+            private void m_pTimeoutTimer_Elapsed(object sender,System.Timers.ElapsedEventArgs e)
+            {
+                OnTimeout();
+            }
+
+            #endregion
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts DNS transaction processing.
+            /// </summary>
+            public void Start()
+            {         
+                // Send parallel query to DNS server(s).
+                foreach(string server in Dns_Client.DnsServers){
+                    try{
+                        if(Net_Utils.IsIPAddress(server)){
+                            IPAddress ip = IPAddress.Parse(server);
+                            if(ip.AddressFamily == AddressFamily.InterNetwork){
+                                m_pOwner.m_pIPv4Socket.SendTo(m_pQuery,new IPEndPoint(ip,53));
+                            }
+                            else if(ip.AddressFamily == AddressFamily.InterNetworkV6){
+                                m_pOwner.m_pIPv6Socket.SendTo(m_pQuery,new IPEndPoint(ip,53));
+                            }
+                        }
+                    }
+                    catch{
+                    }
+                }
+
+                m_pTimeoutTimer.Start();
+            }
+
+            #endregion
+
+
+            #region method ProcessResponse
+
+            /// <summary>
+            /// Processes DNS server response through this transaction.
+            /// </summary>
+            /// <param name="response">DNS server response.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>response</b> is null reference.</exception>
+            internal void ProcessResponse(DnsServerResponse response)
+            {
+                if(response == null){
+                    throw new ArgumentNullException("response");
+                }
+
+                m_pResponse = response;
+
+                OnCompleted();
+            }
+
+            #endregion
+
+
+            #region Properties implementaion
+
+            /// <summary>
+            /// Gets DNS transaction ID.
+            /// </summary>
+            public int ID
+            {
+                get{ return m_ID; }
+            }
+
+            /// <summary>
+            /// Gets QNAME value.
+            /// </summary>
+            public string QName
+            {
+                get{ return m_QName; }
+            }
+
+            /// <summary>
+            /// Gets QTYPE value.
+            /// </summary>
+            public int QType
+            {
+                get{ return m_QType; }
+            }
+
+            /// <summary>
+            /// Gets DNS server response. Value null means no response received yet.
+            /// </summary>
+            public DnsServerResponse Response
+            {
+                get{ return m_pResponse; }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// This event is raised when DNS transaction times out.
+            /// </summary>
+            public event EventHandler Timeout = null;
+
+            #region method OnTimeout
+
+            /// <summary>
+            /// Raises <b>Timeout</b> event.
+            /// </summary>
+            private void OnTimeout()
+            {
+                if(this.Timeout != null){
+                    this.Timeout(this,new EventArgs());
+                }
+            }
+
+            #endregion
+
+            /// <summary>
+            /// This event is raised when DNS server response received.
+            /// </summary>
+            public event EventHandler Completed = null;
+
+            #region method OnCompleted
+
+            /// <summary>
+            /// Raises <b>Completed</b> event.
+            /// </summary>
+            private void OnCompleted()
+            {
+                if(this.Completed != null){
+                    this.Completed(this,new EventArgs());
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+        
+        private static IPAddress[] m_DnsServers  = null;
 		private static bool        m_UseDnsCache = true;
 		private static int         m_ID          = 100;
+        // 
+        private Dictionary<int,DnsTransaction> m_pTransactions = null;
+        private Socket                         m_pIPv4Socket   = null;
+        private Socket                         m_pIPv6Socket   = null;
 
 		/// <summary>
 		/// Static constructor.
@@ -69,10 +286,43 @@ namespace LumiSoft.Net.Dns.Client
 		/// </summary>
 		public Dns_Client()
 		{
-		}
+            m_pTransactions = new Dictionary<int,DnsTransaction>();
+
+            m_pIPv4Socket = new Socket(AddressFamily.InterNetwork,SocketType.Dgram,ProtocolType.Udp);
+            m_pIPv4Socket.Bind(new IPEndPoint(IPAddress.Any,0));
+
+            if(Socket.OSSupportsIPv6){
+                m_pIPv6Socket = new Socket(AddressFamily.InterNetworkV6,SocketType.Dgram,ProtocolType.Udp);
+                m_pIPv6Socket.Bind(new IPEndPoint(IPAddress.IPv6Any,0));
+
+                StartWaitingIPv6Packet();
+            }
+
+            StartWaitingIPv4Packet();
+        }
+
+        #region method Dispose
+
+        /// <summary>
+        /// Cleans up any resources being used.
+        /// </summary>
+        public void Dispose()
+        {
+            m_pIPv4Socket.Close();
+            m_pIPv4Socket = null;
+
+            if(m_pIPv6Socket != null){
+                m_pIPv6Socket.Close();
+                m_pIPv6Socket = null;
+            }
+
+            m_pTransactions = null;
+        }
+
+        #endregion
 
 
-		#region method Query
+        #region method Query
 
         /// <summary>
 		/// Queries server with specified query.
@@ -249,7 +499,124 @@ namespace LumiSoft.Net.Dns.Client
 		}
 
 		#endregion
-               		                                
+
+
+        #region method StartWaitingIPv4Packet
+
+        /// <summary>
+        /// Starts waiting DNS server response.
+        /// </summary>
+        private void StartWaitingIPv4Packet()
+        {
+            byte[] buffer = new byte[1500];
+            EndPoint rtpRemoteEP = new IPEndPoint(IPAddress.Any,0);
+            m_pIPv4Socket.BeginReceiveFrom(
+                buffer,
+                0,
+                buffer.Length,
+                SocketFlags.None,
+                ref rtpRemoteEP,
+                new AsyncCallback(this.IPv4ReceiveCompleted),
+                buffer
+            );
+        }
+
+        #endregion
+
+        #region method StartWaitingIPv6Packet
+
+        /// <summary>
+        /// Starts waiting DNS server response.
+        /// </summary>
+        private void StartWaitingIPv6Packet()
+        {
+            byte[] buffer = new byte[1500];
+            EndPoint rtpRemoteEP = new IPEndPoint(IPAddress.IPv6Any,0);
+            m_pIPv6Socket.BeginReceiveFrom(
+                buffer,
+                0,
+                buffer.Length,
+                SocketFlags.None,
+                ref rtpRemoteEP,
+                new AsyncCallback(this.IPv6ReceiveCompleted),
+                buffer
+            );
+        }
+
+        #endregion
+
+        #region method IPv4ReceiveCompleted
+
+        /// <summary>
+        /// Is called when IPv4 socket has received data.
+        /// </summary>
+        /// <param name="ar">The result of the asynchronous operation.</param>
+        private void IPv4ReceiveCompleted(IAsyncResult ar)
+        {
+            try{
+                EndPoint remoteEP = new IPEndPoint(IPAddress.Any,0);
+                int count = m_pIPv4Socket.EndReceiveFrom(ar,ref remoteEP);
+
+                DnsServerResponse serverResponse = ParseQuery((byte[])ar.AsyncState);
+                DnsTransaction transaction = null;
+                // Pass response to transaction.
+                if(m_pTransactions.TryGetValue(serverResponse.ID,out transaction)){
+                    transaction.ProcessResponse(serverResponse);
+                }
+                // No such transaction or transaction has timed out before answer received.
+                //else{
+                //}
+
+                // TODO: Cache query.
+                if(m_UseDnsCache && serverResponse.ResponseCode == RCODE.NO_ERROR){
+	                DnsCache.AddToCache(transaction.QName,transaction.QType,serverResponse);
+		        }
+            }
+            catch{
+                // Skip receiving socket errors.                
+            }
+
+            StartWaitingIPv4Packet();
+        }
+
+        #endregion
+
+        #region method IPv6ReceiveCompleted
+
+        /// <summary>
+        /// Is called when IPv6 socket has received data.
+        /// </summary>
+        /// <param name="ar">The result of the asynchronous operation.</param>
+        private void IPv6ReceiveCompleted(IAsyncResult ar)
+        {
+            try{
+                EndPoint remoteEP = new IPEndPoint(IPAddress.Any,0);
+                int count = m_pIPv6Socket.EndReceiveFrom(ar,ref remoteEP);
+
+                DnsServerResponse serverResponse = ParseQuery((byte[])ar.AsyncState);
+                DnsTransaction transaction = null;
+                // Pass response to transaction.
+                if(m_pTransactions.TryGetValue(serverResponse.ID,out transaction)){
+                    transaction.ProcessResponse(serverResponse);
+                }
+                // No such transaction or transaction has timed out before answer received.
+                //else{
+                //}
+
+                // TODO: Cache query.
+                if(m_UseDnsCache && serverResponse.ResponseCode == RCODE.NO_ERROR){
+	                DnsCache.AddToCache(transaction.QName,transaction.QType,serverResponse);
+		        }
+            }
+            catch{
+                // Skip receiving socket errors.                
+            }
+
+            StartWaitingIPv6Packet();
+        }
+
+        #endregion
+
 
         #region method QueryServer
 
@@ -260,7 +627,7 @@ namespace LumiSoft.Net.Dns.Client
 		/// <param name="qname">Query text.</param>
 		/// <param name="qtype">Query type.</param>
 		/// <param name="qclass">Query class.</param>
-		/// <returns></returns>
+		/// <returns>Returns DNS server response.</returns>
 		private DnsServerResponse QueryServer(int timeout,string qname,QTYPE qtype,int qclass)
 		{	
 			if(m_DnsServers == null || m_DnsServers.Length == 0){
@@ -273,50 +640,36 @@ namespace LumiSoft.Net.Dns.Client
 				if(resopnse != null){
 					return resopnse;
 				}
-			}
+			}                           
 
-			int queryID = Dns_Client.ID;
-			byte[] query = CreateQuery(queryID,qname,qtype,qclass);
-                        
-            // Create sending UDP socket.
-            using(Socket udpClient = new Socket(AddressFamily.InterNetwork,SocketType.Dgram,ProtocolType.Udp)){
-                udpClient.SendTimeout = 500;
+			int    queryID = Dns_Client.ID;
+			byte[] query   = CreateQuery(queryID,qname,qtype,qclass);
+            
+            // Create transcation and start processing it.            
+            using(DnsTransaction transaction = new DnsTransaction(this,queryID,qname,(int)qtype,timeout,query)){
+                ManualResetEvent wait = new ManualResetEvent(false);
 
-                // Send parallel query to all dns servers and get first answer.
-                DateTime startTime = DateTime.Now;
-                while(startTime.AddMilliseconds(timeout) > DateTime.Now){
-                    foreach(IPAddress dnsServer in m_DnsServers){
-                        try{
-                            udpClient.SendTo(query,new IPEndPoint(dnsServer,53));
-                        }
-                        catch{
-                        }
-                    }
+                transaction.Timeout += delegate(object s,EventArgs e){
+                    wait.Set();
+                };
+                transaction.Completed += delegate(object s,EventArgs e){
+                    wait.Set();
+                };
+                m_pTransactions.Add(transaction.ID,transaction);
 
-                    // Wait 10 ms response to arrive, if no response, retransmit query.
-                    if(udpClient.Poll(50,SelectMode.SelectRead)){
-                        try{
-                            byte[] retVal = new byte[1024];
-					        int countRecieved = udpClient.Receive(retVal);
-                        					    
-					        // If reply is ok, return it
-					        DnsServerResponse serverResponse = ParseQuery(retVal,queryID);
-				
-    					    // Cache query
-					        if(m_UseDnsCache && serverResponse.ResponseCode == RCODE.NO_ERROR){
-	    					    DnsCache.AddToCache(qname,(int)qtype,serverResponse);
-		    			    }
+                // Start transaction processing and wait transaction to complete.
+                transaction.Start();                
+                wait.WaitOne();
 
-			    		    return serverResponse;
-                        }
-                        catch{
-                        }
-                    }
+                // DNS server response received.
+                if(transaction.Response != null){
+                    return transaction.Response;
+                }
+                // No server response - timeout.
+                else{
+                    throw new Exception("Timeout - no response from DNS server.");
                 }
             }
-
-			// If we reach so far, we probably won't get connection to dsn server
-			return new DnsServerResponse(false,RCODE.SERVER_FAILURE,new List<DNS_rr_base>(),new List<DNS_rr_base>(),new List<DNS_rr_base>());
 		}
 
 		#endregion
@@ -497,9 +850,8 @@ namespace LumiSoft.Net.Dns.Client
 		/// Parses query.
 		/// </summary>
 		/// <param name="reply">Dns server reply.</param>
-		/// <param name="queryID">Query id of sent query.</param>
 		/// <returns></returns>
-		private DnsServerResponse ParseQuery(byte[] reply,int queryID)
+		private DnsServerResponse ParseQuery(byte[] reply)
 		{	
 			//--- Parse headers ------------------------------------//
 
@@ -548,11 +900,6 @@ namespace LumiSoft.Net.Dns.Client
 			int    authoritiveAnswerCount = (reply[8]  << 8 | reply[9]);
 			int    additionalAnswerCount  = (reply[10] << 8 | reply[11]);
 			//---- End of headers ---------------------------------//
-
-			// Check that it's query what we want
-			if(queryID != id){
-				throw new Exception("This isn't query with ID what we expected");
-			}
 		
 			int pos = 12;
 
@@ -573,7 +920,7 @@ namespace LumiSoft.Net.Dns.Client
 			List<DNS_rr_base> authoritiveAnswers = ParseAnswers(reply,authoritiveAnswerCount,ref pos);
 			List<DNS_rr_base> additionalAnswers = ParseAnswers(reply,additionalAnswerCount,ref pos);
 
-			return new DnsServerResponse(true,replyCode,answers,authoritiveAnswers,additionalAnswers);
+			return new DnsServerResponse(true,id,replyCode,answers,authoritiveAnswers,additionalAnswers);
 		}
 
 		#endregion

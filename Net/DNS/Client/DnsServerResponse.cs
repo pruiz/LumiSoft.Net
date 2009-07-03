@@ -11,14 +11,16 @@ namespace LumiSoft.Net.Dns.Client
 	public class DnsServerResponse
 	{
 		private bool              m_Success             = true;
+        private int               m_ID                  = 0;
 		private RCODE             m_RCODE               = RCODE.NO_ERROR;
 		private List<DNS_rr_base> m_pAnswers            = null;
 		private List<DNS_rr_base> m_pAuthoritiveAnswers = null;
 		private List<DNS_rr_base> m_pAdditionalAnswers  = null;
 		
-		internal DnsServerResponse(bool connectionOk,RCODE rcode,List<DNS_rr_base> answers,List<DNS_rr_base> authoritiveAnswers,List<DNS_rr_base> additionalAnswers)
+		internal DnsServerResponse(bool connectionOk,int id,RCODE rcode,List<DNS_rr_base> answers,List<DNS_rr_base> authoritiveAnswers,List<DNS_rr_base> additionalAnswers)
 		{
 			m_Success             = connectionOk;
+            m_ID                  = id;
 			m_RCODE               = rcode;	
 			m_pAnswers            = answers;
 			m_pAuthoritiveAnswers = authoritiveAnswers;
@@ -283,6 +285,14 @@ namespace LumiSoft.Net.Dns.Client
 		{
 			get{ return m_Success; }
 		}
+
+        /// <summary>
+        /// Gets DNS transaction ID.
+        /// </summary>
+        public int ID
+        {
+            get{ return m_ID; }
+        }
 
 		/// <summary>
 		/// Gets dns server response code.

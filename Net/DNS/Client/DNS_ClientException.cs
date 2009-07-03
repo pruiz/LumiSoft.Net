@@ -15,7 +15,7 @@ namespace LumiSoft.Net.Dns.Client
         /// Default constructor.
         /// </summary>
         /// <param name="rcode">DNS server returned error code.</param>
-        public DNS_ClientException(RCODE rcode)
+        public DNS_ClientException(RCODE rcode) : base("Dns error: " + rcode + ".")
         {
             m_RCode = rcode;
         }
