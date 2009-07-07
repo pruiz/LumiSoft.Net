@@ -451,7 +451,7 @@ namespace LumiSoft.Net.TCP
                     session.Dispose();
                 }
                 // Maximum allowed connections per IP exceeded, reject connection.
-                else if(m_MaxConnectionsPerIP != 0){
+                else if(m_MaxConnectionsPerIP != 0 && m_pSessions.GetConnectionsPerIP(session.RemoteEndPoint.Address) > m_MaxConnectionsPerIP){
                     OnMaxConnectionsPerIPExceeded(session);
                     session.Dispose();
                 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Net;
 
 namespace LumiSoft.Net.TCP
 {
@@ -9,7 +10,8 @@ namespace LumiSoft.Net.TCP
     /// </summary>
     public class TCP_SessionCollection<T> where T : TCP_Session
     {
-        private Dictionary<string,T> m_pItems = null;
+        private Dictionary<string,T>    m_pItems            = null;
+        private Dictionary<string,long> m_pConnectionsPerIP = null;
 
         /// <summary>
         /// Default constructor.
@@ -17,6 +19,7 @@ namespace LumiSoft.Net.TCP
         internal TCP_SessionCollection()
         {
             m_pItems = new Dictionary<string,T>();
+            m_pConnectionsPerIP = new Dictionary<string,long>();
         }
 
 
@@ -35,6 +38,15 @@ namespace LumiSoft.Net.TCP
 
             lock(m_pItems){
                 m_pItems.Add(session.ID,session);
+
+                // Increase connections per IP.
+                if(m_pConnectionsPerIP.ContainsKey(session.RemoteEndPoint.Address.ToString())){
+                    m_pConnectionsPerIP[session.RemoteEndPoint.Address.ToString()]++;
+                }
+                // Just add new entry for that IP address.
+                else{
+                    m_pConnectionsPerIP.Add(session.RemoteEndPoint.Address.ToString(),1);
+                }                
             }
         }
 
@@ -55,6 +67,17 @@ namespace LumiSoft.Net.TCP
 
             lock(m_pItems){
                 m_pItems.Remove(session.ID);
+
+                // Decrease connections per IP.
+                if(m_pConnectionsPerIP.ContainsKey(session.RemoteEndPoint.Address.ToString())){
+                    m_pConnectionsPerIP[session.RemoteEndPoint.Address.ToString()]--;
+
+                    // Last IP, so remove that IP entry.
+                    if(m_pConnectionsPerIP[session.RemoteEndPoint.Address.ToString()] == 0){
+                        m_pConnectionsPerIP.Remove(session.RemoteEndPoint.Address.ToString());
+                    }
+                }                
+                
             }
         }
 
@@ -69,12 +92,12 @@ namespace LumiSoft.Net.TCP
         {
             lock(m_pItems){
                 m_pItems.Clear();
+                m_pConnectionsPerIP.Clear();
             }
         }
 
         #endregion
-
-
+        
         #region method ToArray
 
         /// <summary>
@@ -89,6 +112,28 @@ namespace LumiSoft.Net.TCP
 
                 return retVal;
             }
+        }
+
+        #endregion
+
+        #region mehtod GetConnectionsPerIP
+
+        /// <summary>
+        /// Gets number of connections per specified IP.
+        /// </summary>
+        /// <param name="ip">IP address.</param>
+        /// <returns>Returns current number of connections of the specified IP.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>ip</b> is null reference.</exception>
+        public long GetConnectionsPerIP(IPAddress ip)
+        {
+            if(ip == null){
+                throw new ArgumentNullException("ip");
+            }
+
+            long retVal = 0;
+            m_pConnectionsPerIP.TryGetValue(ip.ToString(),out retVal);
+
+            return retVal;
         }
 
         #endregion
