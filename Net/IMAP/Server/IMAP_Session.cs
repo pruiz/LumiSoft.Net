@@ -2924,7 +2924,7 @@ namespace LumiSoft.Net.IMAP.Server
 				}
 
 				// See if message matches to search criteria
-				if(searchCriteria.Match(i,msg.UID,(int)msg.Size,msg.InternalDate,msg.Flags,message,bodyText)){
+				if(searchCriteria.Match(i + 1,msg.UID,(int)msg.Size,msg.InternalDate,msg.Flags,message,bodyText)){
 					if(uidSearch){
 						this.Socket.Write(" " + msg.UID.ToString());
 					}
