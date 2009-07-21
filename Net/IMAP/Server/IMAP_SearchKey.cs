@@ -891,19 +891,25 @@ namespace LumiSoft.Net.IMAP.Server
 			else if(m_SearchKeyName == "HEADER"){				
 				string[] headerField_value = (string[])m_SearchKeyValue;
 
-                // If header field name won't end with :, add it
-                if(!headerField_value[0].EndsWith(":")){
-                    headerField_value[0] = headerField_value[0] + ":";
+                // If header field ends with ":", remove it.
+                if(headerField_value[0].EndsWith(":")){
+                    headerField_value[0] = headerField_value[0].Substring(0,headerField_value[0].Length - 1);
                 }
 
-				if(message.Header.Contains(headerField_value[0])){
-					if(headerField_value[1].Length == 0){
-						return true;
-					}
-					else if(message.Header.GetFirst(headerField_value[0]).ToString().ToLower().IndexOf(headerField_value[1].ToLower()) > -1){
-						return true;
-					}
-				}
+                if(string.IsNullOrEmpty(headerField_value[1])){
+                    return true;
+                }
+                else{
+                    MIME_h h = message.Header.GetFirst(headerField_value[0]);
+                    if(h == null){
+                        return false;
+                    }
+                    else{
+                        if(h.ValueToString().ToLower().IndexOf(headerField_value[1].ToLower()) > -1){
+						    return true;
+					    }
+                    }
+                }
 			}
 
 			#endregion
