@@ -1248,8 +1248,6 @@ namespace LumiSoft.Net.SMTP.Client
 		    	 		S: 250 OK<CRLF>			  
 			    */
 
-
-                // TODO: Get rid of BDAT 0 LAST, this is valid syntax but many servers can't handle it.
                 // We just read 1 buffer ahead, then you see when source stream has EOS.
                 byte[] buffer1         = new byte[16000];
                 byte[] buffer2         = new byte[16000];
@@ -1264,7 +1262,7 @@ namespace LumiSoft.Net.SMTP.Client
                     // Read data block to free buffer.
                     int readedCount = message.Read(currentBuffer,0,currentBuffer.Length);
 
-                    // End of stream reached, "last data block" is last one.
+                    // End of stream reached, "last data block" this is last one.
                     if(readedCount == 0){
                         WriteLine("BDAT " + lastReadedCount.ToString() + " LAST");                        
                         this.TcpStream.Write(lastBuffer,0,lastReadedCount);
@@ -1515,18 +1513,19 @@ namespace LumiSoft.Net.SMTP.Client
             List<string> retVal = new List<string>();
 
             // Get MX records.
-            Dns_Client dns = new Dns_Client();
-            DnsServerResponse response = dns.Query(domain,QTYPE.MX);
-            if(response.ResponseCode == RCODE.NO_ERROR){
-                foreach(DNS_rr_MX mx in response.GetMXRecords()){
-                    // Block invalid MX records.
-                    if(!string.IsNullOrEmpty(mx.Host)){
-                        retVal.Add(mx.Host);
+            using(Dns_Client dns = new Dns_Client()){
+                DnsServerResponse response = dns.Query(domain,QTYPE.MX);
+                if(response.ResponseCode == RCODE.NO_ERROR){
+                    foreach(DNS_rr_MX mx in response.GetMXRecords()){
+                        // Block invalid MX records.
+                        if(!string.IsNullOrEmpty(mx.Host)){
+                            retVal.Add(mx.Host);
+                        }
                     }
                 }
-            }
-            else{
-                throw new DNS_ClientException(response.ResponseCode);
+                else{
+                    throw new DNS_ClientException(response.ResponseCode);
+                }
             }
 
             /* RFC 2821 5.
