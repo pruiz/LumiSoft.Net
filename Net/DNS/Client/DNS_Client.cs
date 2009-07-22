@@ -254,6 +254,7 @@ namespace LumiSoft.Net.Dns.Client
 		private static bool        m_UseDnsCache = true;
 		private static int         m_ID          = 100;
         // 
+        private bool                           m_IsDisposed    = false;
         private Dictionary<int,DnsTransaction> m_pTransactions = null;
         private Socket                         m_pIPv4Socket   = null;
         private Socket                         m_pIPv6Socket   = null;
@@ -311,6 +312,11 @@ namespace LumiSoft.Net.Dns.Client
         /// </summary>
         public void Dispose()
         {
+            if(m_IsDisposed){
+                return;
+            }
+            m_IsDisposed = true;
+
             m_pIPv4Socket.Close();
             m_pIPv4Socket = null;
 
@@ -557,6 +563,10 @@ namespace LumiSoft.Net.Dns.Client
         private void IPv4ReceiveCompleted(IAsyncResult ar)
         {
             try{
+                if(m_IsDisposed){
+                    return;
+                }
+
                 EndPoint remoteEP = new IPEndPoint(IPAddress.Any,0);
                 int count = m_pIPv4Socket.EndReceiveFrom(ar,ref remoteEP);
 
@@ -593,6 +603,10 @@ namespace LumiSoft.Net.Dns.Client
         private void IPv6ReceiveCompleted(IAsyncResult ar)
         {
             try{
+                if(m_IsDisposed){
+                    return;
+                }
+
                 EndPoint remoteEP = new IPEndPoint(IPAddress.Any,0);
                 int count = m_pIPv6Socket.EndReceiveFrom(ar,ref remoteEP);
 
