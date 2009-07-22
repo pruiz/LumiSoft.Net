@@ -96,6 +96,9 @@ namespace LumiSoft.Net.Dns.Client
 
                 m_pQuery = null;
                 m_pResponse = null;
+
+                this.Timeout = null;
+                this.Completed = null;
             }
 
             #endregion
