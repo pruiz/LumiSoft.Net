@@ -8,6 +8,7 @@ using System.Threading;
 
 using LumiSoft.Net;
 using LumiSoft.Net.Log;
+using LumiSoft.Net.Dns.Client;
 using LumiSoft.Net.TCP;
 
 namespace LumiSoft.Net.SMTP.Relay
@@ -38,6 +39,7 @@ namespace LumiSoft.Net.SMTP.Relay
         private CircleCollection<IPBindInfo>         m_pLocalEndPoints       = null;
         private long                                 m_MaxConnections        = 0;
         private long                                 m_MaxConnectionsPerIP   = 0;
+        private Dns_Client                           m_pDsnClient            = null;
         private TCP_SessionCollection<Relay_Session> m_pSessions             = null;
         private Dictionary<IPAddress,long>           m_pConnectionsPerIP     = null;
         private int                                  m_SessionIdleTimeout    = 30;
@@ -50,6 +52,7 @@ namespace LumiSoft.Net.SMTP.Relay
         {
             m_pQueues     = new List<Relay_Queue>();
             m_pSmartHosts = new CircleCollection<Relay_SmartHost>();
+            m_pDsnClient  = new Dns_Client();
         }
 
         #region method Dispose
@@ -77,6 +80,9 @@ namespace LumiSoft.Net.SMTP.Relay
 
             m_pQueues     = null;
             m_pSmartHosts = null;
+
+            m_pDsnClient.Dispose();
+            m_pDsnClient = null;
         }
 
         #endregion
@@ -282,7 +288,7 @@ namespace LumiSoft.Net.SMTP.Relay
         #endregion
 
 
-        #region method AddIpUsage
+        #region method TryAddIpUsage
 
         /// <summary>
         /// Increases specified IP address connactions count if maximum allowed connections to 
@@ -638,6 +644,33 @@ namespace LumiSoft.Net.SMTP.Relay
             get{ return m_pLogger; }
 
             set{ m_pLogger = value; }
+        }
+
+        /// <summary>
+        /// Gets or stes DNS client.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when null value is passed.</exception>
+        public Dns_Client DnsClient
+        {
+            get{
+                if(m_IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return m_pDsnClient;
+            }
+
+            set{
+                if(m_IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+                if(value == null){
+                    throw new ArgumentNullException("DnsClient");
+                }
+
+                m_pDsnClient = value;
+            }
         }
 
         #endregion

@@ -149,6 +149,7 @@ namespace LumiSoft.Net.SMTP.Relay
             m_SessionID         = Guid.NewGuid().ToString();
             m_SessionCreateTime = DateTime.Now;
             m_pTargets          = new List<Relay_Target>();
+            m_pSmtpClient       = new SMTP_Client();
         }
 
         /// <summary>
@@ -184,6 +185,7 @@ namespace LumiSoft.Net.SMTP.Relay
             m_SessionID         = Guid.NewGuid().ToString();
             m_SessionCreateTime = DateTime.Now;
             m_pTargets          = new List<Relay_Target>();
+            m_pSmtpClient       = new SMTP_Client();
         }
 
         #region override method Dispose
@@ -248,8 +250,7 @@ namespace LumiSoft.Net.SMTP.Relay
         /// <param name="state">User data.</param>
         internal void Start(object state)
         {
-            try{
-                m_pSmtpClient = new SMTP_Client();
+            try{                
                 m_pSmtpClient.LocalHostName = m_pLocalBindInfo.HostName;
                 if(m_pServer.Logger != null){
                     m_pSmtpClient.Logger = new Logger();
@@ -261,7 +262,7 @@ namespace LumiSoft.Net.SMTP.Relay
                 // Get all possible target hosts for active recipient.
                 List<string> targetHosts = new List<string>();                
                 if(m_RelayMode == Relay_Mode.Dns){
-                    foreach(string host in SMTP_Client.GetDomainHosts(m_pRelayItem.To)){
+                    foreach(string host in GetDomainHosts(m_pRelayItem.To)){
                         try{
                             foreach(IPAddress ip in Dns_Client.Resolve(host)){
                                 m_pTargets.Add(new Relay_Target(host,new IPEndPoint(ip,25)));                                
@@ -660,6 +661,59 @@ namespace LumiSoft.Net.SMTP.Relay
             }
 
             return false;
+        }
+
+        #endregion
+
+        #region method GetDomainHosts
+
+        /// <summary>
+        /// Gets specified email domain SMTP hosts. Values are in descending priority order.
+        /// </summary>
+        /// <param name="domain">Domain name. This value can be email address too, then domain parsed automatically.</param>
+        /// <returns>Returns specified email domain SMTP hosts.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>domain</b> is null.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="DNS_ClientException">Is raised when DNS query failure.</exception>
+        private string[] GetDomainHosts(string domain)
+        {
+            if(domain == null){
+                throw new ArgumentNullException("domain");
+            }
+            if(string.IsNullOrEmpty(domain)){
+                throw new ArgumentException("Invalid argument 'domain' value, you need to specify domain value.");
+            }
+
+            // We have email address, parse domain.
+            if(domain.IndexOf("@") > -1){
+                domain = domain.Substring(domain.IndexOf('@') + 1);
+            }
+
+            List<string> retVal = new List<string>();
+
+            // Get MX records.
+            DnsServerResponse response = m_pServer.DnsClient.Query(domain,QTYPE.MX);
+            if(response.ResponseCode == RCODE.NO_ERROR){
+                foreach(DNS_rr_MX mx in response.GetMXRecords()){
+                    // Block invalid MX records.
+                    if(!string.IsNullOrEmpty(mx.Host)){
+                        retVal.Add(mx.Host);
+                    }
+                }
+            }
+            else{
+                throw new DNS_ClientException(response.ResponseCode);
+            }
+
+            /* RFC 2821 5.
+			    If no MX records are found, but an A RR is found, the A RR is treated as if it 
+                was associated with an implicit MX RR, with a preference of 0, pointing to that host.
+			*/
+            if(retVal.Count == 0){
+                retVal.Add(domain);
+            }
+
+            return retVal.ToArray();
         }
 
         #endregion
