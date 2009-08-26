@@ -1,6 +1,6 @@
 using System;
 
-namespace LumiSoft.Net.IMAP.Server
+namespace LumiSoft.Net.IMAP
 {
 	/// <summary>
 	/// IMAP flags store type.
@@ -11,10 +11,12 @@ namespace LumiSoft.Net.IMAP.Server
 		/// Flags are added to existing ones.
 		/// </summary>
 		Add = 1,
+
 		/// <summary>
 		/// Flags are removed from existing ones.
 		/// </summary>
 		Remove = 3,
+
 		/// <summary>
 		/// Flags are replaced.
 		/// </summary>
