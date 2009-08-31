@@ -81,12 +81,18 @@ namespace LumiSoft.Net.MIME
                     if(phrase == null){
                         if(r.Available == 0){
                             retVal.m_Value = v.ToString().TrimStart();
+                            break;
                         }
-                        // Parsing failed, leave raw unparsed value.
+                        // Some special char(like :,{ ...) just read it.
                         else{
-                            retVal.m_Value = MIME_Utils.UnfoldHeader(name_value.Length == 2 ? name_value[1].TrimStart() : "");
-                        }                        
-                        break;
+                            v.Append((char)r.Char(false));
+                        }
+
+                        // Parsing failed, leave raw unparsed value.
+                        //else{
+                        //    retVal.m_Value = MIME_Utils.UnfoldHeader(name_value.Length == 2 ? name_value[1].TrimStart() : "");
+                        //}                        
+                        //break;
                     }
                     else{
                         v.Append(phrase);
