@@ -136,8 +136,8 @@ namespace LumiSoft.Net.MIME
                     // We just split text to 30 char words, then if some chars encoded, we don't exceed 75 chars lenght limit.
                     while(index < text.Length){
                         int countReaded = Math.Min(30,text.Length - index);
-                        parts.Add(text.Substring(index,countReaded));
-                        index += countReaded;
+                        parts.Add(text.Substring(index,countReaded));                        
+                        index += countReaded;                        
                     }
                 }
                 else{
@@ -147,7 +147,7 @@ namespace LumiSoft.Net.MIME
                 StringBuilder retVal = new StringBuilder();
                 for(int i=0;i<parts.Count;i++){
                     string part = parts[i];
-                    byte[] data = charset.GetBytes(text);
+                    byte[] data = charset.GetBytes(part);
 
                     #region B encode
 
