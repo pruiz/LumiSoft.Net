@@ -70,7 +70,7 @@ namespace LumiSoft.Net.MIME
             // There may be multiple encoded-words and they can be mixed with atom/quoted-string ... .
             try{
                 StringBuilder v = new StringBuilder();
-                MIME_Reader r = new MIME_Reader(MIME_Utils.UnfoldHeader(name_value.Length == 2 ? name_value[1].TrimStart() : ""));
+                MIME_Reader r = new MIME_Reader(MIME_Utils.UnfoldHeader(name_value.Length == 2 ? name_value[1].TrimStart() : ""));                
                 while(true){
                     string whiteSpaces = r.ToFirstChar();
                     if(!string.IsNullOrEmpty(whiteSpaces)){
