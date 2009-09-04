@@ -279,7 +279,7 @@ namespace LumiSoft.Net.MIME
             StringBuilder retVal = new StringBuilder();
             while(true){
                 int index = m_Source.IndexOf("?=",m_Offset);
-                // Invalid or not enoded-word.
+                // Invalid or not encoded-word.
                 if(index == -1){
                     retVal.Append(ToEnd());
                 }
@@ -294,7 +294,7 @@ namespace LumiSoft.Net.MIME
                         if(encodedWordParts[2].ToUpper() == "Q"){ 
                             retVal.Append(MIME_Utils.QDecode(Encoding.GetEncoding(encodedWordParts[1]),encodedWordParts[3]));
                         }
-                        else if(encodedWordParts[2].ToUpper() == "B"){                        
+                        else if(encodedWordParts[2].ToUpper() == "B"){
                             retVal.Append(Encoding.GetEncoding(encodedWordParts[1]).GetString(Net_Utils.FromBase64(Encoding.Default.GetBytes(encodedWordParts[3]))));
                         }
                         // Failed to parse encoded-word, leave it as is. RFC 2047 6.3.
@@ -308,9 +308,12 @@ namespace LumiSoft.Net.MIME
                     }
                 }
 
-                ToFirstChar();
+                // We have continuos encoded-word.
+                if(m_Source.Substring(m_Offset).TrimStart().StartsWith("=?")){
+                    ToFirstChar();
+                }
                 // encoded-word does not continue.
-                if(Peek(false) != '='){
+                else{
                     break;
                 }
             }
