@@ -130,62 +130,60 @@ namespace LumiSoft.Net.MIME
             */
 
             if(MustEncode(text)){
-                StringBuilder retVal             = new StringBuilder();
-                byte[]        data               = charset.GetBytes(text);
-                int           maxEncodedTextSize = int.MaxValue;
+                List<string> parts = new List<string>();
                 if(split){
-                    maxEncodedTextSize = 75 - ((string)("=?" + charset.WebName + "?" + encoding.ToString() + "?" + "?=")).Length;
-                }
-
-                #region B encode
-
-                if(encoding == MIME_EncodedWordEncoding.B){
-                    retVal.Append("=?" + charset.WebName + "?B?");
-                    int    stored = 0;
-                    string base64 = Convert.ToBase64String(data);
-                    for(int i=0;i<base64.Length;i+=4){
-                        // Encoding buffer full, create new encoded-word.
-                        if(stored + 4 > maxEncodedTextSize){
-                            retVal.Append("?=\r\n =?" + charset.WebName + "?B?");
-                            stored = 0;
-                        }
-
-                        retVal.Append(base64,i,4);
-                        stored += 4;
+                    int index = 0;
+                    // We just split text to 30 char words, then if some chars encoded, we don't exceed 75 chars lenght limit.
+                    while(index < text.Length){
+                        int countReaded = Math.Min(30,text.Length - index);
+                        parts.Add(text.Substring(index,countReaded));
+                        index += countReaded;
                     }
-                    retVal.Append("?=");
                 }
-
-                #endregion
-
-                #region Q encode
-
                 else{
-                    retVal.Append("=?" + charset.WebName + "?Q?");
-                    int stored = 0;
-                    foreach(byte b in data){
-                        string val = null;
-                        // We need to encode byte. Defined in RFC 2047 4.2.
-                        if(b > 127 || b == '=' || b == '?' || b == '_' || b == ' '){
-                            val = "=" + b.ToString("X2");
-                        }
-                        else{
-                            val = ((char)b).ToString();
-                        }
-
-                        // Encoding buffer full, create new encoded-word.
-                        if(stored + val.Length > maxEncodedTextSize){
-                            retVal.Append("?=\r\n =?" + charset.WebName + "?Q?");
-                            stored = 0;
-                        }
-
-                        retVal.Append(val);
-                        stored += val.Length;
-                    }
-                    retVal.Append("?=");
+                    parts.Add(text);
                 }
 
-                #endregion
+                StringBuilder retVal = new StringBuilder();
+                for(int i=0;i<parts.Count;i++){
+                    string part = parts[i];
+                    byte[] data = charset.GetBytes(text);
+
+                    #region B encode
+
+                    if(encoding == MIME_EncodedWordEncoding.B){
+                        retVal.Append("=?" + charset.WebName + "?B?" + Convert.ToBase64String(data) + "?=");
+                    }
+
+                    #endregion
+
+                    #region Q encode
+
+                    else{
+                        retVal.Append("=?" + charset.WebName + "?Q?");
+                        int stored = 0;
+                        foreach(byte b in data){
+                            string val = null;
+                            // We need to encode byte. Defined in RFC 2047 4.2.
+                            if(b > 127 || b == '=' || b == '?' || b == '_' || b == ' '){
+                                val = "=" + b.ToString("X2");
+                            }
+                            else{
+                                val = ((char)b).ToString();
+                            }
+
+                            retVal.Append(val);
+                            stored += val.Length;
+                        }
+                        retVal.Append("?=");
+                    }
+
+                    #endregion
+
+                    if(i < (parts.Count - 1)){
+                        retVal.Append("\r\n ");
+                    }
+                }
 
                 return retVal.ToString();
             }
