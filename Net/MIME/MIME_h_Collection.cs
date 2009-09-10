@@ -382,6 +382,24 @@ namespace LumiSoft.Net.MIME
                 throw new ArgumentNullException("stream");
             }
 
+            Parse(stream,Encoding.UTF8);
+        }
+
+        /// <summary>
+        /// Parses MIME header from the specified stream.
+        /// </summary>
+        /// <param name="stream">MIME header stream.</param>
+        /// <param name="encoding">Headers fields reading encoding. If not sure, UTF-8 is recommended.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>stream</b> or <b>encoding</b> is null.</exception>
+        public void Parse(SmartStream stream,Encoding encoding)
+        {
+            if(stream == null){
+                throw new ArgumentNullException("stream");
+            }
+            if(encoding == null){
+                throw new ArgumentNullException("encoding");
+            }
+
             StringBuilder               currentHeader = new StringBuilder();
             SmartStream.ReadLineAsyncOP readLineOP    = new SmartStream.ReadLineAsyncOP(new byte[32000],SizeExceededAction.ThrowException);
             while(true){                
@@ -408,7 +426,7 @@ namespace LumiSoft.Net.MIME
                     return;
                 }
                 else{
-                    string line = Encoding.UTF8.GetString(readLineOP.Buffer,0,readLineOP.BytesInBuffer);
+                    string line = encoding.GetString(readLineOP.Buffer,0,readLineOP.BytesInBuffer);
  
                     // New header field starts.
                     if(currentHeader.Length == 0){
