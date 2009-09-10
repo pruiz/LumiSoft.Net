@@ -7,7 +7,7 @@ using System.Drawing;
 namespace LumiSoft.Net.Mime.vCard
 {
     /// <summary>
-    /// Rfc 2426 vCard implementation.
+    /// RFC 2426 vCard implementation.
     /// </summary>
     public class vCard
     {
