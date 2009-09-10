@@ -618,7 +618,7 @@ namespace LumiSoft.Net.MIME
             _MultipartReader multipartReader = new _MultipartReader(stream,owner.ContentType.Param_Boundary);
             while(multipartReader.Next()){                
                 MIME_Entity entity = new MIME_Entity();
-                entity.Parse(new SmartStream(multipartReader,false),body.DefaultBodyPartContentType);
+                entity.Parse(new SmartStream(multipartReader,false),Encoding.UTF8,body.DefaultBodyPartContentType);
                 body.m_pBodyParts.Add(entity);
                 entity.SetParent(owner);
             }

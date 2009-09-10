@@ -151,18 +151,22 @@ namespace LumiSoft.Net.MIME
         /// Parses MIME entiry from the specified stream.
         /// </summary>
         /// <param name="stream">Source stream.</param>
+        /// <param name="headerEncoding">Header reading encoding. If not sure UTF-8 is recommended.</param>
         /// <param name="defaultContentType">Default content type.</param>
-        /// <exception cref="ArgumentNullException">Is raised when <b>stream</b> or <b>defaultContentType</b> is null reference.</exception>
-        internal void Parse(SmartStream stream,MIME_h_ContentType defaultContentType)
+        /// <exception cref="ArgumentNullException">Is raised when <b>stream</b>,<b>headerEncoding</b> or <b>defaultContentType</b> is null reference.</exception>
+        internal void Parse(SmartStream stream,Encoding headerEncoding,MIME_h_ContentType defaultContentType)
         {
             if(stream == null){
                 throw new ArgumentNullException("stream");
+            }
+            if(headerEncoding == null){
+                throw new ArgumentNullException("headerEncoding");
             }
             if(defaultContentType == null){
                 throw new ArgumentNullException("defaultContentType");
             }
             
-            m_pHeader.Parse(stream); 
+            m_pHeader.Parse(stream,headerEncoding); 
           
             m_pBody = m_pBodyProvider.Parse(this,stream,defaultContentType);
             m_pBody.SetParent(this,false);         
