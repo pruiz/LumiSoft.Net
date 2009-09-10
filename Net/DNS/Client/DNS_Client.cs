@@ -580,7 +580,7 @@ namespace LumiSoft.Net.Dns.Client
                 //else{
                 //}
 
-                // TODO: Cache query.
+                // Cache query.
                 if(m_UseDnsCache && serverResponse.ResponseCode == RCODE.NO_ERROR){
 	                DnsCache.AddToCache(transaction.QName,transaction.QType,serverResponse);
 		        }
@@ -589,7 +589,11 @@ namespace LumiSoft.Net.Dns.Client
                 // Skip receiving socket errors.                
             }
 
-            StartWaitingIPv4Packet();
+            try{
+                StartWaitingIPv4Packet();
+            }
+            catch{
+            }
         }
 
         #endregion
@@ -620,7 +624,7 @@ namespace LumiSoft.Net.Dns.Client
                 //else{
                 //}
 
-                // TODO: Cache query.
+                // Cache query.
                 if(m_UseDnsCache && serverResponse.ResponseCode == RCODE.NO_ERROR){
 	                DnsCache.AddToCache(transaction.QName,transaction.QType,serverResponse);
 		        }
@@ -629,7 +633,11 @@ namespace LumiSoft.Net.Dns.Client
                 // Skip receiving socket errors.                
             }
 
-            StartWaitingIPv6Packet();
+            try{
+                StartWaitingIPv6Packet();
+            }
+            catch{
+            }
         }
 
         #endregion
