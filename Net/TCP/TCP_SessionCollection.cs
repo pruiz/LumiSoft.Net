@@ -39,14 +39,16 @@ namespace LumiSoft.Net.TCP
             lock(m_pItems){
                 m_pItems.Add(session.ID,session);
 
-                // Increase connections per IP.
-                if(m_pConnectionsPerIP.ContainsKey(session.RemoteEndPoint.Address.ToString())){
-                    m_pConnectionsPerIP[session.RemoteEndPoint.Address.ToString()]++;
+                if(session.IsConnected && session.RemoteEndPoint != null){
+                    // Increase connections per IP.
+                    if(m_pConnectionsPerIP.ContainsKey(session.RemoteEndPoint.Address.ToString())){
+                        m_pConnectionsPerIP[session.RemoteEndPoint.Address.ToString()]++;
+                    }
+                    // Just add new entry for that IP address.
+                    else{
+                        m_pConnectionsPerIP.Add(session.RemoteEndPoint.Address.ToString(),1);
+                    }
                 }
-                // Just add new entry for that IP address.
-                else{
-                    m_pConnectionsPerIP.Add(session.RemoteEndPoint.Address.ToString(),1);
-                }                
             }
         }
 
@@ -69,7 +71,7 @@ namespace LumiSoft.Net.TCP
                 m_pItems.Remove(session.ID);
 
                 // Decrease connections per IP.
-                if(m_pConnectionsPerIP.ContainsKey(session.RemoteEndPoint.Address.ToString())){
+                if(session.IsConnected && m_pConnectionsPerIP.ContainsKey(session.RemoteEndPoint.Address.ToString())){
                     m_pConnectionsPerIP[session.RemoteEndPoint.Address.ToString()]--;
 
                     // Last IP, so remove that IP entry.
