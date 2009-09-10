@@ -54,6 +54,25 @@ namespace LumiSoft.Net.Mail
             return ParseFromStream(new MemoryStream(data));
         }
 
+        /// <summary>
+        /// Parses mail message from the specified byte array.
+        /// </summary>
+        /// <param name="data">Mail message data.</param>
+        /// <param name="headerEncoding">Header reading encoding. If not sure UTF-8 is recommended.</param>
+        /// <returns>Returns parsed mail message.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>data</b> or <b>headerEncoding</b> is null reference.</exception>
+        public static Mail_Message ParseFromByte(byte[] data,Encoding headerEncoding)
+        {
+            if(data == null){
+                throw new ArgumentNullException("data");
+            }
+            if(headerEncoding == null){
+                throw new ArgumentNullException("headerEncoding");
+            }
+
+            return ParseFromStream(new MemoryStream(data),headerEncoding);
+        }
+
         #endregion
 
         #region static method ParseFromFile
@@ -79,6 +98,31 @@ namespace LumiSoft.Net.Mail
             }
         }
 
+        /// <summary>
+        /// Parses mail message from the specified file.
+        /// </summary>
+        /// <param name="file">File name with path from where to parse mail message.</param>
+        /// <param name="headerEncoding">Header reading encoding. If not sure UTF-8 is recommended.</param>
+        /// <returns>Returns parsed mail message.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>file</b> or <b>headerEncoding</b> is null.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        public static new Mail_Message ParseFromFile(string file,Encoding headerEncoding)
+        {
+            if(file == null){
+                throw new ArgumentNullException("file");
+            }
+            if(file == ""){
+                throw new ArgumentException("Argument 'file' value must be specified.");
+            }
+            if(headerEncoding == null){
+                throw new ArgumentNullException("headerEncoding");
+            }
+
+            using(FileStream fs = File.OpenRead(file)){
+                return ParseFromStream(fs,headerEncoding);
+            }
+        }
+
         #endregion
 
         #region static method ParseFromStream
@@ -95,8 +139,27 @@ namespace LumiSoft.Net.Mail
                 throw new ArgumentNullException("stream");
             }
 
+            return ParseFromStream(stream,Encoding.UTF8);
+        }
+        
+        /// <summary>
+        /// Parses mail message from the specified stream.
+        /// </summary>
+        /// <param name="stream">Stream from where to parse mail message. Parsing starts from current stream position.</param>
+        /// <param name="headerEncoding">Header reading encoding. If not sure UTF-8 is recommended.</param>
+        /// <returns>Returns parsed mail message.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>stream</b> or <b>headerEncoding</b> is null.</exception>
+        public static new Mail_Message ParseFromStream(Stream stream,Encoding headerEncoding)
+        {
+            if(stream == null){
+                throw new ArgumentNullException("stream");
+            }
+            if(headerEncoding == null){
+                throw new ArgumentNullException("headerEncoding");
+            }
+
             Mail_Message retVal = new Mail_Message();
-            retVal.Parse(new SmartStream(stream,false),new MIME_h_ContentType("text/plain"));
+            retVal.Parse(new SmartStream(stream,false),headerEncoding,new MIME_h_ContentType("text/plain"));
 
             return retVal;
         }
