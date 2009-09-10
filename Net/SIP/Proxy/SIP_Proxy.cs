@@ -377,20 +377,25 @@ namespace LumiSoft.Net.SIP.Proxy
                 If the first value in the Route header field indicates this proxy,
                 the proxy MUST remove that value from the request.
             */
-                        
-            // Strict route.
-            if(SIP_Utils.IsSipOrSipsUri(request.RequestLine.Uri.ToString()) && IsLocalRoute(((SIP_Uri)request.RequestLine.Uri))){        
+            
+            // Strict route - handle it.
+            if((request.RequestLine.Uri is SIP_Uri) && IsRecordRoute(((SIP_Uri)request.RequestLine.Uri)) && request.Route.GetAllValues().Length > 0){
                 request.RequestLine.Uri = request.Route.GetAllValues()[request.Route.GetAllValues().Length - 1].Address.Uri;
                 SIP_t_AddressParam[] routes = request.Route.GetAllValues();
                 route = (SIP_Uri)routes[routes.Length - 1].Address.Uri;
                 request.Route.RemoveLastValue();
             }
-            // Our proxy route.
-            else if(request.Route.GetAllValues().Length > 0){
+
+            // Check if Route header field indicates this proxy.
+            if(request.Route.GetAllValues().Length > 0){
                 route = (SIP_Uri)request.Route.GetTopMostValue().Address.Uri;
 
-                // If our proxy route or loose-route, consider route as this proxy route.
-                if(IsLocalRoute(SIP_Uri.Parse(request.Route.GetTopMostValue().Address.Uri.ToString())) || route.Param_Lr){
+                // We consider loose-route always ours, because otherwise this message never reach here.
+                if(route.Param_Lr){
+                    request.Route.RemoveTopMostValue();
+                }
+                // It's our route, remove it.
+                else if(IsLocalRoute(route)){
                     request.Route.RemoveTopMostValue();
                 }
             }
@@ -880,15 +885,33 @@ namespace LumiSoft.Net.SIP.Proxy
                 return false;
             }
 
-            // Consider any IP address as local route, because if server behind NAT we can't do IP check.
-            if(Net_Utils.IsIPAddress(uri.Host)){
-                return true;
+            foreach(IPBindInfo bind in m_pStack.BindInfo){
+                if(uri.Host.ToLower() == bind.HostName.ToLower()){
+                    return true;
+                }
             }
-            else{
-                foreach(IPBindInfo bind in m_pStack.BindInfo){
-                    if(uri.Host.ToLower() == bind.HostName.ToLower()){
-                        return true;
-                    }
+            
+            return false;
+        }
+
+        #endregion
+
+        #region method IsRecordRoute
+
+        /// <summary>
+        /// Checks if the specified route is Record-Route what we add.
+        /// </summary>
+        /// <param name="route">Record route.</param>
+        /// <returns>Returns true if the specified route is local Record-Route value, otherwise false.</returns>
+        private bool IsRecordRoute(SIP_Uri route)
+        {
+            if(route == null){
+                throw new ArgumentNullException("route");
+            }
+
+            foreach(IPBindInfo bind in m_pStack.BindInfo){
+                if(route.Host.ToLower() == bind.HostName.ToLower()){
+                    return true;
                 }
             }
 
