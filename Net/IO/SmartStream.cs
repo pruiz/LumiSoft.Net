@@ -2636,7 +2636,7 @@ namespace LumiSoft.Net.IO
             }
 
             SmartStream reader = new SmartStream(stream,false);
-            reader.ReadHeader(this,-1,SizeExceededAction.ThrowException);
+            reader.ReadHeader(this,0,SizeExceededAction.ThrowException);
         }
 
         #endregion
