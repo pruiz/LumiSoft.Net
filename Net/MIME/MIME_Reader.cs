@@ -422,7 +422,7 @@ namespace LumiSoft.Net.MIME
                         
             int peek = Peek(true);
             if(peek == '"'){
-                return QuotedString();
+                return "\"" + QuotedString() + "\"";
             }
             else if(peek == '='){
                 return EncodedWord();
