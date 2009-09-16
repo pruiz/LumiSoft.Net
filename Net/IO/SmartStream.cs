@@ -2582,6 +2582,7 @@ namespace LumiSoft.Net.IO
             }
 
             // We need to read lines, do period handling and write them to stream.
+            bool            lineEndsCRLF = false;
             long            totalWritten = 0;
             byte[]          buffer       = new byte[m_BufferSize];
             ReadLineAsyncOP readLineOP   = new ReadLineAsyncOP(buffer,SizeExceededAction.ThrowException);
@@ -2603,9 +2604,16 @@ namespace LumiSoft.Net.IO
                     totalWritten++;
                 }
 
+                
                 // Write line to source stream.
                 Write(buffer,0,readLineOP.BytesInBuffer);
                 totalWritten += readLineOP.BytesInBuffer;
+                lineEndsCRLF = (readLineOP.Buffer[readLineOP.BytesInBuffer - 1] == '\n');
+            }
+
+            // Provided data didn't end with CRLF, add it automatically.
+            if(!lineEndsCRLF){
+                WriteLine("");
             }
 
             // Write period terminator.
