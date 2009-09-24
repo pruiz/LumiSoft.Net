@@ -500,7 +500,7 @@ namespace LumiSoft.Net.IMAP
 
 			// personal name
             if(address.DisplayName != null){
-			    retVal.Append(TextUtils.QuoteString(wordEncoder.Encode(address.DisplayName)));
+			    retVal.Append(TextUtils.QuoteString(wordEncoder.Encode(RemoveCrlf(address.DisplayName))));
             }
             else{
                 retVal.Append("NIL");
@@ -510,11 +510,11 @@ namespace LumiSoft.Net.IMAP
 			retVal.Append(" NIL");
 
 			// mailbox name
-			retVal.Append(" " + TextUtils.QuoteString(wordEncoder.Encode(address.LocalPart)));
+			retVal.Append(" " + TextUtils.QuoteString(wordEncoder.Encode(RemoveCrlf(address.LocalPart))));
 
 			// host name
             if(address.Domain != null){
-			    retVal.Append(" " + TextUtils.QuoteString(wordEncoder.Encode(address.Domain)));
+			    retVal.Append(" " + TextUtils.QuoteString(wordEncoder.Encode(RemoveCrlf(address.Domain))));
             }
             else{
                 retVal.Append(" NIL");
@@ -528,9 +528,28 @@ namespace LumiSoft.Net.IMAP
 		#endregion
 
 
-		#region Properties Implementation
+        #region static method RemoveCrlf
 
-		/// <summary>
+        /// <summary>
+        /// Removes CR and LF chars from the specified string.
+        /// </summary>
+        /// <param name="value">String value.</param>
+        /// <returns>Reurns string.</returns>
+        private static string RemoveCrlf(string value)
+        {
+            if(value == null){
+                throw new ArgumentNullException("value");
+            }
+
+            return value.Replace("\r","").Replace("\n","");
+        }
+
+        #endregion
+
+
+        #region Properties Implementation
+
+        /// <summary>
 		/// Gets header field "<b>Date:</b>" value. Returns DateTime.MinValue if no date or date parsing fails.
 		/// </summary>
 		public DateTime Date

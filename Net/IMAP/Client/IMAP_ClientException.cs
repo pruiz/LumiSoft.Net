@@ -11,7 +11,7 @@ namespace LumiSoft.Net.IMAP.Client
     {
         private string m_StatusCode   = "";
         private string m_ResponseText = "";
-
+        
         /// <summary>
         /// Default constructor.
         /// </summary>
@@ -29,6 +29,32 @@ namespace LumiSoft.Net.IMAP.Client
             if(code_text.Length == 2){
                 m_ResponseText = code_text[1];
             }
+        }
+
+        /// <summary>
+        /// Default constructor.
+        /// </summary>
+        /// <param name="responseCode">IMAP response code(BAD,NO).</param>
+        /// <param name="responseText">Response text.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>responseCode</b> or <b>responseText</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        public IMAP_ClientException(string responseCode,string responseText)
+        {
+            if(responseCode == null){
+                throw new ArgumentNullException("responseCode");
+            }
+            if(responseCode == string .Empty){
+                throw new ArgumentException("Argument 'responseCode' value must be specified.","responseCode");
+            }
+            if(responseText == null){
+                throw new ArgumentNullException("responseText");
+            }
+            if(responseText == string .Empty){
+                throw new ArgumentException("Argument 'responseText' value must be specified.","responseText");
+            }
+
+            m_StatusCode   = responseCode;
+            m_ResponseText = responseText;
         }
 
 

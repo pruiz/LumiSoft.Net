@@ -183,7 +183,7 @@ namespace LumiSoft.Net.IMAP
 			*/
             if(date.IndexOf('-') > -1){
                 try{
-                    return DateTime.ParseExact(date.Trim(),"d-MMM-yyyy HH:mm:ss zzz",System.Globalization.DateTimeFormatInfo.InvariantInfo);
+                    return DateTime.ParseExact(date.Trim(),new string[]{"d-MMM-yyyy","d-MMM-yyyy HH:mm:ss zzz"},System.Globalization.DateTimeFormatInfo.InvariantInfo,System.Globalization.DateTimeStyles.None);
                 }
                 catch{
                     throw new ArgumentException("Argument 'date' value '" + date + "' is not valid IMAP date.");
@@ -420,10 +420,26 @@ namespace LumiSoft.Net.IMAP
 
 		#endregion
 
+        #region static method IsValidFolderName
 
-		#region method ParseQuotedParam
+        /// <summary>
+        /// Gets if the specified folder name is valid folder name.
+        /// </summary>
+        /// <param name="folder">Folder name.</param>
+        /// <returns>Returns true if specified folde name is valid.</returns>
+        public static bool IsValidFolderName(string folder)
+        {
+            // TODO: Path ?
 
-		/// <summary>
+            return true;
+        }
+
+        #endregion
+
+
+        #region method ParseQuotedParam
+
+        /// <summary>
 		/// Parses [quoted] parameter from args text. Parameter may be not quoted, then parameter is
 		/// terminated by SP. Example: argsText="string gdkga agkgs";argsText=stringValue 10.
 		/// 
