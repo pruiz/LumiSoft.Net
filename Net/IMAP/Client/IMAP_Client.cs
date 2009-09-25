@@ -7,24 +7,26 @@ using System.Security.Principal;
 using LumiSoft.Net.IO;
 using LumiSoft.Net.TCP;
 using LumiSoft.Net.IMAP;
+using LumiSoft.Net.MIME;
 
 namespace LumiSoft.Net.IMAP.Client
 {
     /// <summary>
     /// IMAP v4 Client. Defined in RFC 3501.
     /// </summary>
-    public class IMAP_ClientN : TCP_Client
+    public class IMAP_Client : TCP_Client
     {
         #region class _FetchResponseReader
 
         /// <summary>
         /// This class implements FETCH response reader.
         /// </summary>
-        private class _FetchResponseReader
+        internal class _FetchResponseReader
         {
-            private IMAP_ClientN             m_pImap     = null;
-            private string                   m_FetchLine = null;
-            private IMAP_Client_FetchHandler m_pHandler  = null;
+            private IMAP_Client              m_pImap        = null;
+            private string                   m_FetchLine    = null;
+            private StringReader             m_pFetchReader = null;
+            private IMAP_Client_FetchHandler m_pHandler     = null;
 
             /// <summary>
             /// Default constructor.
@@ -33,7 +35,7 @@ namespace LumiSoft.Net.IMAP.Client
             /// <param name="fetchLine">Initial FETCH response line.</param>
             /// <param name="handler">Fetch data-items handler.</param>
             /// <exception cref="ArgumentNullException">Is raised when <b>imap</b>,<b>fetchLine</b> or <b>handler</b> is null reference.</exception>
-            public _FetchResponseReader(IMAP_ClientN imap,string fetchLine,IMAP_Client_FetchHandler handler)
+            public _FetchResponseReader(IMAP_Client imap,string fetchLine,IMAP_Client_FetchHandler handler)
             {
                 if(imap == null){
                     throw new ArgumentNullException("imap");
@@ -65,35 +67,35 @@ namespace LumiSoft.Net.IMAP.Client
                 m_pHandler.SetCurrentSeqNo(seqNo);
                 m_pHandler.OnNextMessage();
 
-                StringReader r = new StringReader(m_FetchLine.Split(new char[]{' '},4)[3]);
-                if(r.StartsWith("(")){
-                    r.ReadSpecifiedLength(1);
+                m_pFetchReader = new StringReader(m_FetchLine.Split(new char[]{' '},4)[3]);
+                if(m_pFetchReader.StartsWith("(")){
+                    m_pFetchReader.ReadSpecifiedLength(1);
                 }
 
                 // Read data-items.
-                while(r.Available > 0){
-                    r.ReadToFirstChar();
+                while(m_pFetchReader.Available > 0){
+                    m_pFetchReader.ReadToFirstChar();
 //*
                     #region BODY
 
-                    if(r.StartsWith("BODY ",false)){
+                    if(m_pFetchReader.StartsWith("BODY ",false)){
                     }
 
                     #endregion
 
                     #region BODY[<section>]<<origin octet>>
 
-                    else if(r.StartsWith("BODY[",false)){
+                    else if(m_pFetchReader.StartsWith("BODY[",false)){
                         // Eat BODY word.
-                        r.ReadWord();
+                        m_pFetchReader.ReadWord();
 
                         // Read body-section.
-                        string section = r.ReadParenthesized();
+                        string section = m_pFetchReader.ReadParenthesized();
 
                         // Read origin if any.
                         int offset = -1;
-                        if(r.StartsWith("<")){
-                            offset = Convert.ToInt32(r.ReadParenthesized().Split(' ')[0]);
+                        if(m_pFetchReader.StartsWith("<")){
+                            offset = Convert.ToInt32(m_pFetchReader.ReadParenthesized().Split(' ')[0]);
                         }
 
 
@@ -102,26 +104,26 @@ namespace LumiSoft.Net.IMAP.Client
                         m_pHandler.OnBody(eArgs);
 
                         // We don't have BODY[].
-                        r.ReadToFirstChar();
-                        if(r.StartsWith("NIL",false)){
+                        m_pFetchReader.ReadToFirstChar();
+                        if(m_pFetchReader.StartsWith("NIL",false)){
                             // Eat NIL.
-                            r.ReadWord();
+                            m_pFetchReader.ReadWord();
                         }
                         // BODY[] value is returned as string-literal.
-                        else if(r.StartsWith("{",false)){
+                        else if(m_pFetchReader.StartsWith("{",false)){
                             if(eArgs.Stream == null){
-                                m_pImap.ReadStringLiteral(Convert.ToInt32(r.ReadParenthesized()),new JunkingStream());
+                                m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()),new JunkingStream());
                             }
                             else{
-                                m_pImap.ReadStringLiteral(Convert.ToInt32(r.ReadParenthesized()),eArgs.Stream);
+                                m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()),eArgs.Stream);
                             }
                             
                             // Read continuing FETCH line.
-                            r = new StringReader(m_pImap.ReadLine());
+                            m_pFetchReader = new StringReader(m_pImap.ReadLine());
                         }
                         // BODY[] is quoted-string.
                         else{
-                            r.ReadWord();
+                            m_pFetchReader.ReadWord();
                         }
 
                         // Notify that message storing has completed.
@@ -132,71 +134,72 @@ namespace LumiSoft.Net.IMAP.Client
 //*
                     #region BODYSTRUCTURE
 
-                    else if(r.StartsWith("BODYSTRUCTURE ",false)){
+                    else if(m_pFetchReader.StartsWith("BODYSTRUCTURE ",false)){
                     }
 
                     #endregion
-//*
+
                     #region ENVELOPE
 
-                    else if(r.StartsWith("ENVELOPE ",false)){
+                    else if(m_pFetchReader.StartsWith("ENVELOPE ",false)){
+                        m_pHandler.OnEnvelope(IMAP_Envelope.Parse(this));
                     }
 
                     #endregion
 
                     #region  FLAGS
 
-                    else if(r.StartsWith("FLAGS ",false)){
+                    else if(m_pFetchReader.StartsWith("FLAGS ",false)){
                         // Eat FLAGS word.
-                        r.ReadWord();
+                        m_pFetchReader.ReadWord();
 
-                        m_pHandler.OnFlags(r.ReadParenthesized().Split(' '));
+                        m_pHandler.OnFlags(m_pFetchReader.ReadParenthesized().Split(' '));
                     }
 
                     #endregion
 
                     #region INTERNALDATE
 
-                    else if(r.StartsWith("INTERNALDATE ",false)){
+                    else if(m_pFetchReader.StartsWith("INTERNALDATE ",false)){
                          // Eat INTERNALDATE word.
-                        r.ReadWord();
+                        m_pFetchReader.ReadWord();
 
-                        m_pHandler.OnInternalDate(IMAP_Utils.ParseDate(r.ReadWord()));
+                        m_pHandler.OnInternalDate(IMAP_Utils.ParseDate(m_pFetchReader.ReadWord()));
                     }
 
                     #endregion
 
                     #region RFC822
 
-                    else if(r.StartsWith("RFC822 ",false)){
+                    else if(m_pFetchReader.StartsWith("RFC822 ",false)){
                         // Eat RFC822 word.
-                        r.ReadWord(false,new char[]{' '},false);
-                        r.ReadToFirstChar();
+                        m_pFetchReader.ReadWord(false,new char[]{' '},false);
+                        m_pFetchReader.ReadToFirstChar();
 
                         // Get Message store stream.
                         IMAP_Client_Fetch_Rfc822_EArgs eArgs = new IMAP_Client_Fetch_Rfc822_EArgs();
                         m_pHandler.OnRfc822(eArgs);
 
                         // We don't have RFC822.
-                        if(r.StartsWith("NIL",false)){
+                        if(m_pFetchReader.StartsWith("NIL",false)){
                             // Eat NIL.
-                            r.ReadWord();
+                            m_pFetchReader.ReadWord();
                         }
                         // RFC822 value is returned as string-literal.
-                        else if(r.StartsWith("{",false)){
+                        else if(m_pFetchReader.StartsWith("{",false)){
                             if(eArgs.Stream == null){
-                                m_pImap.ReadStringLiteral(Convert.ToInt32(r.ReadParenthesized()),new JunkingStream());
+                                m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()),new JunkingStream());
                             }
                             else{
-                                m_pImap.ReadStringLiteral(Convert.ToInt32(r.ReadParenthesized()),eArgs.Stream);
+                                m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()),eArgs.Stream);
                             }
                             
                             // Read continuing FETCH line.
-                            r = new StringReader(m_pImap.ReadLine());
+                            m_pFetchReader = new StringReader(m_pImap.ReadLine());
                         }
                         // RFC822 is quoted-string.
                         else{
-                            r.ReadWord();
+                            m_pFetchReader.ReadWord();
                         }
 
                         // Notify that message storing has completed.
@@ -207,29 +210,29 @@ namespace LumiSoft.Net.IMAP.Client
 
                     #region RFC822.HEADER
 
-                    else if(r.StartsWith("RFC822.HEADER ",false)){
+                    else if(m_pFetchReader.StartsWith("RFC822.HEADER ",false)){
                         // Eat RFC822.HEADER word.
-                        r.ReadWord(false,new char[]{' '},false);
-                        r.ReadToFirstChar();
+                        m_pFetchReader.ReadWord(false,new char[]{' '},false);
+                        m_pFetchReader.ReadToFirstChar();
                         
                         string text = null;
                         // We don't have HEADER.
-                        if(r.StartsWith("NIL",false)){
+                        if(m_pFetchReader.StartsWith("NIL",false)){
                             // Eat NIL.
-                            r.ReadWord();
+                            m_pFetchReader.ReadWord();
 
                             text = null;
                         }
                         // HEADER value is returned as string-literal.
-                        else if(r.StartsWith("{",false)){
-                            text = m_pImap.ReadStringLiteral(Convert.ToInt32(r.ReadParenthesized()));
+                        else if(m_pFetchReader.StartsWith("{",false)){
+                            text = m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()));
                             
                             // Read continuing FETCH line.
-                            r = new StringReader(m_pImap.ReadLine());
+                            m_pFetchReader = new StringReader(m_pImap.ReadLine());
                         }
                         // HEADER is quoted-string.
                         else{
-                            text = r.ReadWord();
+                            text = m_pFetchReader.ReadWord();
                         }
 
                         m_pHandler.OnRfc822Header(text);
@@ -239,40 +242,40 @@ namespace LumiSoft.Net.IMAP.Client
 
                     #region RFC822.SIZE
 
-                    else if(r.StartsWith("RFC822.SIZE ",false)){
+                    else if(m_pFetchReader.StartsWith("RFC822.SIZE ",false)){
                         // Eat RFC822.SIZE word.
-                        r.ReadWord(false,new char[]{' '},false);
+                        m_pFetchReader.ReadWord(false,new char[]{' '},false);
 
-                        m_pHandler.OnSize(Convert.ToInt32(r.ReadWord()));
+                        m_pHandler.OnSize(Convert.ToInt32(m_pFetchReader.ReadWord()));
                     }
 
                     #endregion
 
                     #region RFC822.TEXT
 
-                    else if(r.StartsWith("RFC822.TEXT ",false)){
+                    else if(m_pFetchReader.StartsWith("RFC822.TEXT ",false)){
                         // Eat RFC822.TEXT word.
-                        r.ReadWord(false,new char[]{' '},false);
-                        r.ReadToFirstChar();
+                        m_pFetchReader.ReadWord(false,new char[]{' '},false);
+                        m_pFetchReader.ReadToFirstChar();
                         
                         string text = null;
                         // We don't have TEXT.
-                        if(r.StartsWith("NIL",false)){
+                        if(m_pFetchReader.StartsWith("NIL",false)){
                             // Eat NIL.
-                            r.ReadWord();
+                            m_pFetchReader.ReadWord();
 
                             text = null;
                         }
                         // TEXT value is returned as string-literal.
-                        else if(r.StartsWith("{",false)){
-                            text = m_pImap.ReadStringLiteral(Convert.ToInt32(r.ReadParenthesized()));
+                        else if(m_pFetchReader.StartsWith("{",false)){
+                            text = m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()));
                             
                             // Read continuing FETCH line.
-                            r = new StringReader(m_pImap.ReadLine());
+                            m_pFetchReader = new StringReader(m_pImap.ReadLine());
                         }
                         // TEXT is quoted-string.
                         else{
-                            text = r.ReadWord();
+                            text = m_pFetchReader.ReadWord();
                         }
 
                         m_pHandler.OnRfc822Text(text);
@@ -282,26 +285,71 @@ namespace LumiSoft.Net.IMAP.Client
 
                     #region UID
 
-                    else if(r.StartsWith("UID ",false)){
+                    else if(m_pFetchReader.StartsWith("UID ",false)){
                         // Eat UID word.
-                        r.ReadWord();
+                        m_pFetchReader.ReadWord();
 
-                        m_pHandler.OnUID(Convert.ToInt64(r.ReadWord()));
+                        m_pHandler.OnUID(Convert.ToInt64(m_pFetchReader.ReadWord()));
                     }
 
                     #endregion
 
                     #region Fetch closing ")"
 
-                    else if(r.StartsWith(")",false)){
+                    else if(m_pFetchReader.StartsWith(")",false)){
                         break;
                     }
 
                     #endregion
 
                     else{
-                        throw new NotSupportedException("Not supported IMAP FETCH data-item '" + r.ReadToEnd() + "'.");
+                        throw new NotSupportedException("Not supported IMAP FETCH data-item '" + m_pFetchReader.ReadToEnd() + "'.");
                     }
+                }
+            }
+
+            #endregion
+
+
+            #region method GetReader
+
+            /// <summary>
+            /// Gets FETCH current line data reader.
+            /// </summary>
+            internal StringReader GetReader()
+            {
+                return m_pFetchReader;
+            }
+
+            #endregion
+
+            #region method ReadString
+
+            /// <summary>
+            /// Reads string. Quoted-string-string-literal and NIL supported.
+            /// </summary>
+            /// <returns>Returns readed string.</returns>
+            internal string ReadString()
+            {                        
+                m_pFetchReader.ReadToFirstChar();
+                // NIL string.
+                if(m_pFetchReader.StartsWith("NIL",false)){
+                    m_pFetchReader.ReadWord();
+
+                    return null;
+                }
+                // string-literal.
+                else if(m_pFetchReader.StartsWith("{")){
+                    string retVal = m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()));
+
+                    // Read continuing FETCH line.
+                    m_pFetchReader = new StringReader(m_pImap.ReadLine());
+
+                    return retVal;
+                }
+                // quoted-string or atom.
+                else{
+                    return MIME_Encoding_EncodedWord.DecodeS(m_pFetchReader.ReadWord());
                 }
             }
 
@@ -318,7 +366,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// <summary>
         /// Default constructor.
         /// </summary>
-        public IMAP_ClientN()
+        public IMAP_Client()
         {
         }
 
@@ -363,10 +411,13 @@ namespace LumiSoft.Net.IMAP.Client
         /// Switches connection to secure connection.
         /// </summary>
         /// <exception cref="InvalidOperationException">Is raised when connection is already secure and this method is called or
-        /// when IMAP client is not in valid state(not-authenticated state).</exception>
+        /// when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void StartTls()
         {
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
             if(this.IsSecureConnection){
                 throw new InvalidOperationException("Connection is already secure.");
             }
@@ -401,8 +452,14 @@ namespace LumiSoft.Net.IMAP.Client
                 STARTTLS.  The server MAY advertise d
             */
 
-            // TODO:
-            throw new NotImplementedException();
+            SendCommand((m_CommandIndex++).ToString("d5") + " STARTTLS\r\n");
+
+            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
+            if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
+                throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
+            }
+
+            SwitchToSecure();
         }
 
         #endregion
@@ -416,7 +473,8 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="password">Password.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>user</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when user is already authenticated and this method is called.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when user is already authenticated and this method is called or
+        /// when IMAP client is not in valid state(not-connected state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void Login(string user,string password)
         {
@@ -425,6 +483,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(user == string.Empty){
                 throw new ArgumentException("Argument 'user' value must be specified.");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
             }
             if(this.IsAuthenticated){
                 throw new InvalidOperationException("Re-authentication error, you are already authenticated.");
@@ -499,10 +560,16 @@ namespace LumiSoft.Net.IMAP.Client
         /// Gets IMAP server namespaces.
         /// </summary>
         /// <returns>Returns namespaces responses.</returns>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public IMAP_Response_Namespace[] GetNamespaces()
-        {
-            // TODO: not connected,not authenticated
+        {           
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }
 
             /* RFC 2342 5. NAMESPACE Command.
                 Arguments: none
@@ -549,6 +616,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// </summary>
         /// <param name="filter">Folders filter. If this value is null, all folders are returned.</param>
         /// <returns>Returns folders list.</returns>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         /// <remarks>
         /// The character "*" is a wildcard, and matches zero or more
@@ -559,7 +627,12 @@ namespace LumiSoft.Net.IMAP.Client
         /// </remarks>
         public IMAP_Response_List[] GetFolders(string filter)
         {
-            // TODO: not connected,not authenticated
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }
 
             /* RFC 3501 6.3.8. LIST Command.
                 Arguments:  reference name
@@ -718,16 +791,21 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="folder">Folder name with path.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void CreateFolder(string folder)
         {
-            // TODO: not connected,not authenticated
-
             if(folder == null){
                 throw new ArgumentNullException("folder");
             }
             if(folder == string.Empty){
                 throw new ArgumentException("Argument 'folder' value must be specified.","folder");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
             /* RFC 3501 6.3.3. CREATE Command.
@@ -798,16 +876,21 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="folder">Folder name with path.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void DeleteFolder(string folder)
         {
-            // TODO: not connected,not authenticated
-
             if(folder == null){
                 throw new ArgumentNullException("folder");
             }
             if(folder == string.Empty){
                 throw new ArgumentException("Argument 'folder' value must be specified.","folder");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
             /* RFC 3501 6.3.4. DELETE Command.
@@ -881,11 +964,10 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="newFolder">New folder name with path.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> or <b>newFolder</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void RenameFolder(string folder,string newFolder)
         {
-            // TODO: not connected,not authenticated
-
             if(folder == null){
                 throw new ArgumentNullException("folder");
             }
@@ -897,6 +979,12 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(newFolder == string.Empty){
                 throw new ArgumentException("Argument 'newFolder' name must be specified.","newFolder");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
             /* RFC 3501 6.3.5. RENAME Command.
@@ -974,6 +1062,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// </summary>
         /// <param name="filter">Folders filter. If this value is null, all folders are returned.</param>
         /// <returns>Returns subscribed folders list.</returns>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         /// <remarks>
         /// The character "*" is a wildcard, and matches zero or more
@@ -983,8 +1072,13 @@ namespace LumiSoft.Net.IMAP.Client
         /// of hierarchy are also returned.
         /// </remarks>
         public IMAP_Response_LSub[] GetSubscribedFolders(string filter)
-        {
-            // TODO: not connected,not authenticated
+        {            
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }
 
             /* RFC 3501 6.3.9. LSUB Command.
                 Arguments:  reference name
@@ -1050,16 +1144,21 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="folder">Foler name with path.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void SubscribeFolder(string folder)
         {
-            // TODO: not connected,not authenticated
-
             if(folder == null){
                 throw new ArgumentNullException("folder");
             }
             if(folder == string.Empty){
                 throw new ArgumentException("Argument 'folder' value must be specified.","folder");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
             /* RFC 3501 6.3.6. SUBSCRIBE Command.
@@ -1110,16 +1209,21 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="folder">Foler name with path.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void UnsubscribeFolder(string folder)
         {
-            // TODO: not connected,not authenticated
-
             if(folder == null){
                 throw new ArgumentNullException("folder");
             }
             if(folder == string.Empty){
                 throw new ArgumentException("Argument 'folder' value must be specified.","folder");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
             /* RFC 3501 6.3.7. UNSUBSCRIBE Command.
@@ -1159,16 +1263,21 @@ namespace LumiSoft.Net.IMAP.Client
         /// <returns>Returns STATUS responses.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public IMAP_Response_Status[] FolderStatus(string folder)
         {
-            // TODO: not connected,not authenticated
-
             if(folder == null){
                 throw new ArgumentNullException("folder");
             }
             if(folder == string.Empty){
                 throw new ArgumentException("Argument 'folder' value must be specified.","folder");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
             /* RFC 3501 6.3.10. STATUS Command.
@@ -1263,16 +1372,21 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="folder">Folder name with path.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void SelectFolder(string folder)
         {
-            // TODO: not connected,not authenticated
-
             if(folder == null){
                 throw new ArgumentNullException("folder");
             }
             if(folder == string.Empty){
                 throw new ArgumentException("Argument 'folder' value must be specified.","folder");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
             /* RFC 3501 6.3.1.  SELECT Command.
@@ -1368,16 +1482,21 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="folder">Folder name with path.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void ExamineFolder(string folder)
         {
-            // TODO: not connected,not authenticated
-
             if(folder == null){
                 throw new ArgumentNullException("folder");
             }
             if(folder == string.Empty){
                 throw new ArgumentException("Argument 'folder' value must be specified.","folder");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
             /* RFC 3501 6.3.2.  EXAMINE Command.
@@ -1465,11 +1584,18 @@ namespace LumiSoft.Net.IMAP.Client
         /// <returns>Returns quota-root resource limit entries.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>quotaRootName</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public IMAP_Response_Quota[] GetFolderQuota(string quotaRootName)
         {
             if(quotaRootName == null){
                 throw new ArgumentNullException("quotaRootName");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
             /* RFC 2087 4.2. GETQUOTA Command.
@@ -1542,16 +1668,21 @@ namespace LumiSoft.Net.IMAP.Client
         /// <returns>Returns folder ACL entries.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public IMAP_Response_Acl[] GetFolderAcl(string folder)
         {
-            // TODO: not connected,not authenticated
-
             if(folder == null){
                 throw new ArgumentNullException("folder");
             }
             if(folder == string.Empty){
                 throw new ArgumentException("Argument 'folder' value must be specified.","folder");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
             /* RFC 4314 3.3. GETACL Command.
@@ -1602,11 +1733,10 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="permissions">ACL permissions.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> or <b>user</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void SetFolderAcl(string folder,string user,IMAP_Flags_SetType setType,IMAP_ACL_Flags permissions)
         {
-            // TODO: not connected,not authenticated
-
             if(folder == null){
                 throw new ArgumentNullException("folder");
             }
@@ -1618,6 +1748,12 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(user == string.Empty){
                 throw new ArgumentException("Argument 'user' value must be specified.","user");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
             /* RFC 4314 3.1. SETACL Command.
@@ -1691,11 +1827,10 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="user">User name.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> or <b>user</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void DeleteFolderAcl(string folder,string user)
         {
-            // TODO: not connected,not authenticated
-
             if(folder == null){
                 throw new ArgumentNullException("folder");
             }
@@ -1707,6 +1842,12 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(user == string.Empty){
                 throw new ArgumentException("Argument 'user' value must be specified.","user");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
             /* RFC 4314 3.2. DELETEACL Command.
@@ -1750,10 +1891,10 @@ namespace LumiSoft.Net.IMAP.Client
         /// <returns>Returns LISTRIGHTS responses.</returns>
         /// <exception cref="ArgumentNullException">Is raised when<b>folder</b> or <b>identifier</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
+        /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public IMAP_Response_ListRights[] GetFolderRights(string folder,string identifier)
         {
-            // TODO: not connected,not authenticated
-
             if(folder == null){
                 throw new ArgumentNullException("folder");
             }
@@ -1765,6 +1906,12 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(identifier == string.Empty){
                 throw new ArgumentException("Argument 'identifier' value must be specified.","identifier");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
             /* RFC 4314 3.4. LISTRIGHTS Command.
@@ -1820,16 +1967,21 @@ namespace LumiSoft.Net.IMAP.Client
         /// <returns>Returns MYRIGHTS responses.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public IMAP_Response_MyRights[] GetFolderMyRights(string folder)
         {
-            // TODO: not connected,not authenticated
-
             if(folder == null){
                 throw new ArgumentNullException("folder");
             }
             if(folder == string.Empty){
                 throw new ArgumentException("Argument 'folder' value must be specified.","folder");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
             /* RFC 4314 3.5. MYRIGHTS Command.
@@ -1875,11 +2027,10 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="count">Number of bytes send from <b>message</b> stream.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> or <b>stream</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void StoreMessage(string folder,IMAP_MessageFlags flags,DateTime internalDate,Stream message,int count)
         {
-            // TODO: not connected,not authenticated
-
             if(folder == null){
                 throw new ArgumentNullException("folder");
             }
@@ -1891,6 +2042,12 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(count < 1){
                 throw new ArgumentException("Argument 'count' value must be >= 1.","count");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
             /* RFC 3501 6.3.11. APPEND Command.
@@ -2014,9 +2171,19 @@ namespace LumiSoft.Net.IMAP.Client
         /// <summary>
         /// Closes selected folder, all messages marked as Deleted will be expunged.
         /// </summary>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected, not-authenticated or not-selected state).</exception>
+        /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void CloseFolder()
-        {
-            // TODO: not connected,not authenticated, not selected
+        {            
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }
+            if(m_pSelectedFolder == null){
+                throw new InvalidOperationException("Not selected state, you need to select some folder first.");
+            }
 
             /* RFC 3501 6.4.2. CLOSE Command.
                 Arguments:  none
@@ -2054,6 +2221,8 @@ namespace LumiSoft.Net.IMAP.Client
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
+
+            m_pSelectedFolder = null;
         }
 
         #endregion
@@ -2069,6 +2238,8 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="handler">Fetch responses handler.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b>,<b>items</b> or <b>handler</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected, not-authenticated or not-selected state).</exception>
+        /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void Fetch(bool uid,IMAP_SequenceSet seqSet,IMAP_Client_FetchArg[] items,IMAP_Client_FetchHandler handler)
         {
             if(seqSet == null){
@@ -2083,9 +2254,15 @@ namespace LumiSoft.Net.IMAP.Client
             if(handler == null){
                 throw new ArgumentNullException("handler");
             }
-
-            // TODO: not connected,not authenticated,not selected
-            // TODO: Callback method. Call it for each matched message.
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }
+            if(m_pSelectedFolder == null){
+                throw new InvalidOperationException("Not selected state, you need to select some folder first.");
+            }
 
             /* RFC 3501 6.4.5. FETCH Command.
                 Arguments:  sequence set
@@ -2147,16 +2324,24 @@ namespace LumiSoft.Net.IMAP.Client
         /// <returns>Returns search expression matehced messages sequence-numbers or UIDs(This depends on argument <b>uid</b> value).</returns>
         /// <exception cref="ArgumentNullException">Is rised when <b>criteria</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected, not-authenticated or not-selected state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public int[] Search(bool uid,string charset,string criteria)
         {
-            // TODO: not connected,not authenticated,not selected
-
             if(criteria == null){
                 throw new ArgumentNullException("criteria");
             }
             if(criteria == string.Empty){
                 throw new ArgumentException("Argument 'criteria' value must be specified.","criteria");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }
+            if(m_pSelectedFolder == null){
+                throw new InvalidOperationException("Not selected state, you need to select some folder first.");
             }
 
             StringBuilder command = new StringBuilder();
@@ -2193,13 +2378,21 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="setType">Specifies how flags are set.</param>
         /// <param name="flags">Message flags.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b> is null reference.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected, not-authenticated or not-selected state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void StoreMessageFlags(bool uid,IMAP_SequenceSet seqSet,IMAP_Flags_SetType setType,IMAP_MessageFlags flags)
         {
-            // TODO: not connected,not authenticated,not selected
-
             if(seqSet == null){
                 throw new ArgumentNullException("seqSet");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }
+            if(m_pSelectedFolder == null){
+                throw new InvalidOperationException("Not selected state, you need to select some folder first.");
             }
 
             /* RFC 3501 6.4.6. STORE Command.
@@ -2301,11 +2494,10 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="targetFolder">Target folder name with path.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b> or <b>targetFolder</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected, not-authenticated or not-selected state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void CopyMessages(bool uid,IMAP_SequenceSet seqSet,string targetFolder)
         {
-            // TODO: not connected,not authenticated,not selected
-
             if(seqSet == null){
                 throw new ArgumentNullException("seqSet");
             }
@@ -2314,6 +2506,15 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(targetFolder == string.Empty){
                 throw new ArgumentException("Argument 'folder' value must be specified.","folder");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }
+            if(m_pSelectedFolder == null){
+                throw new InvalidOperationException("Not selected state, you need to select some folder first.");
             }
 
             /* RFC 3501 6.4.7. COPY Command.
@@ -2376,10 +2577,19 @@ namespace LumiSoft.Net.IMAP.Client
         /// <summary>
         /// Deletes all messages in selected folder which has "Deleted" flag set.
         /// </summary>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected, not-authenticated or not-selected state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void Expunge()
         {
-            // TODO: not connected,not authenticated, not selected
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }
+            if(m_pSelectedFolder == null){
+                throw new InvalidOperationException("Not selected state, you need to select some folder first.");
+            }
 
             /* RFC 3501 6.4.3. EXPUNGE Command.
                 Arguments:  none
@@ -2425,10 +2635,13 @@ namespace LumiSoft.Net.IMAP.Client
         /// Gets IMAP server capabilities.
         /// </summary>
         /// <returns>Returns CAPABILITIES responses.</returns>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public IMAP_Response_Capability[] Capability()
         {
-            // TODO: not connected.
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
 
             /* RFC 3501 6.1.1. CAPABILITY Command.
                 Arguments:  none
@@ -2494,10 +2707,13 @@ namespace LumiSoft.Net.IMAP.Client
         /// <summary>
         /// Sends NOOP command to IMAP server.
         /// </summary>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void Noop()
         {
-            // TODO: not connected
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
 
             /* RFC 3501 6.1.2. NOOP Command.
 

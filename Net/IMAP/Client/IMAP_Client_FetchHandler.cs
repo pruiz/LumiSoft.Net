@@ -66,6 +66,8 @@ namespace LumiSoft.Net.IMAP.Client
 
         #endregion
 
+        //public event EventHandler BodyS = null;
+
         /// <summary>
         /// Is raised when current message FETCH BODY[] data-item is returned.
         /// </summary>
@@ -86,6 +88,28 @@ namespace LumiSoft.Net.IMAP.Client
 
         #endregion
 
+        //public event EventHandler BodyStructure = null;
+
+        /// <summary>
+        /// Is raised when current message FETCH ENVELOPE data-item is returned.
+        /// </summary>
+        public event EventHandler<EventArgs<IMAP_Envelope>> Envelope = null;
+
+        #region method OnEnvelope
+
+        /// <summary>
+        /// Raises <b>Envelope</b> event.
+        /// </summary>
+        /// <param name="envelope">Envelope value.</param>
+        internal void OnEnvelope(IMAP_Envelope envelope)
+        {
+            if(this.Envelope != null){
+                this.Envelope(this,new EventArgs<IMAP_Envelope>(envelope));
+            }
+        }
+
+        #endregion
+
         /// <summary>
         /// Is raised when current message FETCH FLAGS data-item is returned.
         /// </summary>
@@ -96,7 +120,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// <summary>
         /// Raises <b>Flags</b> event.
         /// </summary>
-        /// <param name="date">Message flags.</param>
+        /// <param name="flags">Message flags.</param>
         internal void OnFlags(string[] flags)
         {
             if(this.Flags != null){

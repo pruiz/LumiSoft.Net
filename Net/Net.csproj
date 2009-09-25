@@ -122,7 +122,7 @@
     <Compile Include="DNS\DNS_QClass.cs" />
     <Compile Include="DNS\DNS_QType.cs" />
     <Compile Include="DNS\DNS_RCode.cs" />
-    <Compile Include="IMAP\Client\IMAP_ClientN.cs" />
+    <Compile Include="IMAP\Client\IMAP_Client.cs" />
     <Compile Include="IMAP\Client\IMAP_Client_FetchArg.cs" />
     <Compile Include="IMAP\Client\IMAP_Client_FetchArg_Body.cs" />
     <Compile Include="IMAP\Client\IMAP_Client_FetchArg_BodyPeek.cs" />
@@ -141,6 +141,7 @@
     <Compile Include="IMAP\Client\IMAP_Client_SelectedFolder.cs" />
     <Compile Include="IMAP\IMAP_Acl_Entry.cs" />
     <Compile Include="IMAP\IMAP_CompletionResponseType.cs" />
+    <Compile Include="IMAP\IMAP_Envelope.cs" />
     <Compile Include="IMAP\IMAP_Namespace_Entry.cs" />
     <Compile Include="IMAP\IMAP_Quota_Entry.cs" />
     <Compile Include="IMAP\IMAP_Response_Acl.cs" />
@@ -396,39 +397,12 @@
     <Compile Include="UDP\UDP_ProcessMode.cs" />
     <Compile Include="UDP\UDP_Server.cs" />
     <Compile Include="URI\AbsoluteUri.cs" />
-    <Compile Include="_Obsolete\IMAP\Client\IMAP_Acl.cs" />
-    <Compile Include="_Obsolete\IMAP\Client\IMAP_Namespace.cs" />
-    <Compile Include="_Obsolete\IMAP\Client\IMAP_NamespacesInfo.cs" />
-    <Compile Include="_Obsolete\IMAP\Client\IMAP_Quota.cs" />
     <Compile Include="IMAP\Server\IMAP_eArgs_GetMessagesInfo.cs" />
     <Compile Include="IMAP\Server\IMAP_eArgs_GetQuota.cs" />
     <Compile Include="IMAP\Server\IMAP_eArgs_MessageItems.cs" />
     <Compile Include="IMAP\Server\IMAP_Message.cs" />
     <Compile Include="IMAP\Server\IMAP_MessageCollection.cs" />
     <Compile Include="IMAP\Server\IMAP_MessageItems_enum.cs" />
-    <None Include="_Obsolete\Data\DbFile.cs">
-      <SubType>Code</SubType>
-    </None>
-    <None Include="_Obsolete\Data\LDB_DataColumn.cs">
-      <SubType>Code</SubType>
-    </None>
-    <None Include="_Obsolete\Data\LDB_DataColumnCollection.cs">
-      <SubType>Code</SubType>
-    </None>
-    <None Include="_Obsolete\Data\LDB_DataType.cs">
-      <SubType>Code</SubType>
-    </None>
-    <None Include="_Obsolete\Data\LDB_Record.cs">
-      <SubType>Code</SubType>
-    </None>
-    <None Include="_Obsolete\Data\lsDB_FixedLengthRecord.cs" />
-    <None Include="_Obsolete\Data\lsDB_FixedLengthTable.cs" />
-    <None Include="_Obsolete\Data\_DataPage.cs">
-      <SubType>Code</SubType>
-    </None>
-    <None Include="_Obsolete\Data\_ldb_Utils.cs">
-      <SubType>Code</SubType>
-    </None>
     <Compile Include="DNS\Client\DNS_rr_A.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -489,22 +463,10 @@
     <Compile Include="ICMP\Icmp.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="_Obsolete\IMAP\Client\IMAP_Client.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="_Obsolete\IMAP\Client\IMAP_FetchItem.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="_Obsolete\IMAP\Client\IMAP_FetchItem_Flags.cs">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="IMAP\IMAP_ACL_Flags.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="_Obsolete\IMAP\IMAP_BODY.cs" />
-    <Compile Include="IMAP\IMAP_Envelope.cs">
-      <SubType>Code</SubType>
-    </Compile>
+    <None Include="_Obsolete\IMAP\IMAP_BODY.cs" />
     <Compile Include="IMAP\IMAP_MessageFlags.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -517,7 +479,7 @@
     <Compile Include="IMAP\Server\Folder_EventArgs.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="_Obsolete\IMAP\IMAP_BODY_Entity.cs" />
+    <None Include="_Obsolete\IMAP\IMAP_BODY_Entity.cs" />
     <Compile Include="IMAP\Server\IMAP_eArgs_DELETEACL.cs">
       <SubType>Code</SubType>
     </Compile>
