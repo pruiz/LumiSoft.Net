@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP QUOTAROOT response. Defined in RFC 2087 5.2.
     /// </summary>
-    public class IMAP_Response_QuotaRoot
+    public class IMAP_Response_QuotaRoot : IMAP_Response
     {
         private string   m_FolderName = "";
         private string[] m_QuotaRoots = null;

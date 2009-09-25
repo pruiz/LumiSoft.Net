@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP QUOTA response. Defined in RFC 2087 5.1.
     /// </summary>
-    public class IMAP_Response_Quota
+    public class IMAP_Response_Quota : IMAP_Response
     {
         private string             m_QuotaRootName = "";
         private IMAP_Quota_Entry[] m_pEntries      = null;

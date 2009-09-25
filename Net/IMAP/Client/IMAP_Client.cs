@@ -2225,7 +2225,7 @@ namespace LumiSoft.Net.IMAP.Client
         }
 
         #endregion
-//*
+
         #region method Fetch
 
         /// <summary>
@@ -2488,7 +2488,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// <summary>
         /// Copies specified messages from current selected folder to the specified target folder.
         /// </summary>
-        /// <param name="uid">Specifies if <b>seqSet</b> contains UIDs or messageNos.</param>
+        /// <param name="uid">Specifies if <b>seqSet</b> contains UIDs or message-numberss.</param>
         /// <param name="seqSet">Messages sequence set.</param>
         /// <param name="targetFolder">Target folder name with path.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b> or <b>targetFolder</b> is null reference.</exception>
@@ -2557,17 +2557,48 @@ namespace LumiSoft.Net.IMAP.Client
         }
 
         #endregion
-
-        // Not usefull, expunge may expunge messages before marked for deletion.
+                
         #region method MoveMessages
-        /*
-        public void MoveMessages()
+        
+        /// <summary>
+        /// Moves specified messages from current selected folder to the specified target folder.
+        /// </summary>
+        /// <param name="uid">Specifies if <b>seqSet</b> contains UIDs or message-numberss.</param>
+        /// <param name="seqSet">Messages sequence set.</param>
+        /// <param name="targetFolder">Target folder name with path.</param>
+        /// <param name="expunge">If ture messages are expunged from selected folder, otherwise they are marked as <b>Deleted</b>.
+        /// Note: If true - then all messages marked as <b>Deleted</b> are expunged !</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b> or <b>targetFolder</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected, not-authenticated or not-selected state).</exception>
+        /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
+        public void MoveMessages(bool uid,IMAP_SequenceSet seqSet,string targetFolder,bool expunge)
         {
-            // ??? Probably not usefull, expunge may expunge messages before wanted
+            if(seqSet == null){
+                throw new ArgumentNullException("seqSet");
+            }
+            if(targetFolder == null){
+                throw new ArgumentNullException("folder");
+            }
+            if(targetFolder == string.Empty){
+                throw new ArgumentException("Argument 'folder' value must be specified.","folder");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }
+            if(m_pSelectedFolder == null){
+                throw new InvalidOperationException("Not selected state, you need to select some folder first.");
+            }
 
-            // TODO:
-            throw new NotImplementedException();
-        }*/
+            CopyMessages(uid,seqSet,targetFolder);
+            StoreMessageFlags(uid,seqSet,IMAP_Flags_SetType.Add,IMAP_MessageFlags.Deleted);
+            if(expunge){
+                Expunge();
+            }
+        }
 
         #endregion
 

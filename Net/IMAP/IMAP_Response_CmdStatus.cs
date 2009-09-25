@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class implements IMAP command completion status response. Defined in RFC 3501.
     /// </summary>
-    public class IMAP_Response_CmdStatus
+    public class IMAP_Response_CmdStatus : IMAP_Response
     {
         private string m_CommandTag           = "";
         private string m_ResponseCode         = "";

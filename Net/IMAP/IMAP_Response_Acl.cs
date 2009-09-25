@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP ACL response. Defined in RFC 4314 3.6.2.
     /// </summary>
-    public class IMAP_Response_Acl
+    public class IMAP_Response_Acl : IMAP_Response
     {
         private string           m_FolderName = "";
         private IMAP_Acl_Entry[] m_pEntries   = null;

@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP MYRIGHTS response. Defined in RFC 4314 3.7.
     /// </summary>
-    public class IMAP_Response_ListRights
+    public class IMAP_Response_ListRights : IMAP_Response
     {
         private string m_FolderName     = "";
         private string m_Identifier     = "";

@@ -144,6 +144,7 @@
     <Compile Include="IMAP\IMAP_Envelope.cs" />
     <Compile Include="IMAP\IMAP_Namespace_Entry.cs" />
     <Compile Include="IMAP\IMAP_Quota_Entry.cs" />
+    <Compile Include="IMAP\IMAP_Response.cs" />
     <Compile Include="IMAP\IMAP_Response_Acl.cs" />
     <Compile Include="IMAP\IMAP_Response_Capability.cs" />
     <Compile Include="IMAP\IMAP_Response_List.cs" />

@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP LIST response. Defined in RFC 3501 7.2.2.
     /// </summary>
-    public class IMAP_Response_List
+    public class IMAP_Response_List : IMAP_Response
     {
         private string   m_FolderName        = "";
         private char     m_Delimiter         = '/';
