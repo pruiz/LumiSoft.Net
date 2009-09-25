@@ -370,7 +370,6 @@ namespace LumiSoft.Net.IMAP.Client
         {
         }
 
-        // TODO: not connected
 
         #region override method Disconnect
 

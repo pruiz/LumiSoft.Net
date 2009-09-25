@@ -38,7 +38,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="responseText">Response text.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>responseCode</b> or <b>responseText</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        public IMAP_ClientException(string responseCode,string responseText)
+        public IMAP_ClientException(string responseCode,string responseText) : base(responseCode + " " + responseText)
         {
             if(responseCode == null){
                 throw new ArgumentNullException("responseCode");
