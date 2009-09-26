@@ -514,7 +514,7 @@ namespace LumiSoft.Net.IMAP.Client
             string cmd = (m_CommandIndex++).ToString("d5") + " LOGIN " + TextUtils.QuoteString(user) + " " + TextUtils.QuoteString(password) + "\r\n";      
             this.TcpStream.Write(cmd);
             // Log manually, remove password.
-            LogAddWrite(cmd.Length,(m_CommandIndex - 1).ToString("d5") + " LOGIN " + TextUtils.QuoteString(user) + " <PASSWORD-REMOVED>\r\n");
+            LogAddWrite(cmd.Length,(m_CommandIndex - 1).ToString("d5") + " LOGIN " + TextUtils.QuoteString(user) + " <PASSWORD-REMOVED>");
 
             IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
@@ -2808,9 +2808,9 @@ namespace LumiSoft.Net.IMAP.Client
             if(command == null){
                 throw new ArgumentNullException("command");
             }
-                                                
+                                  
             this.TcpStream.Write(command);
-            LogAddWrite(command.Length,command);
+            LogAddWrite(command.Length,command.TrimEnd());
         }
 
         #endregion
@@ -2855,6 +2855,9 @@ namespace LumiSoft.Net.IMAP.Client
                     throw args.Error;
                 }
                 string responseLine = args.LineUtf8;
+
+                // Log
+                LogAddRead(args.BytesInBuffer,responseLine);
 
                 // Untagged response.
                 if(responseLine.StartsWith("*")){
@@ -3057,6 +3060,7 @@ namespace LumiSoft.Net.IMAP.Client
                     // EXPUNGE,FETCH
 
                     else if(Net_Utils.IsInteger(word) && parts[2].Equals("EXPUNGE",StringComparison.InvariantCultureIgnoreCase)){
+                        OnMessageExpunged(IMAP_Response_Expunge.Parse(responseLine));
                     }
                     else if(Net_Utils.IsInteger(word) && parts[2].Equals("FETCH",StringComparison.InvariantCultureIgnoreCase)){
                         // User din't provide us FETCH handler, make dummy one which eats up all fetch responses.
@@ -3174,7 +3178,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// Gets session authenticated user identity, returns null if not authenticated.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when this property is accessed and POP3 client is not connected.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when this property is accessed and IMAP client is not connected.</exception>
         public override GenericIdentity AuthenticatedUserIdentity
         {
             get{ 
@@ -3192,25 +3196,71 @@ namespace LumiSoft.Net.IMAP.Client
         /// <summary>
         /// Get IMAP server greeting text.
         /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when this property is accessed and IMAP client is not connected.</exception>
         public string GreetingText
         {
-            get{ return m_GreetingText; }
+            get{ 
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+                if(!this.IsConnected){
+				    throw new InvalidOperationException("You must connect first.");
+			    }
+
+                return m_GreetingText; 
+            }
         }
 
         /// <summary>
         /// Gets IMAP server folder separator.
         /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when this property is accessed and IMAP client is not connected.</exception>
         public char FolderSeparator
         {
-            get{ return '/'; }
+            get{ 
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+                if(!this.IsConnected){
+				    throw new InvalidOperationException("You must connect first.");
+			    }
+
+                SendCommand((m_CommandIndex++).ToString("d5") + " LIST \"\" \"\"\r\n");
+
+                List<IMAP_Response_List> retVal = new List<IMAP_Response_List>();
+                IMAP_Response_CmdStatus response = ReadResponse(null,null,null,retVal,null,null,null,null,null,null,null,null,null);
+                if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
+                    throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
+                }
+
+                if(retVal.Count == 0){
+                    throw new Exception("Unexpected result: IMAP server didn't return LIST response for [... LIST \"\" \"\"].");
+                }
+                else{
+                    return retVal[0].HierarchyDelimiter;
+                }
+            }
         }
 
         /// <summary>
         /// Gets selected folder. Returns null if no folder selected.
         /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when this property is accessed and IMAP client is not connected.</exception>
         public IMAP_Client_SelectedFolder SelectedFolder
         {
-            get{ return m_pSelectedFolder; }
+            get{ 
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+                if(!this.IsConnected){
+				    throw new InvalidOperationException("You must connect first.");
+			    }
+
+                return m_pSelectedFolder; 
+            }
         }
 
         #endregion
@@ -3230,6 +3280,26 @@ namespace LumiSoft.Net.IMAP.Client
         {
         }
 
+        /// <summary>
+        /// This event is raised when IMAP server expunges message and sends EXPUNGE response.
+        /// </summary>
+        public event EventHandler<EventArgs<IMAP_Response_Expunge>> MessageExpunged = null;
+
+        #region method OnMessageExpunged
+
+        /// <summary>
+        /// Raises <b>MessageExpunged</b> event.
+        /// </summary>
+        /// <param name="response">Expunge response.</param>
+        private void OnMessageExpunged(IMAP_Response_Expunge response)
+        {
+            if(this.MessageExpunged != null){
+                this.MessageExpunged(this,new EventArgs<IMAP_Response_Expunge>(response));
+            }
+        }
+
+        #endregion
+                
         #endregion
     }
 }

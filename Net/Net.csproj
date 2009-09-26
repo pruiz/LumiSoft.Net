@@ -147,6 +147,7 @@
     <Compile Include="IMAP\IMAP_Response.cs" />
     <Compile Include="IMAP\IMAP_Response_Acl.cs" />
     <Compile Include="IMAP\IMAP_Response_Capability.cs" />
+    <Compile Include="IMAP\IMAP_Response_Expunge.cs" />
     <Compile Include="IMAP\IMAP_Response_List.cs" />
     <Compile Include="IMAP\IMAP_Response_ListRights.cs" />
     <Compile Include="IMAP\IMAP_Response_LSub.cs" />

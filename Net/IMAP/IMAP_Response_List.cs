@@ -26,9 +26,6 @@ namespace LumiSoft.Net.IMAP
             if(folder == null){
                 throw new ArgumentNullException("folder");
             }
-            if(folder == string.Empty){
-                throw new ArgumentException("Argument 'folder' value must be specified.","folder");
-            }
 
             m_FolderName = folder;
             m_Delimiter  = delimiter;
