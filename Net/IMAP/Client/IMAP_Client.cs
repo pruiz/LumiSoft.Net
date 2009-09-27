@@ -1542,11 +1542,33 @@ namespace LumiSoft.Net.IMAP.Client
         }
 
         #endregion
-//*
+
         #region method GetFolderQuotaRoots
 
-        private void GetFolderQuotaRoots(string folder)
+        /// <summary>
+        /// Gets specified folder quota roots and their quota resource usage.
+        /// </summary>
+        /// <param name="folder">Folder name with path.</param>
+        /// <returns>Returns quota-roots and their resource limit entries.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
+        /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
+        public IMAP_Response[] GetFolderQuotaRoots(string folder)
         {
+            if(folder == null){
+                throw new ArgumentNullException("folder");
+            }
+            if(folder == string.Empty){
+                throw new ArgumentException("Argument 'folder' value must be specified.","folder");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }
+
             /* RFC 2087 4.3. GETQUOTAROOT Command.
                 Arguments:  mailbox name
 
@@ -1567,9 +1589,20 @@ namespace LumiSoft.Net.IMAP.Client
                             S: A003 OK Getquota completed
             */
 
-            // TODO:
+            SendCommand((m_CommandIndex++).ToString("d5") + " GETQUOTAROOT " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folder)) + "\r\n");
+            
+            List<IMAP_Response_Quota> quota = new List<IMAP_Response_Quota>();
+            List<IMAP_Response_QuotaRoot> quotaRoot = new List<IMAP_Response_QuotaRoot>();
+            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,quota,quotaRoot,null,null);
+            if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
+                throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
+            }
 
-            throw new NotImplementedException();
+            List<IMAP_Response> retVal = new List<IMAP_Response>();
+            retVal.AddRange(quotaRoot.ToArray());
+            retVal.AddRange(quota.ToArray());
+
+            return retVal.ToArray();
         }
 
         #endregion
@@ -3103,7 +3136,7 @@ namespace LumiSoft.Net.IMAP.Client
                     }
                     else if(word.Equals("QUOTAROOT",StringComparison.InvariantCultureIgnoreCase)){
                         if(quotaRoot != null){
-                            IMAP_Response_QuotaRoot.Parse(responseLine);
+                            quotaRoot.Add(IMAP_Response_QuotaRoot.Parse(responseLine));
                         }
                     }
 
