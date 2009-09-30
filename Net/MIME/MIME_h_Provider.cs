@@ -40,6 +40,11 @@ namespace LumiSoft.Net.MIME
                 throw new ArgumentNullException("field");
             }
 
+            // <CRLF> is misssing from end, add it.
+            if(!field.EndsWith("\r\n")){
+                field += "\r\n";
+            }
+
             MIME_h   headerField = null;
             string[] name_value  = field.Split(new char[]{':'},2);
             string   name        = name_value[0].Trim();
