@@ -122,8 +122,12 @@ namespace LumiSoft.Net.MIME
                 }
                 int timeZoneMinutes = 0;
                 v = r.Atom();
+                // Time zone missing. Not RFC syntax, but some servers will send such dates.
+                if(v == null){
+                    // Just consider time zone as 0(GMT).
+                }
                 // We have RFC 2822 date. For example: +2000.
-                if(v[0] == '+' || v[0] == '-'){
+                else if(v[0] == '+' || v[0] == '-'){
                     if(v[0] == '+'){
                         timeZoneMinutes = (Convert.ToInt32(v.Substring(1,2)) * 60 + Convert.ToInt32(v.Substring(3,2)));
                     }
