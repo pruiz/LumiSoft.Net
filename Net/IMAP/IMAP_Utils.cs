@@ -286,7 +286,7 @@ namespace LumiSoft.Net.IMAP
 					}
 
 					// Ecode block
-					byte[] encodedData = Core.Base64EncodeEx(encodeBlock.ToArray(),base64Chars,false);
+					byte[] encodedData = Net_Utils.Base64EncodeEx(encodeBlock.ToArray(),base64Chars,false);
 					retVal.WriteByte((byte)'&');
 					retVal.Write(encodedData,0,encodedData.Length);
 					retVal.WriteByte((byte)'-');
@@ -373,7 +373,7 @@ namespace LumiSoft.Net.IMAP
 						byte[] encodedBlock = System.Text.Encoding.Default.GetBytes(text.Substring(i + 1,endingPos - i - 1));
 		
 						// Convert to UTF-16 char						
-						byte[] decodedData = Core.Base64DecodeEx(encodedBlock,base64Chars);
+						byte[] decodedData = Net_Utils.Base64DecodeEx(encodedBlock,base64Chars);
 						char[] decodedChars = new char[decodedData.Length / 2];                        
 						for(int iC=0;iC<decodedChars.Length;iC++){
 							decodedChars[iC] = (char)(decodedData[iC * 2] << 8 | decodedData[(iC * 2) + 1]);

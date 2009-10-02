@@ -8,6 +8,7 @@ namespace LumiSoft.Net.IO
     /// This class proviedes data to asynchronous read line callback method.
     /// NOTE: ReadLine_EventArgs is reused for next read line call, so don't store references to this class.
     /// </summary>
+    [Obsolete("Get rid of it.")]
     public class ReadLine_EventArgs
     {
         private Exception m_pException  = null;

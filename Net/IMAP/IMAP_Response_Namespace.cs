@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP NAMESPACE response. Defined in RFC 2342 5.
     /// </summary>
-    public class IMAP_Response_Namespace : IMAP_Response
+    public class IMAP_Response_Namespace : IMAP_ResponseUntagged
     {
         private IMAP_Namespace_Entry[] m_pPersonalNamespaces   = null;
         private IMAP_Namespace_Entry[] m_pOtherUsersNamespaces = null;

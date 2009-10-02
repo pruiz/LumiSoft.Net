@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP STATUS response. Defined in RFC 3501 7.2.4.
     /// </summary>
-    public class IMAP_Response_Status : IMAP_Response
+    public class IMAP_Response_Status : IMAP_ResponseUntagged
     {
         private string m_FolderName   = "";
         private int    m_MessageCount = 0;

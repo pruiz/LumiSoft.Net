@@ -40,6 +40,7 @@ namespace LumiSoft.Net
 	/// <summary>
 	/// Summary description for ReadException.
 	/// </summary>
+    [Obsolete("Get rid of it.")]
 	public class ReadException : System.Exception
 	{
 		private ReadReplyCode m_ReadReplyCode;

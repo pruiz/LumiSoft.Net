@@ -2902,6 +2902,8 @@ namespace LumiSoft.Net.IMAP.Client
                     // OK,NO,BAD,PREAUTH,BYE
 
                     if(word.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
+                        IMAP_ResponseUntagged_ServerStatus response = IMAP_ResponseUntagged_ServerStatus.Parse(responseLine);
+
                         // Process optional response-codes(7.2). ALERT,BADCHARSET,CAPABILITY,PARSE,PERMANENTFLAGS,READ-ONLY,
                         // READ-WRITE,TRYCREATE,UIDNEXT,UIDVALIDITY,UNSEEN
 
@@ -2946,27 +2948,19 @@ namespace LumiSoft.Net.IMAP.Client
                             // We don't care about other response codes.                            
                         }
 
-                        OnUntaggedStatusResponse(responseLine);
+                        OnUntaggedStatusResponse(response);
                     }
                     else if(word.Equals("NO",StringComparison.InvariantCultureIgnoreCase)){
-                        // We do not do any processing here.
-
-                        OnUntaggedStatusResponse(responseLine);
+                        OnUntaggedStatusResponse(IMAP_ResponseUntagged_ServerStatus.Parse(responseLine));
                     }
                     else if(word.Equals("BAD",StringComparison.InvariantCultureIgnoreCase)){
-                        // We do not do any processing here.
-
-                        OnUntaggedStatusResponse(responseLine);
+                        OnUntaggedStatusResponse(IMAP_ResponseUntagged_ServerStatus.Parse(responseLine));
                     }
                     else if(word.Equals("PREAUTH",StringComparison.InvariantCultureIgnoreCase)){
-                        // We do not do any processing here.
-
-                        OnUntaggedStatusResponse(responseLine);
+                        OnUntaggedStatusResponse(IMAP_ResponseUntagged_ServerStatus.Parse(responseLine));
                     }
                     else if(word.Equals("BYE",StringComparison.InvariantCultureIgnoreCase)){
-                        // We do not do any processing here.
-
-                        OnUntaggedStatusResponse(responseLine);
+                        OnUntaggedStatusResponse(IMAP_ResponseUntagged_ServerStatus.Parse(responseLine));
                     }
 
                     #endregion
@@ -3299,20 +3293,27 @@ namespace LumiSoft.Net.IMAP.Client
         #endregion
 
         #region Events implementation
+        
+        /// <summary>
+        /// This event is raised when IMAP server sends untagged status response.
+        /// </summary>
+        public event EventHandler<EventArgs<IMAP_ResponseUntagged>> UntaggedStatusResponse = null;
 
-        private void OnMailboxSize()
+        #region method OnUntaggedStatusResponse
+
+        /// <summary>
+        /// Raises <b>UntaggedStatusResponse</b> event.
+        /// </summary>
+        /// <param name="response">Untagged response.</param>
+        private void OnUntaggedStatusResponse(IMAP_ResponseUntagged response)
         {
+            if(this.UntaggedStatusResponse != null){
+                this.UntaggedStatusResponse(this,new EventArgs<IMAP_ResponseUntagged>(response));
+            }
         }
 
-        private void OnMessageStatus()
-        {
-            // TODO:
-        }
-
-        private void OnUntaggedStatusResponse(string responseLine)
-        {
-        }
-
+        #endregion
+                
         /// <summary>
         /// This event is raised when IMAP server expunges message and sends EXPUNGE response.
         /// </summary>

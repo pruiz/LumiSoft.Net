@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP CAPABILITY response. Defined in RFC 3501 7.2.1.
     /// </summary>
-    public class IMAP_Response_Capability : IMAP_Response
+    public class IMAP_Response_Capability : IMAP_ResponseUntagged
     {
         private string[] m_pCapabilities = null;
 

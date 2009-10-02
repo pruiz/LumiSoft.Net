@@ -11,24 +11,28 @@ namespace LumiSoft.Net.IO
     /// This delegate represents callback method for BeginReadLine.
     /// </summary>
     /// <param name="e">Method data.</param>
+    [Obsolete("Use SmartStream instead.")]
     public delegate void ReadLineCallback(ReadLine_EventArgs e);
 
     /// <summary>
     /// This delegate represents callback method for BeginReadToEnd,BeginReadHeader,BeginReadPeriodTerminated.
     /// </summary>
     /// <param name="e">Method data.</param>
+    [Obsolete("Use SmartStream instead.")]
     public delegate void ReadToStreamCallback(ReadToStream_EventArgs e);
 
     /// <summary>
     /// This delegate represents callback method for BeginWrite.
     /// </summary>
     /// <param name="e">Method data.</param>
+    [Obsolete("Use SmartStream instead.")]
     public delegate void WriteCallback(Write_EventArgs e);
 
     /// <summary>
     /// This delegate represents callback method for BeginWrite,BeginWritePeriodTerminated.
     /// </summary>
     /// <param name="e">Method data.</param>
+    [Obsolete("Use SmartStream instead.")]
     public delegate void WriteStreamCallback(WriteStream_EventArgs e);
 
     /// <summary>

@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP EXPUNGE response. Defined in RFC 3501 7.4.1.
     /// </summary>
-    public class IMAP_Response_Expunge : IMAP_Response
+    public class IMAP_Response_Expunge : IMAP_ResponseUntagged
     {
         private int m_SeqNo = 1;
 
