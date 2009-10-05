@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP ACL response. Defined in RFC 4314 3.6.2.
     /// </summary>
-    public class IMAP_Response_Acl : IMAP_ResponseUntagged
+    public class IMAP_r_u_Acl : IMAP_r_u
     {
         private string           m_FolderName = "";
         private IMAP_Acl_Entry[] m_pEntries   = null;
@@ -18,7 +18,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="folderName">Folder name with path.</param>
         /// <param name="entries">ACL entries.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folderName</b> or <b>entries</b> is null reference.</exception>
-        public IMAP_Response_Acl(string folderName,IMAP_Acl_Entry[] entries)
+        public IMAP_r_u_Acl(string folderName,IMAP_Acl_Entry[] entries)
         {
             if(folderName == null){
                 throw new ArgumentNullException("folderName");
@@ -43,7 +43,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="aclResponse">ACL response.</param>
         /// <returns>Returns parsed ACL response.</returns>
         /// <exception cref="ArgumentNullException">Is raised wehn <b>aclResponse</b> is null reference.</exception>
-        public static IMAP_Response_Acl Parse(string aclResponse)
+        public static IMAP_r_u_Acl Parse(string aclResponse)
         {
             if(aclResponse == null){
                 throw new ArgumentNullException("aclResponse");
@@ -77,7 +77,7 @@ namespace LumiSoft.Net.IMAP
                 entries.Add(new IMAP_Acl_Entry(items[i],items[i + 1]));
             }
 
-            return new IMAP_Response_Acl(folderName,entries.ToArray());
+            return new IMAP_r_u_Acl(folderName,entries.ToArray());
         }
 
         #endregion

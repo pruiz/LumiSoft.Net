@@ -453,7 +453,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " STARTTLS\r\n");
 
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -516,7 +516,7 @@ namespace LumiSoft.Net.IMAP.Client
             // Log manually, remove password.
             LogAddWrite(cmd.Length,(m_CommandIndex - 1).ToString("d5") + " LOGIN " + TextUtils.QuoteString(user) + " <PASSWORD-REMOVED>");
 
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -561,7 +561,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// <returns>Returns namespaces responses.</returns>
         /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
-        public IMAP_Response_Namespace[] GetNamespaces()
+        public IMAP_r_u_Namespace[] GetNamespaces()
         {           
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
@@ -597,8 +597,8 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " NAMESPACE\r\n");
 
-            List<IMAP_Response_Namespace> retVal = new List<IMAP_Response_Namespace>();
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,retVal,null);
+            List<IMAP_r_u_Namespace> retVal = new List<IMAP_r_u_Namespace>();
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,retVal,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -624,7 +624,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// is the last character of a mailbox name argument, matching levels
         /// of hierarchy are also returned.
         /// </remarks>
-        public IMAP_Response_List[] GetFolders(string filter)
+        public IMAP_r_u_List[] GetFolders(string filter)
         {
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
@@ -771,8 +771,8 @@ namespace LumiSoft.Net.IMAP.Client
                 SendCommand((m_CommandIndex++).ToString("d5") + " LIST \"\" \"*\"\r\n");
             }
             
-            List<IMAP_Response_List> retVal = new List<IMAP_Response_List>();
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,retVal,null,null,null,null,null,null,null,null,null);
+            List<IMAP_r_u_List> retVal = new List<IMAP_r_u_List>();
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,retVal,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -859,7 +859,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " CREATE " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folder)) + "\r\n");
 
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -946,7 +946,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " DELETE " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folder)) + "\r\n");
 
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -1046,7 +1046,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " RENAME " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folder)) + " " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(newFolder)) + "\r\n");
 
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -1125,7 +1125,7 @@ namespace LumiSoft.Net.IMAP.Client
             }
             
             List<IMAP_Response_LSub> retVal  = new List<IMAP_Response_LSub>();
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,retVal,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,retVal,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -1192,7 +1192,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " SUBSCRIBE " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folder)) + "\r\n");
 
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -1245,7 +1245,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " UNSUBSCRIBE " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folder)) + "\r\n");
 
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -1264,7 +1264,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
-        public IMAP_Response_Status[] FolderStatus(string folder)
+        public IMAP_r_u_Status[] FolderStatus(string folder)
         {
             if(folder == null){
                 throw new ArgumentNullException("folder");
@@ -1352,8 +1352,8 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " STATUS " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folder)) + " (MESSAGES RECENT UIDNEXT UIDVALIDITY UNSEEN)\r\n");
 
-            List<IMAP_Response_Status> retVal  = new List<IMAP_Response_Status>();
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,retVal,null,null,null,null);
+            List<IMAP_r_u_Status> retVal  = new List<IMAP_r_u_Status>();
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,retVal,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -1457,7 +1457,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             IMAP_Client_SelectedFolder folderInfo = new IMAP_Client_SelectedFolder(folder);
 
-            IMAP_Response_CmdStatus response = ReadResponse(null,folderInfo,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,folderInfo,null,null,null,null,null,null,null,null,null,null,null);
             if(response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 m_pSelectedFolder = folderInfo;
  
@@ -1527,7 +1527,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             IMAP_Client_SelectedFolder folderInfo = new IMAP_Client_SelectedFolder(folder);
 
-            IMAP_Response_CmdStatus response = ReadResponse(null,folderInfo,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,folderInfo,null,null,null,null,null,null,null,null,null,null,null);
             if(response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 m_pSelectedFolder = folderInfo;
  
@@ -1554,7 +1554,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
-        public IMAP_Response[] GetFolderQuotaRoots(string folder)
+        public IMAP_r[] GetFolderQuotaRoots(string folder)
         {
             if(folder == null){
                 throw new ArgumentNullException("folder");
@@ -1591,14 +1591,14 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " GETQUOTAROOT " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folder)) + "\r\n");
             
-            List<IMAP_Response_Quota> quota = new List<IMAP_Response_Quota>();
-            List<IMAP_Response_QuotaRoot> quotaRoot = new List<IMAP_Response_QuotaRoot>();
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,quota,quotaRoot,null,null);
+            List<IMAP_r_u_Quota> quota = new List<IMAP_r_u_Quota>();
+            List<IMAP_r_u_QuotaRoot> quotaRoot = new List<IMAP_r_u_QuotaRoot>();
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,quota,quotaRoot,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
 
-            List<IMAP_Response> retVal = new List<IMAP_Response>();
+            List<IMAP_r> retVal = new List<IMAP_r>();
             retVal.AddRange(quotaRoot.ToArray());
             retVal.AddRange(quota.ToArray());
 
@@ -1618,7 +1618,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
-        public IMAP_Response_Quota[] GetFolderQuota(string quotaRootName)
+        public IMAP_r_u_Quota[] GetFolderQuota(string quotaRootName)
         {
             if(quotaRootName == null){
                 throw new ArgumentNullException("quotaRootName");
@@ -1649,8 +1649,8 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " GETQUOTA " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(quotaRootName)) +"\r\n");
 
-            List<IMAP_Response_Quota> retVal  = new List<IMAP_Response_Quota>();
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,retVal,null,null,null);
+            List<IMAP_r_u_Quota> retVal  = new List<IMAP_r_u_Quota>();
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,retVal,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -1702,7 +1702,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
-        public IMAP_Response_Acl[] GetFolderAcl(string folder)
+        public IMAP_r_u_Acl[] GetFolderAcl(string folder)
         {
             if(folder == null){
                 throw new ArgumentNullException("folder");
@@ -1743,8 +1743,8 @@ namespace LumiSoft.Net.IMAP.Client
                           
             SendCommand((m_CommandIndex++).ToString("d5") + " GETACL " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folder)) + "\r\n");
 
-            List<IMAP_Response_Acl> retVal  = new List<IMAP_Response_Acl>();
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,retVal,null,null,null,null,null,null,null);
+            List<IMAP_r_u_Acl> retVal  = new List<IMAP_r_u_Acl>();
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,retVal,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -1842,7 +1842,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand(command.ToString());
 
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             } 
@@ -1905,7 +1905,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " DELETEACL " + TextUtils.QuoteString(user) + " " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folder)) + "\r\n");
 
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -1925,7 +1925,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
-        public IMAP_Response_ListRights[] GetFolderRights(string folder,string identifier)
+        public IMAP_r_u_ListRights[] GetFolderRights(string folder,string identifier)
         {
             if(folder == null){
                 throw new ArgumentNullException("folder");
@@ -1979,8 +1979,8 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " LISTRIGHTS " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folder)) + " " + TextUtils.QuoteString(identifier) + "\r\n");
 
-            List<IMAP_Response_ListRights> retVal = new List<IMAP_Response_ListRights>();
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,retVal,null,null,null,null,null);
+            List<IMAP_r_u_ListRights> retVal = new List<IMAP_r_u_ListRights>();
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,retVal,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -2037,7 +2037,7 @@ namespace LumiSoft.Net.IMAP.Client
             SendCommand((m_CommandIndex++).ToString("d5") + " MYRIGHTS " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folder)) + "\r\n");
 
             List<IMAP_Response_MyRights> retVal = new List<IMAP_Response_MyRights>();
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,retVal,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,retVal,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -2170,7 +2170,7 @@ namespace LumiSoft.Net.IMAP.Client
             SendCommand(command.ToString());
 
             // We must get + here.
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("+",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -2249,7 +2249,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " CLOSE\r\n");
 
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -2337,7 +2337,7 @@ namespace LumiSoft.Net.IMAP.Client
      
             SendCommand(command.ToString());
 
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,handler);
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,handler);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -2390,7 +2390,7 @@ namespace LumiSoft.Net.IMAP.Client
             SendCommand(command.ToString());
 
             List<int> retVal = new List<int>();
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,retVal,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,null,retVal,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -2508,7 +2508,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand(command.ToString());
 
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             } 
@@ -2583,7 +2583,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " COPY " + seqSet.ToSequenceSetString() + " " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(targetFolder)) + "\r\n");
 
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -2683,7 +2683,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " EXPUNGE\r\n");
 
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -2700,7 +2700,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// <returns>Returns CAPABILITIES responses.</returns>
         /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
-        public IMAP_Response_Capability[] Capability()
+        public IMAP_r_u_Capability[] Capability()
         {
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
@@ -2754,8 +2754,8 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " CAPABILITY\r\n");
 
-            List<IMAP_Response_Capability> retVal = new List<IMAP_Response_Capability>();
-            IMAP_Response_CmdStatus response = ReadResponse(retVal,null,null,null,null,null,null,null,null,null,null,null,null);
+            List<IMAP_r_u_Capability> retVal = new List<IMAP_r_u_Capability>();
+            IMAP_r_ServerStatus response = ReadResponse(retVal,null,null,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -2798,7 +2798,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " NOOP\r\n");
 
-            IMAP_Response_CmdStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -2869,7 +2869,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="nspace">List where to store NAMESPACE command result. This value can be null.</param>
         /// <param name="fetchHandler">Fetch data-items handler.</param>
         /// <returns>Returns command completion status response.</returns>
-        private IMAP_Response_CmdStatus ReadResponse(List<IMAP_Response_Capability> capability,IMAP_Client_SelectedFolder folderInfo,List<int> search,List<IMAP_Response_List> list,List<IMAP_Response_LSub> lsub,List<IMAP_Response_Acl> acl,List<IMAP_Response_MyRights> myRights,List<IMAP_Response_ListRights> listRights,List<IMAP_Response_Status> status,List<IMAP_Response_Quota> quota,List<IMAP_Response_QuotaRoot> quotaRoot,List<IMAP_Response_Namespace> nspace,IMAP_Client_FetchHandler fetchHandler)
+        private IMAP_r_ServerStatus ReadResponse(List<IMAP_r_u_Capability> capability,IMAP_Client_SelectedFolder folderInfo,List<int> search,List<IMAP_r_u_List> list,List<IMAP_Response_LSub> lsub,List<IMAP_r_u_Acl> acl,List<IMAP_Response_MyRights> myRights,List<IMAP_r_u_ListRights> listRights,List<IMAP_r_u_Status> status,List<IMAP_r_u_Quota> quota,List<IMAP_r_u_QuotaRoot> quotaRoot,List<IMAP_r_u_Namespace> nspace,IMAP_Client_FetchHandler fetchHandler)
         {
             /* RFC 3501 2.2.2.
                 The protocol receiver of an IMAP4rev1 client reads a response line
@@ -2902,47 +2902,42 @@ namespace LumiSoft.Net.IMAP.Client
                     // OK,NO,BAD,PREAUTH,BYE
 
                     if(word.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
-                        IMAP_ResponseUntagged_ServerStatus response = IMAP_ResponseUntagged_ServerStatus.Parse(responseLine);
+                        IMAP_r_u_ServerStatus response = IMAP_r_u_ServerStatus.Parse(responseLine);
 
                         // Process optional response-codes(7.2). ALERT,BADCHARSET,CAPABILITY,PARSE,PERMANENTFLAGS,READ-ONLY,
                         // READ-WRITE,TRYCREATE,UIDNEXT,UIDVALIDITY,UNSEEN
 
-                        if(responseLine.Split(' ')[2].StartsWith("[")){
-                            StringReader r = new StringReader(responseLine.Split(new char[]{' '},3)[2]);
-                            string respCodeWithArgs = r.ReadParenthesized();
-                            string responseCode     = respCodeWithArgs.Split(new char[]{' '},2)[0];
-                            string responseCodeArgs = respCodeWithArgs.Split(new char[]{' '},2)[1];
-
-                            if(responseCode.Equals("PERMANENTFLAGS",StringComparison.InvariantCultureIgnoreCase)){
+                        if(!string.IsNullOrEmpty(response.OptionalResponseCode)){
+                            if(response.OptionalResponseCode.Equals("PERMANENTFLAGS",StringComparison.InvariantCultureIgnoreCase)){
                                 if(folderInfo != null){
-                                    r = new StringReader(responseCodeArgs);
+                                    StringReader r = new StringReader(response.OptionalResponseArgs);
 
                                     folderInfo.SetPermanentFlags(r.ReadParenthesized().Split(' '));
                                 }
                             }
-                            else if(responseCode.Equals("READ-ONLY",StringComparison.InvariantCultureIgnoreCase)){
+                            else if(response.OptionalResponseCode.Equals("READ-ONLY",StringComparison.InvariantCultureIgnoreCase)){
                                 if(folderInfo != null){
                                     folderInfo.SetReadOnly(true);
                                 }
                             }
-                            else if(responseCode.Equals("READ-WRITE",StringComparison.InvariantCultureIgnoreCase)){
+                            else if(response.OptionalResponseCode.Equals("READ-WRITE",StringComparison.InvariantCultureIgnoreCase)){
                                 if(folderInfo != null){
                                     folderInfo.SetReadOnly(true);
                                 }
                             }
-                            else if(responseCode.Equals("UIDNEXT",StringComparison.InvariantCultureIgnoreCase)){
+                            else if(response.OptionalResponseCode.Equals("UIDNEXT",StringComparison.InvariantCultureIgnoreCase)){
                                 if(folderInfo != null){
-                                    folderInfo.SetUidNext(Convert.ToInt64(responseCodeArgs));
+                                    folderInfo.SetUidNext(Convert.ToInt64(response.OptionalResponseArgs));
                                 }
                             }
-                            else if(responseCode.Equals("UIDVALIDITY",StringComparison.InvariantCultureIgnoreCase)){
+                            else if(response.OptionalResponseCode.Equals("UIDVALIDITY",StringComparison.InvariantCultureIgnoreCase)){
                                 if(folderInfo != null){
-                                    folderInfo.SetUidValidity(Convert.ToInt64(responseCodeArgs));
+                                    folderInfo.SetUidValidity(Convert.ToInt64(response.OptionalResponseArgs));
                                 }
                             }
-                            else if(responseCode.Equals("UNSEEN",StringComparison.InvariantCultureIgnoreCase)){
+                            else if(response.OptionalResponseCode.Equals("UNSEEN",StringComparison.InvariantCultureIgnoreCase)){
                                 if(folderInfo != null){
-                                    folderInfo.SetFirstUnseen(Convert.ToInt32(responseCodeArgs));
+                                    folderInfo.SetFirstUnseen(Convert.ToInt32(response.OptionalResponseArgs));
                                 }
                             }
                             // We don't care about other response codes.                            
@@ -2951,16 +2946,16 @@ namespace LumiSoft.Net.IMAP.Client
                         OnUntaggedStatusResponse(response);
                     }
                     else if(word.Equals("NO",StringComparison.InvariantCultureIgnoreCase)){
-                        OnUntaggedStatusResponse(IMAP_ResponseUntagged_ServerStatus.Parse(responseLine));
+                        OnUntaggedStatusResponse(IMAP_r_u_ServerStatus.Parse(responseLine));
                     }
                     else if(word.Equals("BAD",StringComparison.InvariantCultureIgnoreCase)){
-                        OnUntaggedStatusResponse(IMAP_ResponseUntagged_ServerStatus.Parse(responseLine));
+                        OnUntaggedStatusResponse(IMAP_r_u_ServerStatus.Parse(responseLine));
                     }
                     else if(word.Equals("PREAUTH",StringComparison.InvariantCultureIgnoreCase)){
-                        OnUntaggedStatusResponse(IMAP_ResponseUntagged_ServerStatus.Parse(responseLine));
+                        OnUntaggedStatusResponse(IMAP_r_u_ServerStatus.Parse(responseLine));
                     }
                     else if(word.Equals("BYE",StringComparison.InvariantCultureIgnoreCase)){
-                        OnUntaggedStatusResponse(IMAP_ResponseUntagged_ServerStatus.Parse(responseLine));
+                        OnUntaggedStatusResponse(IMAP_r_u_ServerStatus.Parse(responseLine));
                     }
 
                     #endregion
@@ -2973,7 +2968,7 @@ namespace LumiSoft.Net.IMAP.Client
 
                     else if(word.Equals("CAPABILITY",StringComparison.InvariantCultureIgnoreCase)){
                         if(capability != null){
-                            capability.Add(IMAP_Response_Capability.Parse(responseLine));
+                            capability.Add(IMAP_r_u_Capability.Parse(responseLine));
                         }
                     }
 
@@ -2983,7 +2978,7 @@ namespace LumiSoft.Net.IMAP.Client
 
                     else if(word.Equals("LIST",StringComparison.InvariantCultureIgnoreCase)){
                         if(list != null){
-                            list.Add(IMAP_Response_List.Parse(responseLine));
+                            list.Add(IMAP_r_u_List.Parse(responseLine));
                         }
                     }
 
@@ -3003,7 +2998,7 @@ namespace LumiSoft.Net.IMAP.Client
 
                     else if(word.Equals("STATUS",StringComparison.InvariantCultureIgnoreCase)){
                         if(status != null){
-                            status.Add(IMAP_Response_Status.Parse(responseLine));
+                            status.Add(IMAP_r_u_Status.Parse(responseLine));
                         }
                     }
 
@@ -3087,7 +3082,7 @@ namespace LumiSoft.Net.IMAP.Client
                     // EXPUNGE,FETCH
 
                     else if(Net_Utils.IsInteger(word) && parts[2].Equals("EXPUNGE",StringComparison.InvariantCultureIgnoreCase)){
-                        OnMessageExpunged(IMAP_Response_Expunge.Parse(responseLine));
+                        OnMessageExpunged(IMAP_r_u_Expunge.Parse(responseLine));
                     }
                     else if(Net_Utils.IsInteger(word) && parts[2].Equals("FETCH",StringComparison.InvariantCultureIgnoreCase)){
                         // User din't provide us FETCH handler, make dummy one which eats up all fetch responses.
@@ -3105,12 +3100,12 @@ namespace LumiSoft.Net.IMAP.Client
 
                     else if(word.Equals("ACL",StringComparison.InvariantCultureIgnoreCase)){
                         if(acl != null){
-                            acl.Add(IMAP_Response_Acl.Parse(responseLine));
+                            acl.Add(IMAP_r_u_Acl.Parse(responseLine));
                         }
                     }
                     else if(word.Equals("LISTRIGHTS",StringComparison.InvariantCultureIgnoreCase)){
                         if(listRights != null){
-                            listRights.Add(IMAP_Response_ListRights.Parse(responseLine));
+                            listRights.Add(IMAP_r_u_ListRights.Parse(responseLine));
                         }
                     }
                     else if(word.Equals("MYRIGHTS",StringComparison.InvariantCultureIgnoreCase)){
@@ -3125,12 +3120,12 @@ namespace LumiSoft.Net.IMAP.Client
 
                     else if(word.Equals("QUOTA",StringComparison.InvariantCultureIgnoreCase)){
                         if(quota != null){
-                            quota.Add(IMAP_Response_Quota.Parse(responseLine));
+                            quota.Add(IMAP_r_u_Quota.Parse(responseLine));
                         }
                     }
                     else if(word.Equals("QUOTAROOT",StringComparison.InvariantCultureIgnoreCase)){
                         if(quotaRoot != null){
-                            quotaRoot.Add(IMAP_Response_QuotaRoot.Parse(responseLine));
+                            quotaRoot.Add(IMAP_r_u_QuotaRoot.Parse(responseLine));
                         }
                     }
 
@@ -3140,7 +3135,7 @@ namespace LumiSoft.Net.IMAP.Client
 
                     else if(word.Equals("NAMESPACE",StringComparison.InvariantCultureIgnoreCase)){
                         if(nspace != null){
-                            nspace.Add(IMAP_Response_Namespace.Parse(responseLine));
+                            nspace.Add(IMAP_r_u_Namespace.Parse(responseLine));
                         }
                     }
 
@@ -3148,12 +3143,12 @@ namespace LumiSoft.Net.IMAP.Client
                 }
                 // Command continuation response.
                 else if(responseLine.StartsWith("+")){
-                    return new IMAP_Response_CmdStatus("+","+","","+");
+                    return new IMAP_r_ServerStatus("+","+","","+");
                 }
                 // Completion status response.
                 else{
                     // Command response reading has completed.
-                    return IMAP_Response_CmdStatus.Parse(responseLine);
+                    return IMAP_r_ServerStatus.Parse(responseLine);
                 }
             }
         }
@@ -3256,8 +3251,8 @@ namespace LumiSoft.Net.IMAP.Client
 
                 SendCommand((m_CommandIndex++).ToString("d5") + " LIST \"\" \"\"\r\n");
 
-                List<IMAP_Response_List> retVal = new List<IMAP_Response_List>();
-                IMAP_Response_CmdStatus response = ReadResponse(null,null,null,retVal,null,null,null,null,null,null,null,null,null);
+                List<IMAP_r_u_List> retVal = new List<IMAP_r_u_List>();
+                IMAP_r_ServerStatus response = ReadResponse(null,null,null,retVal,null,null,null,null,null,null,null,null,null);
                 if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                     throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
                 }
@@ -3297,7 +3292,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// <summary>
         /// This event is raised when IMAP server sends untagged status response.
         /// </summary>
-        public event EventHandler<EventArgs<IMAP_ResponseUntagged>> UntaggedStatusResponse = null;
+        public event EventHandler<EventArgs<IMAP_r_u>> UntaggedStatusResponse = null;
 
         #region method OnUntaggedStatusResponse
 
@@ -3305,10 +3300,10 @@ namespace LumiSoft.Net.IMAP.Client
         /// Raises <b>UntaggedStatusResponse</b> event.
         /// </summary>
         /// <param name="response">Untagged response.</param>
-        private void OnUntaggedStatusResponse(IMAP_ResponseUntagged response)
+        private void OnUntaggedStatusResponse(IMAP_r_u response)
         {
             if(this.UntaggedStatusResponse != null){
-                this.UntaggedStatusResponse(this,new EventArgs<IMAP_ResponseUntagged>(response));
+                this.UntaggedStatusResponse(this,new EventArgs<IMAP_r_u>(response));
             }
         }
 
@@ -3317,7 +3312,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// <summary>
         /// This event is raised when IMAP server expunges message and sends EXPUNGE response.
         /// </summary>
-        public event EventHandler<EventArgs<IMAP_Response_Expunge>> MessageExpunged = null;
+        public event EventHandler<EventArgs<IMAP_r_u_Expunge>> MessageExpunged = null;
 
         #region method OnMessageExpunged
 
@@ -3325,10 +3320,10 @@ namespace LumiSoft.Net.IMAP.Client
         /// Raises <b>MessageExpunged</b> event.
         /// </summary>
         /// <param name="response">Expunge response.</param>
-        private void OnMessageExpunged(IMAP_Response_Expunge response)
+        private void OnMessageExpunged(IMAP_r_u_Expunge response)
         {
             if(this.MessageExpunged != null){
-                this.MessageExpunged(this,new EventArgs<IMAP_Response_Expunge>(response));
+                this.MessageExpunged(this,new EventArgs<IMAP_r_u_Expunge>(response));
             }
         }
 

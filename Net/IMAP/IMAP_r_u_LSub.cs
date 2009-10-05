@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP LSUB response. Defined in RFC 3501 7.2.3.
     /// </summary>
-    public class IMAP_Response_LSub : IMAP_ResponseUntagged
+    public class IMAP_Response_LSub : IMAP_r_u
     {
         private string   m_FolderName        = "";
         private char     m_Delimiter         = '/';

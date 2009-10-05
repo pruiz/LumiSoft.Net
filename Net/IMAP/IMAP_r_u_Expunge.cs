@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP EXPUNGE response. Defined in RFC 3501 7.4.1.
     /// </summary>
-    public class IMAP_Response_Expunge : IMAP_ResponseUntagged
+    public class IMAP_r_u_Expunge : IMAP_r_u
     {
         private int m_SeqNo = 1;
 
@@ -16,7 +16,7 @@ namespace LumiSoft.Net.IMAP
         /// </summary>
         /// <param name="seqNo">Message sequence number.</param>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        public IMAP_Response_Expunge(int seqNo)
+        public IMAP_r_u_Expunge(int seqNo)
         {
             if(seqNo < 1){
                 throw new ArgumentException("Arguments 'seqNo' value must be >= 1.","seqNo");
@@ -34,7 +34,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="response">Expunge response string.</param>
         /// <returns>Returns parsed expunge response.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>response</b> is null reference.</exception>
-        public static IMAP_Response_Expunge Parse(string response)
+        public static IMAP_r_u_Expunge Parse(string response)
         {
             if(response == null){
                 throw new ArgumentNullException("response");
@@ -82,7 +82,7 @@ namespace LumiSoft.Net.IMAP
                 Example:    S: * 44 EXPUNGE
             */
                                                
-            return new IMAP_Response_Expunge(Convert.ToInt32(response.Split(' ')[1]));
+            return new IMAP_r_u_Expunge(Convert.ToInt32(response.Split(' ')[1]));
         }
 
         #endregion

@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP STATUS response. Defined in RFC 3501 7.2.4.
     /// </summary>
-    public class IMAP_Response_Status : IMAP_ResponseUntagged
+    public class IMAP_r_u_Status : IMAP_r_u
     {
         private string m_FolderName   = "";
         private int    m_MessageCount = 0;
@@ -27,7 +27,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="unseenCount">Unseen messages count.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> is null.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        public IMAP_Response_Status(string folder,int messagesCount,int recentCount,long uidNext,long folderUid,int unseenCount)
+        public IMAP_r_u_Status(string folder,int messagesCount,int recentCount,long uidNext,long folderUid,int unseenCount)
         {
             if(folder == null){
                 throw new ArgumentNullException("folder");
@@ -53,7 +53,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="response">Satatus response string.</param>
         /// <returns>Returns parsed STATUS response.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>response</b> is null reference.</exception>
-        public static IMAP_Response_Status Parse(string response)
+        public static IMAP_r_u_Status Parse(string response)
         {
             if(response == null){
                 throw new ArgumentNullException("response");
@@ -102,7 +102,7 @@ namespace LumiSoft.Net.IMAP
                 }
             }
 
-            return new IMAP_Response_Status(folder,messages,recent,uidNext,folderUid,unseen);
+            return new IMAP_r_u_Status(folder,messages,recent,uidNext,folderUid,unseen);
         }
 
         #endregion

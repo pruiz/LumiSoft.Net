@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP MYRIGHTS response. Defined in RFC 4314 3.7.
     /// </summary>
-    public class IMAP_Response_ListRights : IMAP_ResponseUntagged
+    public class IMAP_r_u_ListRights : IMAP_r_u
     {
         private string m_FolderName     = "";
         private string m_Identifier     = "";
@@ -23,7 +23,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="optionalRights">Optional rights.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> or <b>identifier</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        public IMAP_Response_ListRights(string folder,string identifier,string requiredRights,string optionalRights)
+        public IMAP_r_u_ListRights(string folder,string identifier,string requiredRights,string optionalRights)
         {
             if(folder == null){
                 throw new ArgumentNullException("folder");
@@ -53,7 +53,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="listRightsResponse">LISTRIGHTS response line.</param>
         /// <returns>Returns parsed LISTRIGHTS response.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>listRightsResponse</b> is null reference.</exception>
-        public static IMAP_Response_ListRights Parse(string listRightsResponse)
+        public static IMAP_r_u_ListRights Parse(string listRightsResponse)
         {
             if(listRightsResponse == null){
                 throw new ArgumentNullException("listRightsResponse");
@@ -97,7 +97,7 @@ namespace LumiSoft.Net.IMAP
             string reqRights  = r.ReadWord(true);
             string optRights  = r.ReadWord(true);
 
-            return new IMAP_Response_ListRights(folder,identifier,reqRights,optRights);
+            return new IMAP_r_u_ListRights(folder,identifier,reqRights,optRights);
         }
 
         #endregion

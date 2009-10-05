@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP CAPABILITY response. Defined in RFC 3501 7.2.1.
     /// </summary>
-    public class IMAP_Response_Capability : IMAP_ResponseUntagged
+    public class IMAP_r_u_Capability : IMAP_r_u
     {
         private string[] m_pCapabilities = null;
 
@@ -16,7 +16,7 @@ namespace LumiSoft.Net.IMAP
         /// </summary>
         /// <param name="capabilities">Capabilities list.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>capabilities</b> is null reference.</exception>
-        public IMAP_Response_Capability(string[] capabilities)
+        public IMAP_r_u_Capability(string[] capabilities)
         {
             if(capabilities == null){
                 throw new ArgumentNullException("capabilities");
@@ -34,7 +34,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="response">Capability response string.</param>
         /// <returns>Returns parsed CAPABILITY response.</returns>
         /// <exception cref="ArgumentNullException">Is riased when <b>response</b> is null reference.</exception>
-        public static IMAP_Response_Capability Parse(string response)
+        public static IMAP_r_u_Capability Parse(string response)
         {
             if(response == null){
                 throw new ArgumentNullException("response");
@@ -96,7 +96,7 @@ namespace LumiSoft.Net.IMAP
 
             string[] capabilities = r.ReadToEnd().Split(' ');
 
-            return new IMAP_Response_Capability(capabilities);
+            return new IMAP_r_u_Capability(capabilities);
         }
 
         #endregion

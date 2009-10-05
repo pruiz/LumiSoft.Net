@@ -5,10 +5,11 @@ using System.Text;
 namespace LumiSoft.Net.IMAP
 {
     /// <summary>
-    /// This class represents IMAP server untagged status(OK,NO,BAD,PREAUTH and BYE) response response. Defined in RFC 3501 7.1.
+    /// This class represents IMAP server status(OK,NO,BAD) response. Defined in RFC 3501 7.1.
     /// </summary>
-    public class IMAP_ResponseUntagged_ServerStatus : IMAP_ResponseUntagged
+    public class IMAP_r_ServerStatus : IMAP_r
     {
+        private string m_CommandTag           = "";
         private string m_ResponseCode         = "";
         private string m_OptionalResponseCode = null;
         private string m_ResponseText         = "";
@@ -16,13 +17,20 @@ namespace LumiSoft.Net.IMAP
         /// <summary>
         /// Default constructor.
         /// </summary>
+        /// <param name="commandTag">Command tag.</param>
         /// <param name="responseCode">Response code.</param>
         /// <param name="optResponseCode">Optional response code(Response code between []).</param>
         /// <param name="responseText">Response text after response-code.</param>
-        /// <exception cref="ArgumentNullException">Is raised when <b>responseCode</b> or <b>responseText</b> is null reference.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>commandTag</b>,<b>responseCode</b> or <b>responseText</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        public IMAP_ResponseUntagged_ServerStatus(string responseCode,string optResponseCode,string responseText)
+        public IMAP_r_ServerStatus(string commandTag,string responseCode,string optResponseCode,string responseText)
         {
+            if(commandTag == null){
+                throw new ArgumentNullException("commandTag");
+            }
+            if(commandTag == string.Empty){
+                throw new ArgumentException("The argument 'commandTag' value must be specified.","commandTag");
+            }
             if(responseCode == null){
                 throw new ArgumentNullException("responseCode");
             }
@@ -36,6 +44,7 @@ namespace LumiSoft.Net.IMAP
                 throw new ArgumentException("The argument 'responseText' value must be specified.","responseText");
             }
 
+            m_CommandTag           = commandTag;
             m_ResponseCode         = responseCode;
             m_OptionalResponseCode = optResponseCode;
             m_ResponseText         = responseText;
@@ -50,7 +59,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="responseLine">Response line.</param>
         /// <returns>Returns parsed IMAP command completion status response.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>responseLine</b> is null reference value.</exception>
-        public static IMAP_ResponseUntagged_ServerStatus Parse(string responseLine)
+        public static IMAP_r_ServerStatus Parse(string responseLine)
         {
             if(responseLine == null){
                 throw new ArgumentNullException("responseLine");
@@ -69,7 +78,7 @@ namespace LumiSoft.Net.IMAP
                 responseText    = r.ReadToEnd();
             }
 
-            return new IMAP_ResponseUntagged_ServerStatus(responseCode,optResponseCode,responseText);
+            return new IMAP_r_ServerStatus(commandTag,responseCode,optResponseCode,responseText);
         }
 
         #endregion
@@ -78,7 +87,15 @@ namespace LumiSoft.Net.IMAP
         #region Properties implementation
 
         /// <summary>
-        /// Gets IMAP server status response code(OK,NO,BAD,PREAUTH,BYE).
+        /// Gets command tag.
+        /// </summary>
+        public string CommandTag
+        {
+            get{ return m_CommandTag; }
+        }
+
+        /// <summary>
+        /// Gets IMAP server status response code(OK,NO,BAD).
         /// </summary>
         public string ResponseCode
         {

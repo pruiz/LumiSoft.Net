@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP NAMESPACE response. Defined in RFC 2342 5.
     /// </summary>
-    public class IMAP_Response_Namespace : IMAP_ResponseUntagged
+    public class IMAP_r_u_Namespace : IMAP_r_u
     {
         private IMAP_Namespace_Entry[] m_pPersonalNamespaces   = null;
         private IMAP_Namespace_Entry[] m_pOtherUsersNamespaces = null;
@@ -20,7 +20,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="otherUsersNamespaces">Other users namespaces.</param>
         /// <param name="sharedNamespaces">Shared users namespaces.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>personalNamespaces</b>,<b>otherUsersNamespaces</b> or <b>sharedNamespaces</b> is null reference.</exception>
-        public IMAP_Response_Namespace(IMAP_Namespace_Entry[] personalNamespaces,IMAP_Namespace_Entry[] otherUsersNamespaces,IMAP_Namespace_Entry[] sharedNamespaces)
+        public IMAP_r_u_Namespace(IMAP_Namespace_Entry[] personalNamespaces,IMAP_Namespace_Entry[] otherUsersNamespaces,IMAP_Namespace_Entry[] sharedNamespaces)
         {
             if(personalNamespaces == null){
                 throw new ArgumentNullException("personalNamespaces");
@@ -46,7 +46,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="response">NAMESPACE response string.</param>
         /// <returns>Returns parsed NAMESPACE response.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>response</b> is null reference.</exception>
-        public static IMAP_Response_Namespace Parse(string response)
+        public static IMAP_r_u_Namespace Parse(string response)
         {
             if(response == null){
                 throw new ArgumentNullException("response");
@@ -128,7 +128,7 @@ namespace LumiSoft.Net.IMAP
                 r.ReadWord();
             }
 
-            return new IMAP_Response_Namespace(personal.ToArray(),other.ToArray(),shared.ToArray());
+            return new IMAP_r_u_Namespace(personal.ToArray(),other.ToArray(),shared.ToArray());
         }
 
         #endregion

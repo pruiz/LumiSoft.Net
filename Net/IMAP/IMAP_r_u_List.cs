@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP LIST response. Defined in RFC 3501 7.2.2.
     /// </summary>
-    public class IMAP_Response_List : IMAP_ResponseUntagged
+    public class IMAP_r_u_List : IMAP_r_u
     {
         private string   m_FolderName        = "";
         private char     m_Delimiter         = '/';
@@ -21,7 +21,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="attributes">Folder attributes.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        public IMAP_Response_List(string folder,char delimiter,string[] attributes)
+        public IMAP_r_u_List(string folder,char delimiter,string[] attributes)
         {
             if(folder == null){
                 throw new ArgumentNullException("folder");
@@ -43,7 +43,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="listResponse">List response string.</param>
         /// <returns>Returns parsed list response.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>listResponse</b> is null reference.</exception>
-        public static IMAP_Response_List Parse(string listResponse)
+        public static IMAP_r_u_List Parse(string listResponse)
         {
             if(listResponse == null){
                 throw new ArgumentNullException("listResponse");
@@ -106,7 +106,7 @@ namespace LumiSoft.Net.IMAP
             string delimiter  = r.ReadWord();
             string folder     = TextUtils.UnQuoteString(IMAP_Utils.Decode_IMAP_UTF7_String(r.ReadToEnd().Trim()));
 
-            return new IMAP_Response_List(folder,delimiter[0],attributes == string.Empty ? new string[0] : attributes.Split(' '));
+            return new IMAP_r_u_List(folder,delimiter[0],attributes == string.Empty ? new string[0] : attributes.Split(' '));
         }
 
         #endregion

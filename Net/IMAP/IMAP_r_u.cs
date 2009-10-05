@@ -5,9 +5,9 @@ using System.Text;
 namespace LumiSoft.Net.IMAP
 {
     /// <summary>
-    /// This is base class for any IMAP server response.
+    /// This class is base class for IMAP server untagged responses.
     /// </summary>
-    public abstract class IMAP_Response
+    public abstract class IMAP_r_u : IMAP_r
     {
     }
 }

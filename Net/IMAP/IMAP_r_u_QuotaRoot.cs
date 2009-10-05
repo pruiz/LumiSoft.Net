@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP QUOTAROOT response. Defined in RFC 2087 5.2.
     /// </summary>
-    public class IMAP_Response_QuotaRoot : IMAP_ResponseUntagged
+    public class IMAP_r_u_QuotaRoot : IMAP_r_u
     {
         private string   m_FolderName = "";
         private string[] m_QuotaRoots = null;
@@ -19,7 +19,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="quotaRoots">Quota roots.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> or <b>quotaRoots</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        public IMAP_Response_QuotaRoot(string folder,string[] quotaRoots)
+        public IMAP_r_u_QuotaRoot(string folder,string[] quotaRoots)
         {
             if(folder == null){
                 throw new ArgumentNullException("folder");
@@ -44,7 +44,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="response">QUOTAROOT response string.</param>
         /// <returns>Returns parsed QUOTAROOT response.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>response</b> is null reference.</exception>
-        public static IMAP_Response_QuotaRoot Parse(string response)
+        public static IMAP_r_u_QuotaRoot Parse(string response)
         {
             if(response == null){
                 throw new ArgumentNullException("response");
@@ -80,7 +80,7 @@ namespace LumiSoft.Net.IMAP
                 }
             }
 
-            return new IMAP_Response_QuotaRoot(folderName,quotaRoots.ToArray());
+            return new IMAP_r_u_QuotaRoot(folderName,quotaRoots.ToArray());
         }
 
         #endregion

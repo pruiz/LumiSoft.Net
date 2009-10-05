@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP QUOTA response. Defined in RFC 2087 5.1.
     /// </summary>
-    public class IMAP_Response_Quota : IMAP_ResponseUntagged
+    public class IMAP_r_u_Quota : IMAP_r_u
     {
         private string             m_QuotaRootName = "";
         private IMAP_Quota_Entry[] m_pEntries      = null;
@@ -18,7 +18,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="quotaRootName">Qouta root name.</param>
         /// <param name="entries">Resource limit entries.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>quotaRootName</b> or <b>entries</b> is null reference.</exception>
-        public IMAP_Response_Quota(string quotaRootName,IMAP_Quota_Entry[] entries)
+        public IMAP_r_u_Quota(string quotaRootName,IMAP_Quota_Entry[] entries)
         {
             if(quotaRootName == null){
                 throw new ArgumentNullException("quotaRootName");
@@ -40,7 +40,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="response">QUOTA response string.</param>
         /// <returns>Returns parsed QUOTA response.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>response</b> is null reference.</exception>
-        public static IMAP_Response_Quota Parse(string response)
+        public static IMAP_r_u_Quota Parse(string response)
         {
             if(response == null){
                 throw new ArgumentNullException("response");
@@ -79,7 +79,7 @@ namespace LumiSoft.Net.IMAP
                 entries.Add(new IMAP_Quota_Entry(items[i],Convert.ToInt64(items[i + 1]),Convert.ToInt64(items[i + 2])));
             }
 
-            return new IMAP_Response_Quota(name,entries.ToArray());
+            return new IMAP_r_u_Quota(name,entries.ToArray());
         }
 
         #endregion
