@@ -5,7 +5,7 @@ using System.Text;
 namespace LumiSoft.Net.POP3.Server
 {
     /// <summary>
-    /// This class provides data for <b cref="POP3_Session.Started">SMTP_Session.Started</b> event.
+    /// This class provides data for <b cref="POP3_Session.Started">POP3_Session.Started</b> event.
     /// </summary>
     public class POP3_e_Started : EventArgs
     {
