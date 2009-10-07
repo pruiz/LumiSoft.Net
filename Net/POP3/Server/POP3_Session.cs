@@ -12,7 +12,7 @@ using LumiSoft.Net.AUTH;
 namespace LumiSoft.Net.POP3.Server
 {
     /// <summary>
-    /// This class implements POP3 session. Defined RFC 1939.
+    /// This class implements POP3 server session. Defined RFC 1939.
     /// </summary>
     public class POP3_Session : TCP_ServerSession
     {
@@ -705,7 +705,7 @@ namespace LumiSoft.Net.POP3.Server
                 return;
             }
             if(!this.IsAuthenticated){
-                this.TcpStream.WriteLine("-ERR Authentication required.");
+                WriteLine("-ERR Authentication required.");
 
                 return;
             }
@@ -765,7 +765,7 @@ namespace LumiSoft.Net.POP3.Server
                 return;
             }
             if(!this.IsAuthenticated){
-                this.TcpStream.WriteLine("-ERR Authentication required.");
+                WriteLine("-ERR Authentication required.");
 
                 return;
             }
@@ -858,7 +858,7 @@ namespace LumiSoft.Net.POP3.Server
                 return;
             }
             if(!this.IsAuthenticated){
-                this.TcpStream.WriteLine("-ERR Authentication required.");
+                WriteLine("-ERR Authentication required.");
 
                 return;
             }
@@ -951,7 +951,7 @@ namespace LumiSoft.Net.POP3.Server
                 return;
             }
             if(!this.IsAuthenticated){
-                this.TcpStream.WriteLine("-ERR Authentication required.");
+                WriteLine("-ERR Authentication required.");
 
                 return;
             }
@@ -1027,7 +1027,7 @@ namespace LumiSoft.Net.POP3.Server
                 return;
             }
             if(!this.IsAuthenticated){
-                this.TcpStream.WriteLine("-ERR Authentication required.");
+                WriteLine("-ERR Authentication required.");
 
                 return;
             }
@@ -1104,7 +1104,7 @@ namespace LumiSoft.Net.POP3.Server
                 return;
             }
             if(!this.IsAuthenticated){
-                this.TcpStream.WriteLine("-ERR Authentication required.");
+                WriteLine("-ERR Authentication required.");
 
                 return;
             }
@@ -1151,7 +1151,7 @@ namespace LumiSoft.Net.POP3.Server
                 return;
             }
             if(!this.IsAuthenticated){
-                this.TcpStream.WriteLine("-ERR Authentication required.");
+                WriteLine("-ERR Authentication required.");
 
                 return;
             }
@@ -1178,7 +1178,7 @@ namespace LumiSoft.Net.POP3.Server
                 return;
             }
             if(!this.IsAuthenticated){
-                this.TcpStream.WriteLine("-ERR Authentication required.");
+                WriteLine("-ERR Authentication required.");
 
                 return;
             }
@@ -1401,7 +1401,7 @@ namespace LumiSoft.Net.POP3.Server
         #region Properties implementation
 
         /// <summary>
-        /// Gets session owner SMTP server.
+        /// Gets session owner POP3 server.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
         public new POP3_Server Server
@@ -1431,7 +1431,7 @@ namespace LumiSoft.Net.POP3.Server
         }
 
         /// <summary>
-        /// Gets number of bad commands happened on SMTP session.
+        /// Gets number of bad commands happened on POP3 session.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
         public int BadCommands
