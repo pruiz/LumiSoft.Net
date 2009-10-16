@@ -3143,7 +3143,7 @@ namespace LumiSoft.Net.IMAP.Client
                 }
                 // Command continuation response.
                 else if(responseLine.StartsWith("+")){
-                    return new IMAP_r_ServerStatus("+","+","","+");
+                    return new IMAP_r_ServerStatus("+","+",null,null,"+");
                 }
                 // Completion status response.
                 else{
