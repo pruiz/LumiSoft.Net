@@ -12,6 +12,7 @@ namespace LumiSoft.Net.IMAP
         private string m_CommandTag           = "";
         private string m_ResponseCode         = "";
         private string m_OptionalResponseCode = null;
+        private string m_OptionalResponseArgs = null;
         private string m_ResponseText         = "";
 
         /// <summary>
@@ -20,10 +21,11 @@ namespace LumiSoft.Net.IMAP
         /// <param name="commandTag">Command tag.</param>
         /// <param name="responseCode">Response code.</param>
         /// <param name="optResponseCode">Optional response code(Response code between []).</param>
+        /// <param name="optResponseArgs">Optional response arguments string.</param>
         /// <param name="responseText">Response text after response-code.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>commandTag</b>,<b>responseCode</b> or <b>responseText</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        public IMAP_r_ServerStatus(string commandTag,string responseCode,string optResponseCode,string responseText)
+        public IMAP_r_ServerStatus(string commandTag,string responseCode,string optResponseCode,string optResponseArgs,string responseText)
         {
             if(commandTag == null){
                 throw new ArgumentNullException("commandTag");
@@ -47,6 +49,7 @@ namespace LumiSoft.Net.IMAP
             m_CommandTag           = commandTag;
             m_ResponseCode         = responseCode;
             m_OptionalResponseCode = optResponseCode;
+            m_OptionalResponseArgs = optResponseArgs;
             m_ResponseText         = responseText;
         }
 
@@ -69,16 +72,46 @@ namespace LumiSoft.Net.IMAP
             string   commandTag      = parts[0];
             string   responseCode    = parts[1];
             string   optResponseCode = null;
+            string   optResponseArgs = null;
             string   responseText    = parts[2];
 
             // Optional status code.
             if(parts[2].StartsWith("[")){
                 StringReader r = new StringReader(parts[2]);
-                optResponseCode = r.ReadParenthesized();
+                string[] code_args = r.ReadParenthesized().Split(new char[]{' '},2);
+                optResponseCode = code_args[0];
+                if(code_args.Length == 2){
+                    optResponseArgs = code_args[1];
+                }
                 responseText    = r.ReadToEnd();
             }
 
-            return new IMAP_r_ServerStatus(commandTag,responseCode,optResponseCode,responseText);
+            return new IMAP_r_ServerStatus(commandTag,responseCode,optResponseCode,optResponseArgs,responseText);
+        }
+
+        #endregion
+
+
+        #region override method ToString
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString()
+        {
+            StringBuilder retVal = new StringBuilder();
+            retVal.Append(m_CommandTag + " " + m_ResponseCode + " ");
+            if(!string.IsNullOrEmpty(m_OptionalResponseCode)){
+                retVal.Append("[" + m_OptionalResponseCode);
+                if(!string.IsNullOrEmpty(m_OptionalResponseArgs)){
+                    retVal.Append(" " + m_OptionalResponseArgs);
+                }
+                retVal.Append("] ");
+            }
+            retVal.Append(m_ResponseText + "\r\n");
+
+            return retVal.ToString();
         }
 
         #endregion
@@ -110,6 +143,14 @@ namespace LumiSoft.Net.IMAP
         public string OptionalResponseCode
         {
             get{ return m_OptionalResponseCode; }
+        }
+
+        /// <summary>
+        /// Gets optional response aruments string. Value null means not specified. For more info see RFC 3501 7.1.
+        /// </summary>
+        public string OptionalResponseArgs
+        {
+            get{ return m_OptionalResponseArgs; }
         }
 
         /// <summary>
