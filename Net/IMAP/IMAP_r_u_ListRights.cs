@@ -29,13 +29,13 @@ namespace LumiSoft.Net.IMAP
                 throw new ArgumentNullException("folder");
             }
             if(folder == string.Empty){
-                throw new ArgumentException("Argument 'folder' name msut be specified.","folder");
+                throw new ArgumentException("Argument 'folder' name must be specified.","folder");
             }
             if(identifier == null){
                 throw new ArgumentNullException("identifier");
             }
             if(identifier == string.Empty){
-                throw new ArgumentException("Argument 'identifier' name msut be specified.","identifier");
+                throw new ArgumentException("Argument 'identifier' name must be specified.","identifier");
             }
 
             m_FolderName     = folder;
@@ -98,6 +98,25 @@ namespace LumiSoft.Net.IMAP
             string optRights  = r.ReadWord(true);
 
             return new IMAP_r_u_ListRights(folder,identifier,reqRights,optRights);
+        }
+
+        #endregion
+
+
+        #region override method ToString
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString()
+        {
+            // Example:    S: * LISTRIGHTS ~/Mail/saved smith la r swicdkxte
+
+            StringBuilder retVal = new StringBuilder();
+            retVal.Append("* LISTRIGHTS \"" + m_FolderName + "\" \"" + m_RequiredRights + "\" " + m_OptionalRights + "\r\n");
+            
+            return retVal.ToString();
         }
 
         #endregion
