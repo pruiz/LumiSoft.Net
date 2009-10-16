@@ -83,6 +83,29 @@ namespace LumiSoft.Net.IMAP
         #endregion
 
 
+        #region override method ToString
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString()
+        {
+            // Example:    S: * ACL INBOX Fred rwipslda test rwipslda
+
+            StringBuilder retVal = new StringBuilder();
+            retVal.Append("* ACL \"" + m_FolderName + "\"");
+            foreach(IMAP_Acl_Entry e in m_pEntries){
+                retVal.Append(" \"" + e.Identifier + "\" \"" + e.Rights + "\"");
+            }
+            retVal.Append("\r\n");
+
+            return retVal.ToString();
+        }
+
+        #endregion
+
+
         #region Properties implementation
 
         /// <summary>
