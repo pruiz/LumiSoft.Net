@@ -112,6 +112,36 @@ namespace LumiSoft.Net.IMAP
         #endregion
 
 
+        #region override method ToString
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString()
+        {
+            // Example:    S: * LIST (\Noselect) "/" ~/Mail/foo
+
+            StringBuilder retVal = new StringBuilder();
+            retVal.Append("* LIST (");
+            if(m_pFolderAttributes != null){
+                for(int i=0;i<m_pFolderAttributes.Length;i++){
+                    if(i > 0){
+                        retVal.Append(" ");
+                    }
+                    retVal.Append(m_pFolderAttributes[i]);
+                }
+            }
+            retVal.Append(") ");
+            retVal.Append("\"" + m_Delimiter + "\" ");
+            retVal.Append("\"" + m_FolderName + "\"\r\n");
+
+            return retVal.ToString();
+        }
+
+        #endregion
+
+
         #region Properties implementation
 
         /// <summary>
