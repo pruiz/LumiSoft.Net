@@ -31,7 +31,7 @@ namespace LumiSoft.Net.IMAP
                 throw new ArgumentNullException("rights");
             }
 
-            m_Identifier = m_Rights;
+            m_Identifier = identifier;
             m_Rights     = rights;
         }
 
