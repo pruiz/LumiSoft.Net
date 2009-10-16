@@ -135,7 +135,7 @@ namespace LumiSoft.Net.IMAP
             DateTime date = DateTime.MinValue;
             string dateS = fetchReader.ReadString();            
             if(dateS != null){
-                date = IMAP_Utils.ParseDate(dateS);
+                date = MIME_Utils.ParseRfc2822DateTime(dateS);
             }
 
             // Read "subject".
@@ -202,7 +202,7 @@ namespace LumiSoft.Net.IMAP
                 non-NIL, this is a start of group marker, and the mailbox name
                 field holds the group name phrase.
             */
-
+            
             fetchReader.GetReader().ReadToFirstChar();
             if(fetchReader.GetReader().StartsWith("NIL",false)){
                 fetchReader.GetReader().ReadWord();
