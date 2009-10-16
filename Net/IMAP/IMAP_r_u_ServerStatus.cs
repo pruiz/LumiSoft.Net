@@ -21,7 +21,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="optResponseCode">Optional response code(Response code between []).</param>
         /// <param name="optResponseArgs">Optional response arguments string.</param>
         /// <param name="responseText">Response text after response-code.</param>
-        /// <exception cref="ArgumentNullException">Is raised when <b>responseCode</b> or <b>responseText</b> is null reference.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>responseCode</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         public IMAP_r_u_ServerStatus(string responseCode,string optResponseCode,string optResponseArgs,string responseText)
         {
@@ -30,12 +30,6 @@ namespace LumiSoft.Net.IMAP
             }
             if(responseCode == string.Empty){
                 throw new ArgumentException("The argument 'responseCode' value must be specified.","responseCode");
-            }
-            if(responseText == null){
-                throw new ArgumentNullException("responseText");
-            }
-            if(responseText == string.Empty){
-                throw new ArgumentException("The argument 'responseText' value must be specified.","responseText");
             }
 
             m_ResponseCode         = responseCode;
@@ -98,9 +92,9 @@ namespace LumiSoft.Net.IMAP
                 if(!string.IsNullOrEmpty(m_OptionalResponseArgs)){
                     retVal.Append(" " + m_OptionalResponseArgs);
                 }
-                retVal.Append("]");
+                retVal.Append("] ");
             }
-            retVal.Append(" " + m_ResponseText + "\r\n");
+            retVal.Append(m_ResponseText + "\r\n");
 
             return retVal.ToString();
         }

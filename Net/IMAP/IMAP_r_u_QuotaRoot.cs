@@ -86,6 +86,29 @@ namespace LumiSoft.Net.IMAP
         #endregion
 
 
+        #region override method ToString
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString()
+        {
+            // Example:    S: * QUOTAROOT INBOX ""
+
+            StringBuilder retVal = new StringBuilder();
+            retVal.Append("* QUOTAROOT \"" + m_FolderName + "\"");
+            foreach(string root in m_QuotaRoots){
+                retVal.Append(" \"" + root + "\"");
+            }
+            retVal.Append("\r\n");
+
+            return retVal.ToString();
+        }
+
+        #endregion
+
+
         #region Properties implementation
 
         /// <summary>

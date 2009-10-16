@@ -82,6 +82,25 @@ namespace LumiSoft.Net.IMAP
         #endregion
 
 
+        #region override method ToString
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString()
+        {
+            // Example:    S: * MYRIGHTS INBOX rwiptsldaex
+
+            StringBuilder retVal = new StringBuilder();
+            retVal.Append("* MYRIGHTS \"" + m_FolderName + "\" \"" + new String(m_pRights.ToArray()) + "\"\r\n");
+
+            return retVal.ToString();
+        }
+
+        #endregion
+
+
         #region Properties implementation
 
         /// <summary>

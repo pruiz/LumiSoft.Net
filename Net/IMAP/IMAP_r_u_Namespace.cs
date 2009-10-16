@@ -19,17 +19,11 @@ namespace LumiSoft.Net.IMAP
         /// <param name="personalNamespaces">Personal namespaces.</param>
         /// <param name="otherUsersNamespaces">Other users namespaces.</param>
         /// <param name="sharedNamespaces">Shared users namespaces.</param>
-        /// <exception cref="ArgumentNullException">Is raised when <b>personalNamespaces</b>,<b>otherUsersNamespaces</b> or <b>sharedNamespaces</b> is null reference.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>personalNamespaces</b> is null reference.</exception>
         public IMAP_r_u_Namespace(IMAP_Namespace_Entry[] personalNamespaces,IMAP_Namespace_Entry[] otherUsersNamespaces,IMAP_Namespace_Entry[] sharedNamespaces)
         {
             if(personalNamespaces == null){
                 throw new ArgumentNullException("personalNamespaces");
-            }
-            if(otherUsersNamespaces == null){
-                throw new ArgumentNullException("otherUsersNamespaces");
-            }
-            if(sharedNamespaces == null){
-                throw new ArgumentNullException("sharedNamespaces");
             }
 
             m_pPersonalNamespaces   = personalNamespaces;
@@ -129,6 +123,62 @@ namespace LumiSoft.Net.IMAP
             }
 
             return new IMAP_r_u_Namespace(personal.ToArray(),other.ToArray(),shared.ToArray());
+        }
+
+        #endregion
+
+
+        #region override method ToString
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString()
+        {
+            // Example:    S: * NAMESPACE (("" "/")) NIL (("Public Folders/" "/"))
+
+            StringBuilder retVal = new StringBuilder();
+            retVal.Append("* NAMESPACE (");
+            if(m_pPersonalNamespaces != null && m_pPersonalNamespaces.Length > 0){
+                for(int i=0;i<m_pPersonalNamespaces.Length;i++){
+                    if(i > 0){
+                        retVal.Append(" ");
+                    }
+                    retVal.Append("(\"" + m_pPersonalNamespaces[i].NamespaceName + "\" \"" + m_pPersonalNamespaces[i].HierarchyDelimiter + "\")");
+                }
+            }
+            else{
+                retVal.Append("NIL");
+            }
+            retVal.Append(" ");
+            if(m_pOtherUsersNamespaces != null && m_pOtherUsersNamespaces.Length > 0){
+                for(int i=0;i<m_pOtherUsersNamespaces.Length;i++){
+                    if(i > 0){
+                        retVal.Append(" ");
+                    }
+                    retVal.Append("(\"" + m_pOtherUsersNamespaces[i].NamespaceName + "\" \"" + m_pOtherUsersNamespaces[i].HierarchyDelimiter + "\")");
+                }
+            }
+            else{
+                retVal.Append("NIL");
+            }
+            retVal.Append(" ");
+            if(m_pSharedNamespaces != null && m_pSharedNamespaces.Length > 0){
+                for(int i=0;i<m_pSharedNamespaces.Length;i++){
+                    if(i > 0){
+                        retVal.Append(" ");
+                    }
+                    retVal.Append("(\"" + m_pSharedNamespaces[i].NamespaceName + "\" \"" + m_pSharedNamespaces[i].HierarchyDelimiter + "\")");
+                }
+            }
+            else{
+                retVal.Append("NIL");
+            }
+            retVal.Append(")\r\n");
+            
+
+            return retVal.ToString();
         }
 
         #endregion

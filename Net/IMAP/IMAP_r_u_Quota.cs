@@ -85,6 +85,32 @@ namespace LumiSoft.Net.IMAP
         #endregion
 
 
+        #region override method ToString
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString()
+        {
+            // Example:    S: * QUOTA "" (STORAGE 10 512)
+
+            StringBuilder retVal = new StringBuilder();
+            retVal.Append("* QUOTA \"" + m_QuotaRootName + "\" (");
+            for(int i=0;i<m_pEntries.Length;i++){
+                if(i > 0){
+                    retVal.Append(" ");
+                }
+                retVal.Append(m_pEntries[i].ResourceName + " " + m_pEntries[i].CurrentUsage + " " + m_pEntries[i].MaxUsage);
+            }
+            retVal.Append(")\r\n");
+
+            return retVal.ToString();
+        }
+
+        #endregion
+
+
         #region Properties impelemntation
 
         /// <summary>
