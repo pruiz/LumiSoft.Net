@@ -71,7 +71,7 @@ namespace LumiSoft.Net.MIME
             if(field == null){
                 throw new ArgumentNullException("field");
             }
-
+   
             MIME_h h = m_pProvider.Parse(field);
             m_pFields.Add(h);
             m_IsModified = true;
@@ -444,7 +444,7 @@ namespace LumiSoft.Net.MIME
                         currentHeader.Append(line);
                     }
                 }
-            }            
+            }        
         }
 
         #endregion
