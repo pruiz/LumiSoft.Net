@@ -83,13 +83,13 @@ namespace LumiSoft.Net.Mail
             Mail_h_MailboxList retVal = new Mail_h_MailboxList(name_value[0],new Mail_t_MailboxList());
 
             while(true){
-                string word = r.QuotedReadToDelimiter(new char[]{',','<',':'});
+                string word = r.QuotedReadToDelimiter(new char[]{',','<'});
                 // We processed all data.
-                if(word == null && r.Available == 0){
+                if(string.IsNullOrEmpty(word) && r.Available == 0){
                     break;
                 }
                 // name-addr
-                else if(r.Peek(true) == '<'){//Console.WriteLine("aaa:'" + r.ReadParenthesized() + "'");
+                else if(r.Peek(true) == '<'){
                     retVal.m_pAddresses.Add(new Mail_t_Mailbox(word != null ? MIME_Encoding_EncodedWord.DecodeS(TextUtils.UnQuoteString(word.Trim())) : null,r.ReadParenthesized()));                    
                 }
                 // addr-spec
