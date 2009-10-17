@@ -53,7 +53,7 @@ namespace LumiSoft.Net.MIME
             }
             else{
                 try{
-                    if(m_pHeadrFields.ContainsKey(name)){
+                    if(m_pHeadrFields.ContainsKey(name)){ 
                         headerField = (MIME_h)m_pHeadrFields[name].GetMethod("Parse").Invoke(null,new object[]{field});
                     }
                     else{
