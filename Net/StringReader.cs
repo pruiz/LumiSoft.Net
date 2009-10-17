@@ -130,46 +130,53 @@ namespace LumiSoft.Net
 		{
 			StringBuilder currentSplitBuffer = new StringBuilder(); // Holds active
 			bool          inQuotedString     = false;               // Holds flag if position is quoted string or not
-			char          lastChar           = (char)0;
+            bool          doEscape           = false;
 
 			for(int i=0;i<m_SourceString.Length;i++){
 				char c = m_SourceString[i];
 
-				// Skip escaped(\) "
-				if(lastChar != '\\' && c == '\"'){
-					// Start/end quoted string area
-					inQuotedString = !inQuotedString;
-				}
-			
-                // See if char is delimiter
-                bool isDelimiter = false;
-                foreach(char delimiter in delimiters){
-                    if(c == delimiter){
-                        isDelimiter = true;
-                        break;
-                    }
+                if(doEscape){
+                    currentSplitBuffer.Append(c);
+                    doEscape = false;
                 }
-
-				// Current char is split char and it isn't in quoted string, do split
-				if(!inQuotedString && isDelimiter){
-					string retVal = currentSplitBuffer.ToString();
-                                        
-					// Remove readed string + delimiter from source string
-                    if(removeDelimiter){
-					    m_SourceString = m_SourceString.Substring(retVal.Length + 1);
+                else if(c == '\\'){
+                    currentSplitBuffer.Append(c);
+                    doEscape = true;
+                }
+                else{
+                    // Start/end quoted string area
+				    if(c == '\"'){					
+					    inQuotedString = !inQuotedString;
+				    }
+			
+                    // See if char is delimiter
+                    bool isDelimiter = false;
+                    foreach(char delimiter in delimiters){
+                        if(c == delimiter){
+                            isDelimiter = true;
+                            break;
+                        }
                     }
-                    // Remove readed string
-                    else{
-                        m_SourceString = m_SourceString.Substring(retVal.Length);
-                    }
 
-					return retVal;
-				}
-				else{
-					currentSplitBuffer.Append(c);
-				}
+				    // Current char is split char and it isn't in quoted string, do split
+				    if(!inQuotedString && isDelimiter){
+					    string retVal = currentSplitBuffer.ToString();
+                                
+					    // Remove readed string + delimiter from source string
+                        if(removeDelimiter){
+					        m_SourceString = m_SourceString.Substring(i + 1);
+                        }
+                        // Remove readed string
+                        else{
+                            m_SourceString = m_SourceString.Substring(i); 
+                        }
 
-				lastChar = c;
+					    return retVal;
+				    }
+				    else{
+					    currentSplitBuffer.Append(c);
+				    }
+                }				
 			}
 
 			// If we reached so far then we are end of string, return it
