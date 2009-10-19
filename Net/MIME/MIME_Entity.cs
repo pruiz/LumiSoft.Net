@@ -154,7 +154,7 @@ namespace LumiSoft.Net.MIME
         /// <param name="headerEncoding">Header reading encoding. If not sure UTF-8 is recommended.</param>
         /// <param name="defaultContentType">Default content type.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>stream</b>,<b>headerEncoding</b> or <b>defaultContentType</b> is null reference.</exception>
-        internal void Parse(SmartStream stream,Encoding headerEncoding,MIME_h_ContentType defaultContentType)
+        internal protected void Parse(SmartStream stream,Encoding headerEncoding,MIME_h_ContentType defaultContentType)
         {
             if(stream == null){
                 throw new ArgumentNullException("stream");
