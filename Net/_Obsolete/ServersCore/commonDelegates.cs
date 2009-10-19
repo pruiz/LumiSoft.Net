@@ -12,6 +12,7 @@ namespace LumiSoft.Net
 	/// <summary>
 	/// To be supplied.
 	/// </summary>
+    [Obsolete("Get rid of it.")]
 	public delegate void LogEventHandler(object sender,Log_EventArgs e);
 
 

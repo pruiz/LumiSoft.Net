@@ -16,6 +16,7 @@ namespace LumiSoft.Net.SMTP.Client
 	/// <summary>
 	/// Is called when asynchronous command had completed.
 	/// </summary>
+    [Obsolete("Get rid of it.")]
 	public delegate void CommadCompleted(SocketCallBackResult result,Exception exception);
 
 	/// <summary>

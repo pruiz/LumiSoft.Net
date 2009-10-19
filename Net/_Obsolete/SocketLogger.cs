@@ -12,6 +12,7 @@ namespace LumiSoft.Net
 	/// <summary>
 	/// Socket logger.
 	/// </summary>
+    [Obsolete("Get rid of it.")]
 	public class SocketLogger
 	{
 		private Socket               m_pSocket         = null;

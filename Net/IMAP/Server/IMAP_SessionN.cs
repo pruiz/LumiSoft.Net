@@ -1,0 +1,3344 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+using System.IO;
+using System.Net.Sockets;
+using System.Security.Principal;
+
+using LumiSoft.Net.IO;
+using LumiSoft.Net.TCP;
+using LumiSoft.Net.AUTH;
+
+namespace LumiSoft.Net.IMAP.Server
+{
+    /// <summary>
+    /// This class implements IMAP server session. Defined RFC 3501.
+    /// </summary>
+    public class IMAP_SessionN : TCP_ServerSession
+    {
+        private Dictionary<string,AUTH_SASL_ServerMechanism> m_pAuthentications = null;
+        private bool                                         m_SessionRejected  = false;
+        private int                                          m_BadCommands      = 0;
+        private List<string>                                 m_pCapabilities    = null;
+        private char                                         m_FolderSeparator  = '/';
+        private GenericIdentity                              m_pUser            = null;
+        private string                                       m_SelectedFolder   = null;
+
+        /// <summary>
+        /// Default constructor.
+        /// </summary>
+        public IMAP_SessionN()
+        {
+            m_pAuthentications = new Dictionary<string,AUTH_SASL_ServerMechanism>(StringComparer.CurrentCultureIgnoreCase);
+
+            m_pCapabilities = new List<string>();
+            m_pCapabilities.AddRange(new string[]{"IMAP4rev1","NAMESPACE","QUOTA","ACL"});
+        }
+
+
+        #region override method Start
+
+        /// <summary>
+        /// Starts session processing.
+        /// </summary>
+        protected internal override void Start()
+        {
+            base.Start();
+
+            /* RFC 3501 7.1.1. Greeting text.
+                The untagged form is also used as one of three possible greetings
+                at connection startup.  It indicates that the connection is not
+                yet authenticated and that a LOGIN command is needed.
+
+                Example:    S: * OK IMAP4rev1 server ready
+                            C: A001 LOGIN fred blurdybloop
+                            S: * OK [ALERT] System shutdown in 10 minutes
+                            S: A001 OK LOGIN Completed
+            */
+            
+            try{
+                IMAP_r_u_ServerStatus response = null;
+                if(string.IsNullOrEmpty(this.Server.GreetingText)){
+                    response = new IMAP_r_u_ServerStatus("OK",null,null,"<" + Net_Utils.GetLocalHostName(this.LocalHostName) + "> IMAP4rev1 server ready.");
+                }
+                else{
+                    response = new IMAP_r_u_ServerStatus("OK",null,null,this.Server.GreetingText);
+                }
+                
+                IMAP_e_Started e = OnStarted(response);
+
+                if(e.Response != null){
+                    WriteLine(response.ToString());
+                }
+
+                // Setup rejected flag, so we respond "* NO Session rejected." any command except QUIT.
+                if(e.Response == null || e.Response.ResponseCode.Equals("NO",StringComparison.InvariantCultureIgnoreCase)){
+                    m_SessionRejected = true;
+                }
+                               
+                BeginReadCmd();
+            }
+            catch(Exception x){
+                OnError(x);
+            }
+        }
+
+        #endregion
+
+        #region override method OnError
+
+        /// <summary>
+        /// Is called when session has processing error.
+        /// </summary>
+        /// <param name="x">Exception happened.</param>
+        protected override void OnError(Exception x)
+        {
+            if(this.IsDisposed){
+                return;
+            }
+            if(x == null){
+                return;
+            }
+
+            /* Error handling:
+                IO and Socket exceptions are permanent, so we must end session.
+            */
+
+            try{
+                LogAddText("Exception: " + x.Message);
+
+                // Permanent error.
+                if(x is IOException || x is SocketException){
+                    Dispose();
+                }
+                // xxx error, may be temporary.
+                else{
+                    base.OnError(x);
+
+                    // Try to send "* BAD Internal server error."
+                    try{
+                        WriteLine("* BAD Internal server error.");
+                    }
+                    catch{
+                        // Error is permanent.
+                        Dispose();
+                    }
+                }
+            }
+            catch{
+            }
+        }
+
+        #endregion
+
+        #region override method OnTimeout
+
+        /// <summary>
+        /// This method is called when specified session times out.
+        /// </summary>
+        /// <remarks>
+        /// This method allows inhereted classes to report error message to connected client.
+        /// Session will be disconnected after this method completes.
+        /// </remarks>
+        protected override void OnTimeout()
+        {
+            try{
+                WriteLine("* BYE Idle timeout, closing connection.");
+            }
+            catch{
+                // Skip errors.
+            }
+        }
+
+        #endregion
+
+
+        #region method BeginReadCmd
+
+        /// <summary>
+        /// Starts reading incoming command from the connected client.
+        /// </summary>
+        private void BeginReadCmd()
+        {
+            if(this.IsDisposed){
+                return;
+            }
+
+            try{
+                SmartStream.ReadLineAsyncOP readLineOP = new SmartStream.ReadLineAsyncOP(new byte[32000],SizeExceededAction.JunkAndThrowException);
+                // This event is raised only when read next coomand completes asynchronously.
+                readLineOP.Completed += new EventHandler<EventArgs<SmartStream.ReadLineAsyncOP>>(delegate(object sender,EventArgs<SmartStream.ReadLineAsyncOP> e){                
+                    if(ProcessCmd(readLineOP)){
+                        BeginReadCmd();
+                    }
+                });
+                // Process incoming commands while, command reading completes synchronously.
+                while(this.TcpStream.ReadLine(readLineOP,true)){
+                    if(!ProcessCmd(readLineOP)){
+                        break;
+                    }
+                }
+            }
+            catch(Exception x){
+                OnError(x);
+            }
+        }
+
+        #endregion
+
+        #region method ProcessCmd
+
+        /// <summary>
+        /// Completes command reading operation.
+        /// </summary>
+        /// <param name="op">Operation.</param>
+        /// <returns>Returns true if server should start reading next command.</returns>
+        private bool ProcessCmd(SmartStream.ReadLineAsyncOP op)
+        {
+            bool readNextCommand = true;
+
+            // Check errors.
+            if(op.Error != null){
+                OnError(op.Error);
+            }
+
+            try{
+                if(this.IsDisposed){
+                    return false;
+                }
+                                
+                string[] cmd_args = Encoding.UTF8.GetString(op.Buffer,0,op.LineBytesInBuffer).Split(new char[]{' '},3);
+                string   cmdTag   = cmd_args[0];
+                string   cmd      = cmd_args[1].ToUpperInvariant();
+                string   args     = cmd_args.Length == 3 ? cmd_args[2] : "";
+        
+                // Log.
+                if(this.Server.Logger != null){
+                    // Hide password from log.
+                    if(cmd == "LOGIN"){                        
+                        this.Server.Logger.AddRead(this.ID,this.AuthenticatedUserIdentity,op.BytesInBuffer,op.LineUtf8.Substring(0,op.LineUtf8.LastIndexOf(' ')) + " <***REMOVED***>",this.LocalEndPoint,this.RemoteEndPoint);
+                    }
+                    else{
+                        this.Server.Logger.AddRead(this.ID,this.AuthenticatedUserIdentity,op.BytesInBuffer,op.LineUtf8,this.LocalEndPoint,this.RemoteEndPoint);
+                    }
+                }
+
+                if(cmd == "STARTTLS"){                    
+                    STARTTLS(cmdTag,args);
+                }
+                else if(cmd == "LOGIN"){
+                    LOGIN(cmdTag,args);
+                }
+                else if(cmd == "AUTHENTICATE"){
+                    AUTHENTICATE(cmdTag,args);
+                }
+                else if(cmd == "NAMESPACE"){
+                    NAMESPACE(cmdTag,args);
+                }
+                else if(cmd == "LIST"){
+                    LIST(cmdTag,args);
+                }
+                else if(cmd == "CREATE"){
+                    CREATE(cmdTag,args);
+                }
+                else if(cmd == "DELETE"){
+                    DELETE(cmdTag,args);
+                }
+                else if(cmd == "RENAME"){
+                    RENAME(cmdTag,args);
+                }
+                else if(cmd == "LSUB"){
+                    LSUB(cmdTag,args);
+                }
+                else if(cmd == "SUBSCRIBE"){
+                    SUBSCRIBE(cmdTag,args);
+                }
+                else if(cmd == "UNSUBSCRIBE"){
+                    UNSUBSCRIBE(cmdTag,args);
+                }
+                else if(cmd == "STATUS"){
+                    STATUS(cmdTag,args);
+                }
+                else if(cmd == "SELECT"){
+                    SELECT(cmdTag,args);
+                }
+                else if(cmd == "EXAMINE"){
+                    EXAMINE(cmdTag,args);
+                }
+                else if(cmd == "APPEND"){
+                    APPEND(cmdTag,args);
+                }
+                else if(cmd == "GETQUOTAROOT"){
+                    GETQUOTAROOT(cmdTag,args);
+                }
+                else if(cmd == "GETQUOTA"){
+                    GETQUOTA(cmdTag,args);
+                }
+                else if(cmd == "GETACL"){
+                    GETACL(cmdTag,args);
+                }
+                else if(cmd == "SETACL"){
+                    SETACL(cmdTag,args);
+                }
+                else if(cmd == "DELETEACL"){
+                    DELETEACL(cmdTag,args);
+                }
+                else if(cmd == "LISTRIGHTS"){
+                    LISTRIGHTS(cmdTag,args);
+                }
+                else if(cmd == "MYRIGHTS"){
+                    MYRIGHTS(cmdTag,args);
+                }
+                else if(cmd == "CLOSE"){
+                    CLOSE(cmdTag,args);
+                }
+                else if(cmd == "FETCH"){
+                    FETCH(false,cmdTag,args);
+                }
+                else if(cmd == "SEARCH"){
+                    SEARCH(false,cmdTag,args);
+                }
+                else if(cmd == "STORE"){
+                    STORE(false,cmdTag,args);
+                }
+                else if(cmd == "COPY"){
+                    COPY(false,cmdTag,args);
+                }
+                else if(cmd == "UID"){
+                    UID(cmdTag,args);
+                }
+                else if(cmd == "EXPUNGE"){
+                    EXPUNGE(cmdTag,args);
+                }
+                else if(cmd == "IDLE"){
+                    IDLE(cmdTag,args);
+                }
+                else if(cmd == "CAPABILITY"){
+                    CAPABILITY(cmdTag,args);
+                }
+                else if(cmd == "NOOP"){
+                    NOOP(cmdTag,args);
+                }
+                else if(cmd == "LOGOUT"){
+                    LOGOUT(cmdTag,args);
+                    readNextCommand = false;
+                }
+                else{
+                     m_BadCommands++;
+
+                     // Maximum allowed bad commands exceeded.
+                     if(this.Server.MaxBadCommands != 0 && m_BadCommands > this.Server.MaxBadCommands){
+                         WriteLine("* BYE Too many bad commands, closing transmission channel.");
+                         Disconnect();
+                         return false;
+                     }
+                     
+                     WriteLine(cmdTag + " BAD Error: command '" + cmd + "' not recognized.");
+                 }
+             }
+             catch(Exception x){
+                 OnError(x);
+             }
+
+             return readNextCommand;
+        }
+
+        #endregion
+
+
+        #region method STARTTLS
+
+        private void STARTTLS(string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.2.1. STARTTLS Command.
+                Arguments:  none
+
+                Responses:  no specific response for this command
+
+                Result:     OK - starttls completed, begin TLS negotiation
+                            BAD - command unknown or arguments invalid
+
+                A [TLS] negotiation begins immediately after the CRLF at the end
+                of the tagged OK response from the server.  Once a client issues a
+                STARTTLS command, it MUST NOT issue further commands until a
+                server response is seen and the [TLS] negotiation is complete.
+
+                The server remains in the non-authenticated state, even if client
+                credentials are supplied during the [TLS] negotiation.  This does
+                not preclude an authentication mechanism such as EXTERNAL (defined
+                in [SASL]) from using client identity determined by the [TLS]
+                negotiation.
+
+                Once [TLS] has been started, the client MUST discard cached
+                information about server capabilities and SHOULD re-issue the
+                CAPABILITY command.  This is necessary to protect against man-in-
+                the-middle attacks which alter the capabilities list prior to
+                STARTTLS.  The server MAY advertise different capabilities after
+                STARTTLS.
+
+                Example:    C: a001 CAPABILITY
+                            S: * CAPABILITY IMAP4rev1 STARTTLS LOGINDISABLED
+                            S: a001 OK CAPABILITY completed
+                            C: a002 STARTTLS
+                            S: a002 OK Begin TLS negotiation now
+                            <TLS negotiation, further commands are under [TLS] layer>
+                            C: a003 CAPABILITY
+                            S: * CAPABILITY IMAP4rev1 AUTH=PLAIN
+                            S: a003 OK CAPABILITY completed
+                            C: a004 LOGIN joe password
+                            S: a004 OK LOGIN completed
+            */
+
+            if(m_SessionRejected){
+                WriteLine(cmdTag + " NO Bad sequence of commands: Session rejected.");
+
+                return;
+            }
+            if(this.IsAuthenticated){
+                this.TcpStream.WriteLine(cmdTag + " NO This ommand is only valid in not-authenticated state.");
+
+                return;
+            }
+            if(this.IsSecureConnection){
+                WriteLine(cmdTag + " NO Bad sequence of commands: Connection is already secure.");
+
+                return;
+            }
+            if(this.Certificate == null){
+                WriteLine(cmdTag + " NO TLS not available: Server has no SSL certificate.");
+
+                return;
+            }
+
+            WriteLine(cmdTag + " OK Begin TLS negotiation now.");
+
+            try{
+                SwitchToSecure();
+
+                // Log
+                LogAddText("TLS negotiation completed successfully.");
+            }
+            catch(Exception x){
+                // Log
+                LogAddText("TLS negotiation failed: " + x.Message + ".");
+
+                Disconnect();
+            }
+        }
+
+        #endregion
+
+        #region method LOGIN
+
+        private void LOGIN(string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.2.3. LOGIN Command.
+                Arguments:  user name
+                            password
+
+                Responses:  no specific responses for this command
+
+                Result:     OK - login completed, now in authenticated state
+                            NO - login failure: user name or password rejected
+                            BAD - command unknown or arguments invalid
+
+                The LOGIN command identifies the client to the server and carries
+                the plaintext password authenticating this user.
+
+                A server MAY include a CAPABILITY response code in the tagged OK
+                response to a successful LOGIN command in order to send
+                capabilities automatically.  It is unnecessary for a client to
+                send a separate CAPABILITY command if it recognizes these
+                automatic capabilities.
+
+                Example:    C: a001 LOGIN SMITH SESAME
+                            S: a001 OK LOGIN completed
+
+                    Note: Use of the LOGIN command over an insecure network
+                    (such as the Internet) is a security risk, because anyone
+                    monitoring network traffic can obtain plaintext passwords.
+                    The LOGIN command SHOULD NOT be used except as a last
+                    resort, and it is recommended that client implementations
+                    have a means to disable any automatic use of the LOGIN
+                    command.
+
+                Unless either the STARTTLS command has been negotiated or
+                some other mechanism that protects the session from
+                password snooping has been provided, a server
+                implementation MUST implement a configuration in which it
+                advertises the LOGINDISABLED capability and does NOT permit
+                the LOGIN command.  Server sites SHOULD NOT use any
+                configuration which permits the LOGIN command without such
+                a protection mechanism against password snooping.  A client
+                implementation MUST NOT send a LOGIN command if the
+                LOGINDISABLED capability is advertised.
+            */
+
+            if(m_SessionRejected){
+                WriteLine(cmdTag + " NO Bad sequence of commands: Session rejected.");
+
+                return;
+            }
+            if(this.IsAuthenticated){
+                this.TcpStream.WriteLine(cmdTag + " NO Re-authentication error.");
+
+                return;
+            }
+            if(string.IsNullOrEmpty(cmdText)){
+                this.TcpStream.WriteLine(cmdTag + " BAD Error in arguments.");
+
+                return;
+            }
+
+            string[] user_pass = TextUtils.SplitQuotedString(cmdText,' ',true);
+            if(user_pass.Length != 2){
+                this.TcpStream.WriteLine(cmdTag + " BAD Error in arguments.");
+
+                return;
+            }
+
+            IMAP_e_Login e = OnLogin(user_pass[0],user_pass[1]);
+            if(e.IsAuthenticated){
+                m_pUser = new GenericIdentity(user_pass[0],"IMAP-LOGIN");
+
+                WriteLine(cmdTag + " OK LOGIN completed.");
+            }
+            else{
+                WriteLine(cmdTag + " NO LOGIN failed.");
+            }
+        }
+
+        #endregion
+
+        #region method AUTHENTICATE
+
+        private void AUTHENTICATE(string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.2.2. AUTHENTICATE Command.
+                Arguments:  authentication mechanism name
+
+                Responses:  continuation data can be requested
+
+                Result:     OK - authenticate completed, now in authenticated state
+                            NO - authenticate failure: unsupported authentication
+                                 mechanism, credentials rejected
+                            BAD - command unknown or arguments invalid,
+                                  authentication exchange cancelled
+
+                The AUTHENTICATE command indicates a [SASL] authentication
+                mechanism to the server.  If the server supports the requested
+                authentication mechanism, it performs an authentication protocol
+                exchange to authenticate and identify the client.  It MAY also
+                negotiate an OPTIONAL security layer for subsequent protocol
+                interactions.  If the requested authentication mechanism is not
+                supported, the server SHOULD reject the AUTHENTICATE command by
+                sending a tagged NO response.
+
+                The AUTHENTICATE command does not support the optional "initial
+                response" feature of [SASL].  Section 5.1 of [SASL] specifies how
+                to handle an authentication mechanism which uses an initial
+                response.
+
+                The service name specified by this protocol's profile of [SASL] is
+                "imap".
+
+                The authentication protocol exchange consists of a series of
+                server challenges and client responses that are specific to the
+                authentication mechanism.  A server challenge consists of a
+                command continuation request response with the "+" token followed
+                by a BASE64 encoded string.  The client response consists of a
+                single line consisting of a BASE64 encoded string.  If the client
+                wishes to cancel an authentication exchange, it issues a line
+                consisting of a single "*".  If the server receives such a
+                response, it MUST reject the AUTHENTICATE command by sending a
+                tagged BAD response.
+
+                If a security layer is negotiated through the [SASL]
+                authentication exchange, it takes effect immediately following the
+                CRLF that concludes the authentication exchange for the client,
+                and the CRLF of the tagged OK response for the server.
+
+                While client and server implementations MUST implement the
+                AUTHENTICATE command itself, it is not required to implement any
+                authentication mechanisms other than the PLAIN mechanism described
+                in [IMAP-TLS].  Also, an authentication mechanism is not required
+                to support any security layers.
+
+                    Note: a server implementation MUST implement a
+                    configuration in which it does NOT permit any plaintext
+                    password mechanisms, unless either the STARTTLS command
+                    has been negotiated or some other mechanism that
+                    protects the session from password snooping has been
+                    provided.  Server sites SHOULD NOT use any configuration
+                    which permits a plaintext password mechanism without
+                    such a protection mechanism against password snooping.
+                    Client and server implementations SHOULD implement
+                    additional [SASL] mechanisms that do not use plaintext
+                    passwords, such the GSSAPI mechanism described in [SASL]
+                    and/or the [DIGEST-MD5] mechanism.
+
+                Servers and clients can support multiple authentication
+                mechanisms.  The server SHOULD list its supported authentication
+                mechanisms in the response to the CAPABILITY command so that the
+                client knows which authentication mechanisms to use.
+
+                A server MAY include a CAPABILITY response code in the tagged OK
+                response of a successful AUTHENTICATE command in order to send
+                capabilities automatically.  It is unnecessary for a client to
+                send a separate CAPABILITY command if it recognizes these
+                automatic capabilities.  This should only be done if a security
+                layer was not negotiated by the AUTHENTICATE command, because the
+                tagged OK response as part of an AUTHENTICATE command is not
+                protected by encryption/integrity checking.  [SASL] requires the
+                client to re-issue a CAPABILITY command in this case.
+                            
+                The authorization identity passed from the client to the server
+                during the authentication exchange is interpreted by the server as
+                the user name whose privileges the client is requesting.
+
+                Example:    S: * OK IMAP4rev1 Server
+                            C: A001 AUTHENTICATE GSSAPI
+                            S: +
+                            C: YIIB+wYJKoZIhvcSAQICAQBuggHqMIIB5qADAgEFoQMCAQ6iBw
+                               MFACAAAACjggEmYYIBIjCCAR6gAwIBBaESGxB1Lndhc2hpbmd0
+                               b24uZWR1oi0wK6ADAgEDoSQwIhsEaW1hcBsac2hpdmFtcy5jYW
+                               Mud2FzaGluZ3Rvbi5lZHWjgdMwgdCgAwIBAaEDAgEDooHDBIHA
+                               cS1GSa5b+fXnPZNmXB9SjL8Ollj2SKyb+3S0iXMljen/jNkpJX
+                               AleKTz6BQPzj8duz8EtoOuNfKgweViyn/9B9bccy1uuAE2HI0y
+                               C/PHXNNU9ZrBziJ8Lm0tTNc98kUpjXnHZhsMcz5Mx2GR6dGknb
+                               I0iaGcRerMUsWOuBmKKKRmVMMdR9T3EZdpqsBd7jZCNMWotjhi
+                               vd5zovQlFqQ2Wjc2+y46vKP/iXxWIuQJuDiisyXF0Y8+5GTpAL
+                               pHDc1/pIGmMIGjoAMCAQGigZsEgZg2on5mSuxoDHEA1w9bcW9n
+                               FdFxDKpdrQhVGVRDIzcCMCTzvUboqb5KjY1NJKJsfjRQiBYBdE
+                               NKfzK+g5DlV8nrw81uOcP8NOQCLR5XkoMHC0Dr/80ziQzbNqhx
+                               O6652Npft0LQwJvenwDI13YxpwOdMXzkWZN/XrEqOWp6GCgXTB
+                               vCyLWLlWnbaUkZdEYbKHBPjd8t/1x5Yg==
+                            S: + YGgGCSqGSIb3EgECAgIAb1kwV6ADAgEFoQMCAQ+iSzBJoAMC
+                               AQGiQgRAtHTEuOP2BXb9sBYFR4SJlDZxmg39IxmRBOhXRKdDA0
+                                uHTCOT9Bq3OsUTXUlk0CsFLoa8j+gvGDlgHuqzWHPSQg==
+                            C:
+                            S: + YDMGCSqGSIb3EgECAgIBAAD/////6jcyG4GE3KkTzBeBiVHe
+                               ceP2CWY0SR0fAQAgAAQEBAQ=
+                            C: YDMGCSqGSIb3EgECAgIBAAD/////3LQBHXTpFfZgrejpLlLImP
+                               wkhbfa2QteAQAgAG1yYwE=
+                            S: A001 OK GSSAPI authentication successful
+
+                            Note: The line breaks within server challenges and client
+                            responses are for editorial clarity and are not in real
+                            authenticators.
+            */
+
+            if(m_SessionRejected){
+                WriteLine(cmdTag + " NO Bad sequence of commands: Session rejected.");
+
+                return;
+            }
+            if(this.IsAuthenticated){
+                this.TcpStream.WriteLine(cmdTag + " NO Re-authentication error.");
+
+                return;
+            }
+
+            string mechanism = cmdText;
+                        
+            if(!this.Authentications.ContainsKey(mechanism)){
+                WriteLine(cmdTag + " NO Not supported authentication mechanism.");
+                return;
+            }
+
+            string clientResponse = "";
+            AUTH_SASL_ServerMechanism auth = this.Authentications[mechanism];            
+            while(true){
+                string serverResponse = auth.Continue(clientResponse);
+                // Authentication completed.
+                if(auth.IsCompleted){
+                    if(auth.IsAuthenticated){
+                        m_pUser = new GenericIdentity(auth.UserName,"SASL-" + auth.Name);
+                                                
+                        WriteLine(cmdTag + " OK Authentication succeeded.");
+                    }
+                    else{
+                        WriteLine(cmdTag + " NO Authentication credentials invalid.");
+                    }
+                    break;
+                }
+                // Authentication continues.
+                else{
+                    // Send server challange.
+                    if(string.IsNullOrEmpty(serverResponse)){
+                        WriteLine("+ ");
+                    }
+                    else{
+                        WriteLine("+ " + Convert.ToBase64String(Encoding.UTF8.GetBytes(serverResponse)));
+                    }
+
+                    // Read client response. 
+                    SmartStream.ReadLineAsyncOP readLineOP = new SmartStream.ReadLineAsyncOP(new byte[32000],SizeExceededAction.JunkAndThrowException);
+                    this.TcpStream.ReadLine(readLineOP,false);
+                    if(readLineOP.Error != null){
+                        throw readLineOP.Error;
+                    }
+                    clientResponse = readLineOP.LineUtf8;
+                    // Log
+                    if(this.Server.Logger != null){
+                        this.Server.Logger.AddRead(this.ID,this.AuthenticatedUserIdentity,readLineOP.BytesInBuffer,"base64 auth-data",this.LocalEndPoint,this.RemoteEndPoint);
+                    }
+
+                    // Client canceled authentication.
+                    if(clientResponse == "*"){
+                        WriteLine(cmdTag + " NO Authentication canceled.");
+                        return;
+                    }
+                    // We have base64 client response, decode it.
+                    else{
+                        try{
+                            clientResponse = Encoding.UTF8.GetString(Convert.FromBase64String(clientResponse));
+                        }
+                        catch{
+                            WriteLine(cmdTag + " NO Invalid client response '" + clientResponse + "'.");
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        #endregion
+
+
+        #region method NAMESPACE
+
+        private void NAMESPACE(string cmdTag,string cmdText)
+        {
+            /* RFC 2342 5. NAMESPACE Command.
+                Arguments: none
+
+                Response:  an untagged NAMESPACE response that contains the prefix
+                           and hierarchy delimiter to the server's Personal
+                           Namespace(s), Other Users' Namespace(s), and Shared
+                           Namespace(s) that the server wishes to expose. The
+                           response will contain a NIL for any namespace class
+                           that is not available. Namespace_Response_Extensions
+                           MAY be included in the response.
+                           Namespace_Response_Extensions which are not on the IETF
+                           standards track, MUST be prefixed with an "X-".
+
+                Result:    OK - Command completed
+                           NO - Error: Can't complete command
+                           BAD - argument invalid
+                
+                Example:
+                    < A server that contains a Personal Namespace and a single Shared Namespace. >
+
+                    C: A001 NAMESPACE
+                    S: * NAMESPACE (("" "/")) NIL (("Public Folders/" "/"))
+                    S: A001 OK NAMESPACE command completed
+            */
+
+            if(!SupportsCap("NAMESPACE")){
+                WriteLine(cmdTag + " NO Command not supported.");
+
+                return;
+            }
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+
+            IMAP_e_Namespace e = OnNamespace(new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"NAMESPACE command completed."));
+
+            StringBuilder retVal = new StringBuilder();
+            if(e.NamespaceResponse != null){
+                retVal.Append(e.NamespaceResponse.ToString());
+            }
+            retVal.Append(e.Response.ToString());
+
+            WriteLine(retVal.ToString());
+        }
+
+        #endregion
+
+        #region method LIST
+
+        private void LIST(string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.3.8. LIST Command.
+                Arguments:  reference name
+                            mailbox name with possible wildcards
+
+                Responses:  untagged responses: LIST
+
+                Result:     OK - list completed
+                            NO - list failure: can't list that reference or name
+                            BAD - command unknown or arguments invalid
+
+                The LIST command returns a subset of names from the complete set
+                of all names available to the client.  Zero or more untagged LIST
+                replies are returned, containing the name attributes, hierarchy
+                delimiter, and name; see the description of the LIST reply for
+                more detail.
+
+                The LIST command SHOULD return its data quickly, without undue
+                delay.  For example, it SHOULD NOT go to excess trouble to
+                calculate the \Marked or \Unmarked status or perform other
+                processing; if each name requires 1 second of processing, then a
+                list of 1200 names would take 20 minutes!
+
+                An empty ("" string) reference name argument indicates that the
+                mailbox name is interpreted as by SELECT.  The returned mailbox
+                names MUST match the supplied mailbox name pattern.  A non-empty
+                reference name argument is the name of a mailbox or a level of
+                mailbox hierarchy, and indicates the context in which the mailbox
+                name is interpreted.
+
+                An empty ("" string) mailbox name argument is a special request to
+                return the hierarchy delimiter and the root name of the name given
+                in the reference.  The value returned as the root MAY be the empty
+                string if the reference is non-rooted or is an empty string.  In
+                all cases, a hierarchy delimiter (or NIL if there is no hierarchy)
+                is returned.  This permits a client to get the hierarchy delimiter
+                (or find out that the mailbox names are flat) even when no
+                mailboxes by that name currently exist.
+
+                The reference and mailbox name arguments are interpreted into a
+                canonical form that represents an unambiguous left-to-right
+                hierarchy.  The returned mailbox names will be in the interpreted
+                form.
+
+                    Note: The interpretation of the reference argument is
+                    implementation-defined.  It depends upon whether the
+                    server implementation has a concept of the "current
+                    working directory" and leading "break out characters",
+                    which override the current working directory.
+
+                    For example, on a server which exports a UNIX or NT
+                    filesystem, the reference argument contains the current
+                    working directory, and the mailbox name argument would
+                    contain the name as interpreted in the current working
+                    directory.
+
+                    If a server implementation has no concept of break out
+                    characters, the canonical form is normally the reference
+                    name appended with the mailbox name.  Note that if the
+                    server implements the namespace convention (section
+                    5.1.2), "#" is a break out character and must be treated
+                    as such.
+
+                    If the reference argument is not a level of mailbox
+                    hierarchy (that is, it is a \NoInferiors name), and/or
+                    the reference argument does not end with the hierarchy
+                    delimiter, it is implementation-dependent how this is
+                    interpreted.  For example, a reference of "foo/bar" and
+                    mailbox name of "rag/baz" could be interpreted as
+                    "foo/bar/rag/baz", "foo/barrag/baz", or "foo/rag/baz".
+                    A client SHOULD NOT use such a reference argument except
+                    at the explicit request of the user.  A hierarchical
+                    browser MUST NOT make any assumptions about server
+                    interpretation of the reference unless the reference is
+                    a level of mailbox hierarchy AND ends with the hierarchy
+                    delimiter.
+
+                Any part of the reference argument that is included in the
+                interpreted form SHOULD prefix the interpreted form.  It SHOULD
+                also be in the same form as the reference name argument.  This
+                rule permits the client to determine if the returned mailbox name
+                is in the context of the reference argument, or if something about
+                the mailbox argument overrode the reference argument.  Without
+                this rule, the client would have to have knowledge of the server's
+                naming semantics including what characters are "breakouts" that
+                override a naming context.
+
+                    For example, here are some examples of how references
+                    and mailbox names might be interpreted on a UNIX-based
+                    server:
+
+                        Reference     Mailbox Name  Interpretation
+                        ------------  ------------  --------------
+                        ~smith/Mail/  foo.*         ~smith/Mail/foo.*
+                        archive/      %             archive/%
+                        #news.        comp.mail.*   #news.comp.mail.*
+                        ~smith/Mail/  /usr/doc/foo  /usr/doc/foo
+                        archive/      ~fred/Mail/*  ~fred/Mail/*
+
+                    The first three examples demonstrate interpretations in
+                    the context of the reference argument.  Note that
+                    "~smith/Mail" SHOULD NOT be transformed into something
+                    like "/u2/users/smith/Mail", or it would be impossible
+                    for the client to determine that the interpretation was
+                    in the context of the reference.
+
+                The character "*" is a wildcard, and matches zero or more
+                characters at this position.  The character "%" is similar to "*",
+                but it does not match a hierarchy delimiter.  If the "%" wildcard
+                is the last character of a mailbox name argument, matching levels
+                of hierarchy are also returned.  If these levels of hierarchy are
+                not also selectable mailboxes, they are returned with the
+                \Noselect mailbox name attribute (see the description of the LIST
+                response for more details).
+
+                Server implementations are permitted to "hide" otherwise
+                accessible mailboxes from the wildcard characters, by preventing
+                certain characters or names from matching a wildcard in certain
+                situations.  For example, a UNIX-based server might restrict the
+                interpretation of "*" so that an initial "/" character does not
+                match.
+
+                The special name INBOX is included in the output from LIST, if
+                INBOX is supported by this server for this user and if the
+                uppercase string "INBOX" matches the interpreted reference and
+                mailbox name arguments with wildcards as described above.  The
+                criteria for omitting INBOX is whether SELECT INBOX will return
+                failure; it is not relevant whether the user's real INBOX resides
+                on this or some other server.
+
+                Example:    C: A101 LIST "" ""
+                            S: * LIST (\Noselect) "/" ""
+                            S: A101 OK LIST Completed
+                            C: A102 LIST #news.comp.mail.misc ""
+                            S: * LIST (\Noselect) "." #news.
+                            S: A102 OK LIST Completed
+                            C: A103 LIST /usr/staff/jones ""
+                            S: * LIST (\Noselect) "/" /
+                            S: A103 OK LIST Completed
+                            C: A202 LIST ~/Mail/ %
+                            S: * LIST (\Noselect) "/" ~/Mail/foo
+                            S: * LIST () "/" ~/Mail/meetings
+                            S: A202 OK LIST completed
+            */
+
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+
+            string[] parts = TextUtils.SplitQuotedString(cmdText,' ',true);
+            if(parts.Length != 2){
+                WriteLine(cmdTag + " BAD Error in arguments.");
+
+                return;
+            }
+
+            string refName = IMAP_Utils.Decode_IMAP_UTF7_String(parts[0]);
+            string folder  = IMAP_Utils.Decode_IMAP_UTF7_String(parts[1]);
+
+            // Store start time
+			long startTime = DateTime.Now.Ticks;
+
+            StringBuilder response = new StringBuilder();
+            // Folder separator request.
+            if(folder == string.Empty){
+                response.Append("* LIST (\\Noselect) \"" + m_FolderSeparator + "\" \"\"\r\n");
+            }
+            else{
+                IMAP_e_List e = OnList(refName,folder);
+                foreach(IMAP_r_u_List r in e.Folders){
+                    response.Append(r.ToString());
+                }
+            }
+                        
+            response.Append(cmdTag + " OK LIST Completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds.\r\n");
+
+            WriteLine(response.ToString());
+        }
+
+        #endregion
+
+        #region method CREATE
+
+        private void CREATE(string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.3.3. CREATE Command.
+                Arguments:  mailbox name
+
+                Responses:  no specific responses for this command
+
+                Result:     OK - create completed
+                            NO - create failure: can't create mailbox with that name
+                            BAD - command unknown or arguments invalid
+
+                The CREATE command creates a mailbox with the given name.  An OK
+                response is returned only if a new mailbox with that name has been
+                created.  It is an error to attempt to create INBOX or a mailbox
+                with a name that refers to an extant mailbox.  Any error in
+                creation will return a tagged NO response.
+
+                If the mailbox name is suffixed with the server's hierarchy
+                separator character (as returned from the server by a LIST
+                command), this is a declaration that the client intends to create
+                mailbox names under this name in the hierarchy.  Server
+                implementations that do not require this declaration MUST ignore
+                the declaration.  In any case, the name created is without the
+                trailing hierarchy delimiter.
+
+                If the server's hierarchy separator character appears elsewhere in
+                the name, the server SHOULD create any superior hierarchical names
+                that are needed for the CREATE command to be successfully
+                completed.  In other words, an attempt to create "foo/bar/zap" on
+                a server in which "/" is the hierarchy separator character SHOULD
+                create foo/ and foo/bar/ if they do not already exist.
+
+                If a new mailbox is created with the same name as a mailbox which
+                was deleted, its unique identifiers MUST be greater than any
+                unique identifiers used in the previous incarnation of the mailbox
+                UNLESS the new incarnation has a different unique identifier
+                validity value.  See the description of the UID command for more
+                detail.
+
+                Example:    C: A003 CREATE owatagusiam/
+                            S: A003 OK CREATE completed
+                            C: A004 CREATE owatagusiam/blurdybloop
+                            S: A004 OK CREATE completed
+
+                    Note: The interpretation of this example depends on whether
+                    "/" was returned as the hierarchy separator from LIST.  If
+                    "/" is the hierarchy separator, a new level of hierarchy
+                    named "owatagusiam" with a member called "blurdybloop" is
+                    created.  Otherwise, two mailboxes at the same hierarchy
+                    level are created.
+            */
+
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+
+            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+            
+            IMAP_e_Folder e = OnCreate(cmdTag,folder);
+            if(e.Response == null){
+                WriteLine(cmdTag + " NO Internal server error: IMAP Server application didn't return any resposne.");
+            }
+            else{
+                WriteLine(e.Response.ToString());
+            }
+        }
+
+        #endregion
+
+        #region method DELETE
+
+        private void DELETE(string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.3.4. DELETE Command.
+                Arguments:  mailbox name
+
+                Responses:  no specific responses for this command
+
+                Result:     OK - delete completed
+                            NO - delete failure: can't delete mailbox with that name
+                            BAD - command unknown or arguments invalid
+
+                The DELETE command permanently removes the mailbox with the given
+                name.  A tagged OK response is returned only if the mailbox has
+                been deleted.  It is an error to attempt to delete INBOX or a
+                mailbox name that does not exist.
+
+                The DELETE command MUST NOT remove inferior hierarchical names.
+                For example, if a mailbox "foo" has an inferior "foo.bar"
+                (assuming "." is the hierarchy delimiter character), removing
+                "foo" MUST NOT remove "foo.bar".  It is an error to attempt to
+                delete a name that has inferior hierarchical names and also has
+                the \Noselect mailbox name attribute (see the description of the
+                LIST response for more details).
+
+                It is permitted to delete a name that has inferior hierarchical
+                names and does not have the \Noselect mailbox name attribute.  In
+                this case, all messages in that mailbox are removed, and the name
+                will acquire the \Noselect mailbox name attribute.
+
+                The value of the highest-used unique identifier of the deleted
+                mailbox MUST be preserved so that a new mailbox created with the
+                same name will not reuse the identifiers of the former
+                incarnation, UNLESS the new incarnation has a different unique
+                identifier validity value.  See the description of the UID command
+                for more detail.
+
+                Examples:   C: A682 LIST "" *
+                            S: * LIST () "/" blurdybloop
+                            S: * LIST (\Noselect) "/" foo
+                            S: * LIST () "/" foo/bar
+                            S: A682 OK LIST completed
+                            C: A683 DELETE blurdybloop
+                            S: A683 OK DELETE completed
+                            C: A684 DELETE foo
+                            S: A684 NO Name "foo" has inferior hierarchical names
+                            C: A685 DELETE foo/bar
+                            S: A685 OK DELETE Completed
+                            C: A686 LIST "" *
+                            S: * LIST (\Noselect) "/" foo
+                            S: A686 OK LIST completed
+                            C: A687 DELETE foo
+                            S: A687 OK DELETE Completed
+            */
+
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+
+            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+            
+            IMAP_e_Folder e = OnDelete(cmdTag,folder);
+            if(e.Response == null){
+                WriteLine(cmdTag + " NO Internal server error: IMAP Server application didn't return any resposne.");
+            }
+            else{
+                WriteLine(e.Response.ToString());
+            }
+        }
+
+        #endregion
+
+        #region method RENAME
+
+        private void RENAME(string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.3.5. RENAME Command.
+                Arguments:  existing mailbox name
+                            new mailbox name
+
+                Responses:  no specific responses for this command
+
+                Result:     OK - rename completed
+                            NO - rename failure: can't rename mailbox with that name,
+                                 can't rename to mailbox with that name
+                            BAD - command unknown or arguments invalid
+
+                The RENAME command changes the name of a mailbox.  A tagged OK
+                response is returned only if the mailbox has been renamed.  It is
+                an error to attempt to rename from a mailbox name that does not
+                exist or to a mailbox name that already exists.  Any error in
+                renaming will return a tagged NO response.
+
+                If the name has inferior hierarchical names, then the inferior
+                hierarchical names MUST also be renamed.  For example, a rename of
+                "foo" to "zap" will rename "foo/bar" (assuming "/" is the
+                hierarchy delimiter character) to "zap/bar".
+
+                If the server's hierarchy separator character appears in the name,
+                the server SHOULD create any superior hierarchical names that are
+                needed for the RENAME command to complete successfully.  In other
+                words, an attempt to rename "foo/bar/zap" to baz/rag/zowie on a
+                server in which "/" is the hierarchy separator character SHOULD
+                create baz/ and baz/rag/ if they do not already exist.
+
+                The value of the highest-used unique identifier of the old mailbox
+                name MUST be preserved so that a new mailbox created with the same
+                name will not reuse the identifiers of the former incarnation,
+                UNLESS the new incarnation has a different unique identifier
+                validity value.  See the description of the UID command for more
+                detail.
+
+                Renaming INBOX is permitted, and has special behavior.  It moves
+                all messages in INBOX to a new mailbox with the given name,
+                leaving INBOX empty.  If the server implementation supports
+                inferior hierarchical names of INBOX, these are unaffected by a
+                rename of INBOX.
+
+                Examples:   C: A682 LIST "" *
+                            S: * LIST () "/" blurdybloop
+                            S: * LIST (\Noselect) "/" foo
+                            S: * LIST () "/" foo/bar
+                            S: A682 OK LIST completed
+                            C: A683 RENAME blurdybloop sarasoop
+                            S: A683 OK RENAME completed
+                            C: A684 RENAME foo zowie
+                            S: A684 OK RENAME Completed
+                            C: A685 LIST "" *
+                            S: * LIST () "/" sarasoop
+                            S: * LIST (\Noselect) "/" zowie
+                            S: * LIST () "/" zowie/bar
+                            S: A685 OK LIST completed
+            */
+
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+            
+            string[] parts = TextUtils.SplitQuotedString(cmdText,' ',true);
+            if(parts.Length != 2){
+                WriteLine(cmdTag + " BAD Error in arguments.");
+
+                return;
+            }
+            
+            IMAP_e_Rename e = OnRename(cmdTag,IMAP_Utils.Decode_IMAP_UTF7_String(parts[0]),IMAP_Utils.Decode_IMAP_UTF7_String(parts[1]));
+            if(e.Response == null){
+                WriteLine(cmdTag + " NO Internal server error: IMAP Server application didn't return any resposne.");
+            }
+            else{
+                WriteLine(e.Response.ToString());
+            }
+        }
+
+        #endregion
+
+        #region method LSUB
+
+        private void LSUB(string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.3.9. LSUB Command.
+                Arguments:  reference name
+                            mailbox name with possible wildcards
+
+                Responses:  untagged responses: LSUB
+
+                Result:     OK - lsub completed
+                            NO - lsub failure: can't list that reference or name
+                            BAD - command unknown or arguments invalid
+
+                The LSUB command returns a subset of names from the set of names
+                that the user has declared as being "active" or "subscribed".
+                Zero or more untagged LSUB replies are returned.  The arguments to
+                LSUB are in the same form as those for LIST.
+
+                The returned untagged LSUB response MAY contain different mailbox
+                flags from a LIST untagged response.  If this should happen, the
+                flags in the untagged LIST are considered more authoritative.
+
+                A special situation occurs when using LSUB with the % wildcard.
+                Consider what happens if "foo/bar" (with a hierarchy delimiter of
+                "/") is subscribed but "foo" is not.  A "%" wildcard to LSUB must
+                return foo, not foo/bar, in the LSUB response, and it MUST be
+                flagged with the \Noselect attribute.
+
+                The server MUST NOT unilaterally remove an existing mailbox name
+                from the subscription list even if a mailbox by that name no
+                longer exists.
+
+                Example:    C: A002 LSUB "#news." "comp.mail.*"
+                            S: * LSUB () "." #news.comp.mail.mime
+                            S: * LSUB () "." #news.comp.mail.misc
+                            S: A002 OK LSUB completed
+                            C: A003 LSUB "#news." "comp.%"
+                            S: * LSUB (\NoSelect) "." #news.comp.mail
+                            S: A003 OK LSUB completed
+            */
+
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+
+            string[] parts = TextUtils.SplitQuotedString(cmdText,' ',true);
+            if(parts.Length != 2){
+                WriteLine(cmdTag + " BAD Error in arguments.");
+
+                return;
+            }
+
+            string refName = IMAP_Utils.Decode_IMAP_UTF7_String(parts[0]);
+            string folder  = IMAP_Utils.Decode_IMAP_UTF7_String(parts[1]);
+
+            // Store start time
+			long startTime = DateTime.Now.Ticks;
+
+            StringBuilder response = new StringBuilder();
+            
+            IMAP_e_LSub e = OnLSub(refName,folder);
+            foreach(IMAP_r_u_List r in e.Folders){
+                response.Append(r.ToString());
+            }
+                                    
+            response.Append(cmdTag + " OK LSUB Completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds.\r\n");
+
+            WriteLine(response.ToString());
+        }
+
+        #endregion
+
+        #region method SUBSCRIBE
+
+        private void SUBSCRIBE(string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.3.6. SUBSCRIBE Command.
+                Arguments:  mailbox
+
+                Responses:  no specific responses for this command
+
+                Result:     OK - subscribe completed
+                            NO - subscribe failure: can't subscribe to that name
+                            BAD - command unknown or arguments invalid
+
+                The SUBSCRIBE command adds the specified mailbox name to the
+                server's set of "active" or "subscribed" mailboxes as returned by
+                the LSUB command.  This command returns a tagged OK response only
+                if the subscription is successful.
+
+                A server MAY validate the mailbox argument to SUBSCRIBE to verify
+                that it exists.  However, it MUST NOT unilaterally remove an
+                existing mailbox name from the subscription list even if a mailbox
+                by that name no longer exists.
+
+                    Note: This requirement is because a server site can
+                    choose to routinely remove a mailbox with a well-known
+                    name (e.g., "system-alerts") after its contents expire,
+                    with the intention of recreating it when new contents
+                    are appropriate.
+
+                Example:    C: A002 SUBSCRIBE #news.comp.mail.mime
+                S: A002 OK SUBSCRIBE completed
+            */
+
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+
+            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+            
+            IMAP_e_Folder e = OnSubscribe(cmdTag,folder);
+            if(e.Response == null){
+                WriteLine(cmdTag + " NO Internal server error: IMAP Server application didn't return any resposne.");
+            }
+            else{
+                WriteLine(e.Response.ToString());
+            }
+        }
+
+        #endregion
+
+        #region method UNSUBSCRIBE
+
+        private void UNSUBSCRIBE(string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.3.7. UNSUBSCRIBE Command.
+                Arguments:  mailbox name
+
+                Responses:  no specific responses for this command
+
+                Result:     OK - unsubscribe completed
+                            NO - unsubscribe failure: can't unsubscribe that name
+                            BAD - command unknown or arguments invalid
+
+                The UNSUBSCRIBE command removes the specified mailbox name from
+                the server's set of "active" or "subscribed" mailboxes as returned
+                by the LSUB command.  This command returns a tagged OK response
+                only if the unsubscription is successful.
+
+                Example:    C: A002 UNSUBSCRIBE #news.comp.mail.mime
+                            S: A002 OK UNSUBSCRIBE completed
+            */
+
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+
+            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+            
+            IMAP_e_Folder e = OnUnsubscribe(cmdTag,folder);
+            if(e.Response == null){
+                WriteLine(cmdTag + " NO Internal server error: IMAP Server application didn't return any resposne.");
+            }
+            else{
+                WriteLine(e.Response.ToString());
+            }
+        }
+
+        #endregion
+//
+        #region method STATUS
+
+        private void STATUS(string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.3.10.STATUS Command.
+                Arguments:  mailbox name
+                            status data item names
+
+                Responses:  untagged responses: STATUS
+
+                Result:     OK - status completed
+                            NO - status failure: no status for that name
+                            BAD - command unknown or arguments invalid
+
+                The STATUS command requests the status of the indicated mailbox.
+                It does not change the currently selected mailbox, nor does it
+                affect the state of any messages in the queried mailbox (in
+                particular, STATUS MUST NOT cause messages to lose the \Recent
+                flag).
+
+                The STATUS command provides an alternative to opening a second
+                IMAP4rev1 connection and doing an EXAMINE command on a mailbox to
+                query that mailbox's status without deselecting the current
+                mailbox in the first IMAP4rev1 connection.
+
+                Unlike the LIST command, the STATUS command is not guaranteed to
+                be fast in its response.  Under certain circumstances, it can be
+                quite slow.  In some implementations, the server is obliged to
+                open the mailbox read-only internally to obtain certain status
+                information.  Also unlike the LIST command, the STATUS command
+                does not accept wildcards.
+
+                Note: The STATUS command is intended to access the
+                status of mailboxes other than the currently selected
+                mailbox.  Because the STATUS command can cause the
+                mailbox to be opened internally, and because this
+                information is available by other means on the selected
+                mailbox, the STATUS command SHOULD NOT be used on the
+                currently selected mailbox.
+
+                The STATUS command MUST NOT be used as a "check for new
+                messages in the selected mailbox" operation (refer to
+                sections 7, 7.3.1, and 7.3.2 for more information about
+                the proper method for new message checking).
+
+                Because the STATUS command is not guaranteed to be fast
+                in its results, clients SHOULD NOT expect to be able to
+                issue many consecutive STATUS commands and obtain
+                reasonable performance.
+
+                The currently defined status data items that can be requested are:
+
+                MESSAGES
+                    The number of messages in the mailbox.
+
+                RECENT
+                    The number of messages with the \Recent flag set.
+
+                UIDNEXT
+                    The next unique identifier value of the mailbox.  Refer to
+                    section 2.3.1.1 for more information.
+
+                UIDVALIDITY
+                    The unique identifier validity value of the mailbox.  Refer to
+                    section 2.3.1.1 for more information.
+
+                UNSEEN
+                    The number of messages which do not have the \Seen flag set.
+
+                Example:    C: A042 STATUS blurdybloop (UIDNEXT MESSAGES)
+                            S: * STATUS blurdybloop (MESSAGES 231 UIDNEXT 44292)
+                            S: A042 OK STATUS completed
+            */
+
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+            // TODO:
+
+            throw new NotImplementedException();
+        }
+
+        #endregion
+//
+        #region method SELECT
+
+        private void SELECT(string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.3.1. SELECT Command.
+                Arguments:  mailbox name
+
+                Responses:  REQUIRED untagged responses: FLAGS, EXISTS, RECENT
+                            REQUIRED OK untagged responses:  UNSEEN,  PERMANENTFLAGS,
+                            UIDNEXT, UIDVALIDITY
+
+                Result:     OK - select completed, now in selected state
+                            NO - select failure, now in authenticated state: no
+                                 such mailbox, can't access mailbox
+                            BAD - command unknown or arguments invalid
+
+                The SELECT command selects a mailbox so that messages in the
+                mailbox can be accessed.  Before returning an OK to the client,
+                the server MUST send the following untagged data to the client.
+                Note that earlier versions of this protocol only required the
+                FLAGS, EXISTS, and RECENT untagged data; consequently, client
+                implementations SHOULD implement default behavior for missing data
+                as discussed with the individual item.
+
+                    FLAGS       Defined flags in the mailbox.  See the description
+                                of the FLAGS response for more detail.
+
+                    <n> EXISTS  The number of messages in the mailbox.  See the
+                                description of the EXISTS response for more detail.
+
+                    <n> RECENT  The number of messages with the \Recent flag set.
+                                See the description of the RECENT response for more
+                                detail.
+
+                    OK [UNSEEN <n>]
+                                The message sequence number of the first unseen
+                                message in the mailbox.  If this is missing, the
+                                client can not make any assumptions about the first
+                                unseen message in the mailbox, and needs to issue a
+                                SEARCH command if it wants to find it.
+
+                    OK [PERMANENTFLAGS (<list of flags>)]
+                                A list of message flags that the client can change
+                                permanently.  If this is missing, the client should
+                                assume that all flags can be changed permanently.
+
+                    OK [UIDNEXT <n>]
+                                The next unique identifier value.  Refer to section
+                                2.3.1.1 for more information.  If this is missing,
+                                the client can not make any assumptions about the
+                                next unique identifier value.
+
+                    OK [UIDVALIDITY <n>]
+                                The unique identifier validity value.  Refer to
+                                section 2.3.1.1 for more information.  If this is
+                                missing, the server does not support unique
+                                identifiers.
+
+                Only one mailbox can be selected at a time in a connection;
+                simultaneous access to multiple mailboxes requires multiple
+                connections.  The SELECT command automatically deselects any
+                currently selected mailbox before attempting the new selection.
+                Consequently, if a mailbox is selected and a SELECT command that
+                fails is attempted, no mailbox is selected.
+
+                If the client is permitted to modify the mailbox, the server
+                SHOULD prefix the text of the tagged OK response with the
+                "[READ-WRITE]" response code.
+
+                If the client is not permitted to modify the mailbox but is
+                permitted read access, the mailbox is selected as read-only, and
+                the server MUST prefix the text of the tagged OK response to
+                SELECT with the "[READ-ONLY]" response code.  Read-only access
+                through SELECT differs from the EXAMINE command in that certain
+                read-only mailboxes MAY permit the change of permanent state on a
+                per-user (as opposed to global) basis.  Netnews messages marked in
+                a server-based .newsrc file are an example of such per-user
+                permanent state that can be modified with read-only mailboxes.
+
+                Example:    C: A142 SELECT INBOX
+                            S: * 172 EXISTS
+                            S: * 1 RECENT
+                            S: * OK [UNSEEN 12] Message 12 is first unseen
+                            S: * OK [UIDVALIDITY 3857529045] UIDs valid
+                            S: * OK [UIDNEXT 4392] Predicted next UID
+                            S: * FLAGS (\Answered \Flagged \Deleted \Seen \Draft)
+                            S: * OK [PERMANENTFLAGS (\Deleted \Seen \*)] Limited
+                            S: A142 OK [READ-WRITE] SELECT completed
+            */
+
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+            
+            // Store start time
+			long startTime = DateTime.Now.Ticks;
+
+            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+
+            IMAP_e_Select e = OnSelect(cmdTag,folder);
+            if(e.ErrorResponse == null){
+                StringBuilder response = new StringBuilder();
+
+                IMAP_e_MessagesInfo eMessagesInfo = OnGetMessagesInfo(folder);
+                response.Append("* " + eMessagesInfo.Exists + " EXISTS\r\n");
+                response.Append("* " + eMessagesInfo.Recent + " RECENT\r\n");
+                response.Append("* OK [UNSEEN " + eMessagesInfo.Unseen + "] Message " + eMessagesInfo.Unseen + " is the first unseen.\r\n");
+                response.Append("* OK [UIDNEXT " + eMessagesInfo.UidNext + "] Predicted next message UID.\r\n");
+                if(e.FolderUID > 0){
+                    response.Append("* OK [UIDVALIDITY " + e.FolderUID + "] Folder UID value.\r\n");
+                }
+                if(e.Flags.Count > 0){
+                    response.Append("* FLAGS (");
+                    for(int i=0;i<e.Flags.Count;i++){
+                        if(i > 0){
+                            response.Append(" ");
+                        }
+                        response.Append(e.Flags[i]);
+                    }
+                    response.Append(")\r\n");
+                }
+                if(e.PermanentFlags.Count > 0){
+                    response.Append("* PERMANENTFLAGS (");
+                    for(int i=0;i<e.PermanentFlags.Count;i++){
+                        if(i > 0){
+                            response.Append(" ");
+                        }
+                        response.Append(e.PermanentFlags[i]);
+                    }
+                    response.Append(")\r\n");
+                }
+                response.Append(cmdTag + " OK [" + (e.IsReadOnly ? "READ-ONLY" : "READ-WRITE") + "] SELECT completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds.\r\n");
+
+                WriteLine(response.ToString());
+
+                // TODO:
+            }
+            else{
+                WriteLine(e.ErrorResponse.ToString());
+            }
+        }
+
+        #endregion
+//
+        #region method EXAMINE
+
+        private void EXAMINE(string cmdTag,string cmdText)
+        {
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+            // TODO:
+
+            throw new NotImplementedException();
+        }
+
+        #endregion
+
+        #region method APPEND
+
+        private void APPEND(string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.3.11. APPEND Command.
+                Arguments:  mailbox name
+                            OPTIONAL flag parenthesized list
+                            OPTIONAL date/time string
+                            message literal
+
+                Responses:  no specific responses for this command
+
+                Result:     OK - append completed
+                            NO - append error: can't append to that mailbox, error
+                                 in flags or date/time or message text
+                            BAD - command unknown or arguments invalid
+
+                The APPEND command appends the literal argument as a new message
+                to the end of the specified destination mailbox.  This argument
+                SHOULD be in the format of an [RFC-2822] message.  8-bit
+                characters are permitted in the message.  A server implementation
+                that is unable to preserve 8-bit data properly MUST be able to
+                reversibly convert 8-bit APPEND data to 7-bit using a [MIME-IMB]
+                content transfer encoding.
+
+                    Note: There MAY be exceptions, e.g., draft messages, in
+                    which required [RFC-2822] header lines are omitted in
+                    the message literal argument to APPEND.  The full
+                    implications of doing so MUST be understood and
+                    carefully weighed.
+
+                If a flag parenthesized list is specified, the flags SHOULD be set
+                in the resulting message; otherwise, the flag list of the
+                resulting message is set to empty by default.  In either case, the
+                Recent flag is also set.
+
+                If a date-time is specified, the internal date SHOULD be set in
+                the resulting message; otherwise, the internal date of the
+                resulting message is set to the current date and time by default.
+
+                If the append is unsuccessful for any reason, the mailbox MUST be
+                restored to its state before the APPEND attempt; no partial
+                appending is permitted.
+
+                If the destination mailbox does not exist, a server MUST return an
+                error, and MUST NOT automatically create the mailbox.  Unless it
+                is certain that the destination mailbox can not be created, the
+                server MUST send the response code "[TRYCREATE]" as the prefix of
+                the text of the tagged NO response.  This gives a hint to the
+                client that it can attempt a CREATE command and retry the APPEND
+                if the CREATE is successful.
+
+                If the mailbox is currently selected, the normal new message
+                actions SHOULD occur.  Specifically, the server SHOULD notify the
+                client immediately via an untagged EXISTS response.  If the server
+                does not do so, the client MAY issue a NOOP command (or failing
+                that, a CHECK command) after one or more APPEND commands.
+
+                Example:    C: A003 APPEND saved-messages (\Seen) {310}
+                            S: + Ready for literal data
+                            C: Date: Mon, 7 Feb 1994 21:52:25 -0800 (PST)
+                            C: From: Fred Foobar <foobar@Blurdybloop.COM>
+                            C: Subject: afternoon meeting
+                            C: To: mooch@owatagu.siam.edu
+                            C: Message-Id: <B27397-0100000@Blurdybloop.COM>
+                            C: MIME-Version: 1.0
+                            C: Content-Type: TEXT/PLAIN; CHARSET=US-ASCII
+                            C:
+                            C: Hello Joe, do you think we can meet at 3:30 tomorrow?
+                            C:
+                            S: A003 OK APPEND completed
+
+                    Note: The APPEND command is not used for message delivery,
+                    because it does not provide a mechanism to transfer [SMTP]
+                    envelope information.
+            */
+
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+
+            // Store start time
+			long startTime = DateTime.Now.Ticks;
+
+            StringReader r = new StringReader(cmdText);
+            r.ReadToFirstChar();
+            string folder = null;
+            if(r.StartsWith("\"")){
+                folder = IMAP_Utils.Decode_IMAP_UTF7_String(r.ReadWord());
+            }
+            else{
+                folder = IMAP_Utils.Decode_IMAP_UTF7_String(r.QuotedReadToDelimiter(' '));
+            }
+            r.ReadToFirstChar();
+            string[] flags = new string[0];
+            if(r.StartsWith("(")){
+                flags = r.ReadParenthesized().Split(' ');
+            }
+            r.ReadToFirstChar();
+            DateTime date = DateTime.MinValue;
+            if(!r.StartsWith("{")){
+                date = IMAP_Utils.ParseDate(r.ReadWord());
+            }
+            int size = Convert.ToInt32(r.ReadParenthesized());
+            if(r.Available > 0){
+                WriteLine(cmdTag + " BAD Error in arguments.");
+
+                return;
+            }
+
+            IMAP_e_Append e = OnAppend(folder,flags,date,size,new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"APPEND command completed in %exectime seconds."));
+            
+            if(!string.Equals(e.Response.ResponseCode,"OK",StringComparison.InvariantCultureIgnoreCase)){
+                WriteLine(e.Response.ToString());
+            }
+            else if(e.Stream == null){
+                WriteLine(cmdTag + " NO Internal server error: No storage stream available.");
+            }
+            else{
+                WriteLine("+ Send message.");
+
+                this.TcpStream.ReadFixedCount(e.Stream,size);
+
+                // Raise Completed event.
+                e.OnCompleted();
+
+                WriteLine(e.Response.ToString().Replace("%exectime",((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2")));
+            }
+        }
+
+        #endregion
+
+        #region method GETQUOTAROOT
+
+        private void GETQUOTAROOT(string cmdTag,string cmdText)
+        {
+            /* RFC 2087 4.3. GETQUOTAROOT
+				Arguments:  mailbox name
+
+                Data:       untagged responses: QUOTAROOT, QUOTA
+
+                Result:     OK - getquota completed
+                            NO - getquota error: no such mailbox, permission denied
+                            BAD - command unknown or arguments invalid
+
+                The GETQUOTAROOT command takes the name of a mailbox and returns the
+                list of quota roots for the mailbox in an untagged QUOTAROOT
+                response.  For each listed quota root, it also returns the quota
+                root's resource usage and limits in an untagged QUOTA response.
+
+                Example:    C: A003 GETQUOTAROOT INBOX
+                            S: * QUOTAROOT INBOX ""
+                            S: * QUOTA "" (STORAGE 10 512)
+                            S: A003 OK Getquota completed
+							
+			*/
+
+            if(!SupportsCap("QUOTA")){
+                WriteLine(cmdTag + " NO Command not supported.");
+
+                return;
+            }
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+            
+            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+
+            IMAP_e_GetQuotaRoot e = OnGetGuotaRoot(folder,new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"GETQUOTAROOT command completed."));
+
+            StringBuilder retVal = new StringBuilder();
+            if(e.QuotaRootResponses.Count > 0){
+                foreach(IMAP_r_u_QuotaRoot r in e.QuotaRootResponses){
+                    retVal.Append(r.ToString());
+                }                
+            }
+            if(e.QuotaResponses.Count > 0){
+                foreach(IMAP_r_u_Quota r in e.QuotaResponses){
+                    retVal.Append(r.ToString());
+                }                
+            }
+            retVal.Append(e.Response.ToString());
+
+            WriteLine(retVal.ToString());
+        }
+
+        #endregion
+
+        #region method GETQUOTA
+
+        private void GETQUOTA(string cmdTag,string cmdText)
+        {
+            /* RFC 2087 4.2. GETQUOTA
+				Arguments:  quota root
+
+                Data:       untagged responses: QUOTA
+
+                Result:     OK - getquota completed
+                            NO - getquota  error:  no  such  quota  root,  permission denied
+                            BAD - command unknown or arguments invalid
+
+                The GETQUOTA command takes the name of a quota root and returns the
+                quota root's resource usage and limits in an untagged QUOTA response.
+
+                Example:    C: A003 GETQUOTA ""
+                            S: * QUOTA "" (STORAGE 10 512)
+                            S: A003 OK Getquota completed
+							
+			*/
+
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }            
+
+            string quotaRoot = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+
+            IMAP_e_GetQuota e = OnGetQuota(quotaRoot,new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"QUOTA command completed."));
+
+            StringBuilder retVal = new StringBuilder();
+            if(e.QuotaResponses.Count > 0){
+                foreach(IMAP_r_u_Quota r in e.QuotaResponses){
+                    retVal.Append(r.ToString());
+                }                
+            }
+            retVal.Append(e.Response.ToString());
+
+            WriteLine(retVal.ToString());
+        }
+
+        #endregion
+
+        #region method GETACL
+
+        private void GETACL(string cmdTag,string cmdText)
+        {
+            /* RFC 4314 3.3. GETACL Command.
+                Arguments:  mailbox name
+
+                Data:       untagged responses: ACL
+
+                Result:     OK - getacl completed
+                            NO - getacl failure: can't get acl
+                            BAD - arguments invalid
+
+                The GETACL command returns the access control list for mailbox in an
+                untagged ACL response.
+
+                Some implementations MAY permit multiple forms of an identifier to
+                reference the same IMAP account.  Usually, such implementations will
+                have a canonical form that is stored internally.  An ACL response
+                caused by a GETACL command MAY include a canonicalized form of the
+                identifier that might be different from the one used in the
+                corresponding SETACL command.
+
+                Example:    C: A002 GETACL INBOX
+							S: * ACL INBOX Fred rwipslda
+							S: A002 OK Getacl complete
+							
+							.... Multiple users
+							S: * ACL INBOX Fred rwipslda test rwipslda
+							
+							.... No acl flags for Fred
+							S: * ACL INBOX Fred "" test rwipslda         
+            */
+
+            if(!SupportsCap("ACL")){
+                WriteLine(cmdTag + " NO Command not supported.");
+
+                return;
+            }
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }            
+
+            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+
+            IMAP_e_GetAcl e = OnGetAcl(folder,new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"GETACL command completed."));
+
+            StringBuilder retVal = new StringBuilder();
+            if(e.AclResponses.Count > 0){
+                foreach(IMAP_r_u_Acl r in e.AclResponses){
+                    retVal.Append(r.ToString());
+                }                
+            }
+            retVal.Append(e.Response.ToString());
+
+            WriteLine(retVal.ToString());
+        }
+
+        #endregion
+
+        #region method SETACL
+
+        private void SETACL(string cmdTag,string cmdText)
+        {
+            /* RFC 4314 3.1. SETACL Command.
+                Arguments:  mailbox name
+                            identifier
+                            access right modification
+
+                Data:       no specific data for this command
+
+                Result:     OK - setacl completed
+                            NO - setacl failure: can't set acl
+                            BAD - arguments invalid
+
+                The SETACL command changes the access control list on the specified
+                mailbox so that the specified identifier is granted permissions as
+                specified in the third argument.
+
+                The third argument is a string containing an optional plus ("+") or
+                minus ("-") prefix, followed by zero or more rights characters.  If
+                the string starts with a plus, the following rights are added to any
+                existing rights for the identifier.  If the string starts with a
+                minus, the following rights are removed from any existing rights for
+                the identifier.  If the string does not start with a plus or minus,
+                the rights replace any existing rights for the identifier.
+
+                Note that an unrecognized right MUST cause the command to return the
+                BAD response.  In particular, the server MUST NOT silently ignore
+                unrecognized rights.
+
+                Example:    C: A035 SETACL INBOX/Drafts John lrQswicda
+                            S: A035 BAD Uppercase rights are not allowed
+            
+                            C: A036 SETACL INBOX/Drafts John lrqswicda
+                            S: A036 BAD The q right is not supported
+            */
+
+            if(!SupportsCap("ACL")){
+                WriteLine(cmdTag + " NO Command not supported.");
+
+                return;
+            }
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }            
+
+            string[] parts = TextUtils.SplitQuotedString(cmdText,' ',true);
+            if(parts.Length != 3){
+                WriteLine(cmdTag + " BAD Error in arguments.");
+
+                return;
+            }
+
+            IMAP_e_SetAcl e = OnSetAcl(
+                IMAP_Utils.Decode_IMAP_UTF7_String(parts[0]),
+                IMAP_Utils.Decode_IMAP_UTF7_String(parts[1]),
+                parts[2],
+                new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"SETACL command completed.")
+            );
+
+            StringBuilder retVal = new StringBuilder();
+            retVal.Append(e.Response.ToString());
+
+            WriteLine(retVal.ToString());
+        }
+
+        #endregion
+
+        #region method DELETEACL
+
+        private void DELETEACL(string cmdTag,string cmdText)
+        {
+            /* RFC 4314 3.2. DELETEACL Command.
+                Arguments:  mailbox name
+                            identifier
+
+                Data:       no specific data for this command
+
+                Result:     OK - deleteacl completed
+                            NO - deleteacl failure: can't delete acl
+                            BAD - arguments invalid
+
+                The DELETEACL command removes any <identifier,rights> pair for the
+                specified identifier from the access control list for the specified
+                mailbox.
+
+                Example:    C: B001 getacl INBOX
+                            S: * ACL INBOX Fred rwipslxetad -Fred wetd $team w
+                            S: B001 OK Getacl complete
+                            C: B002 DeleteAcl INBOX Fred
+                            S: B002 OK Deleteacl complete
+            */
+
+            if(!SupportsCap("ACL")){
+                WriteLine(cmdTag + " NO Command not supported.");
+
+                return;
+            }
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+            
+            string[] parts = TextUtils.SplitQuotedString(cmdText,' ',true);
+            if(parts.Length != 2){
+                WriteLine(cmdTag + " BAD Error in arguments.");
+
+                return;
+            }
+
+            IMAP_e_DeleteAcl e = OnDeleteAcl(
+                IMAP_Utils.Decode_IMAP_UTF7_String(parts[0]),
+                IMAP_Utils.Decode_IMAP_UTF7_String(parts[1]),
+                new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"DELETEACL command completed.")
+            );
+
+            StringBuilder retVal = new StringBuilder();
+            retVal.Append(e.Response.ToString());
+
+            WriteLine(retVal.ToString());
+        }
+
+        #endregion
+
+        #region method LISTRIGHTS
+
+        private void LISTRIGHTS(string cmdTag,string cmdText)
+        {
+            /* RFC 4314 3.4. LISTRIGHTS Command.
+                Arguments:  mailbox name
+                            identifier
+
+                Data:       untagged responses: LISTRIGHTS
+
+                Result:     OK - listrights completed
+                            NO - listrights failure: can't get rights list
+                            BAD - arguments invalid
+
+                The LISTRIGHTS command takes a mailbox name and an identifier and
+                returns information about what rights can be granted to the
+                identifier in the ACL for the mailbox.
+
+                Some implementations MAY permit multiple forms of an identifier to
+                reference the same IMAP account.  Usually, such implementations will
+                have a canonical form that is stored internally.  A LISTRIGHTS
+                response caused by a LISTRIGHTS command MUST always return the same
+                form of an identifier as specified by the client.  This is to allow
+                the client to correlate the response with the command.
+
+                Example:    C: a001 LISTRIGHTS ~/Mail/saved smith
+                            S: * LISTRIGHTS ~/Mail/saved smith la r swicdkxte
+                            S: a001 OK Listrights completed
+
+                Example:    C: a005 listrights archive/imap anyone
+                            S: * LISTRIGHTS archive.imap anyone ""
+                               l r s w i p k x t e c d a 0 1 2 3 4 5 6 7 8 9
+                            S: a005 Listrights successful
+            */
+
+            if(!SupportsCap("ACL")){
+                WriteLine(cmdTag + " NO Command not supported.");
+
+                return;
+            }
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+
+            string[] parts = TextUtils.SplitQuotedString(cmdText,' ',true);
+            if(parts.Length != 2){
+                WriteLine(cmdTag + " BAD Error in arguments.");
+
+                return;
+            }
+            
+
+            IMAP_e_ListRights e = OnListRights(
+                IMAP_Utils.Decode_IMAP_UTF7_String(parts[0]),
+                IMAP_Utils.Decode_IMAP_UTF7_String(parts[1]),
+                new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"LISTRIGHTS command completed.")
+            );
+
+            StringBuilder retVal = new StringBuilder();
+            if(e.ListRightsResponse != null){
+                retVal.Append(e.ListRightsResponse.ToString());
+            }
+            retVal.Append(e.Response.ToString());
+
+            WriteLine(retVal.ToString());
+        }
+
+        #endregion
+
+        #region method MYRIGHTS
+
+        private void MYRIGHTS(string cmdTag,string cmdText)
+        {
+            /* RFC 4314 3.5. MYRIGHTS Command.
+                Arguments:  mailbox name
+
+                Data:       untagged responses: MYRIGHTS
+
+                Result:     OK - myrights completed
+                            NO - myrights failure: can't get rights
+                            BAD - arguments invalid
+
+                The MYRIGHTS command returns the set of rights that the user has to
+                mailbox in an untagged MYRIGHTS reply.
+
+                Example:    C: A003 MYRIGHTS INBOX
+                            S: * MYRIGHTS INBOX rwiptsldaex
+                            S: A003 OK Myrights complete
+            */
+
+            if(!SupportsCap("ACL")){
+                WriteLine(cmdTag + " NO Command not supported.");
+
+                return;
+            }
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+            
+            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+
+            IMAP_e_MyRights e = OnMyRights(folder,new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"MYRIGHTS command completed."));
+
+            StringBuilder retVal = new StringBuilder();
+            if(e.MyRightsResponse != null){
+                retVal.Append(e.MyRightsResponse.ToString());
+            }
+            retVal.Append(e.Response.ToString());
+
+            WriteLine(retVal.ToString());
+        }
+
+        #endregion
+
+//
+        #region method CLOSE
+
+        private void CLOSE(string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.4.2. CLOSE Command.
+                Arguments:  none
+
+                Responses:  no specific responses for this command
+
+                Result:     OK - close completed, now in authenticated state
+                            BAD - command unknown or arguments invalid
+
+                The CLOSE command permanently removes all messages that have the
+                \Deleted flag set from the currently selected mailbox, and returns
+                to the authenticated state from the selected state.  No untagged
+                EXPUNGE responses are sent.
+
+                No messages are removed, and no error is given, if the mailbox is
+                selected by an EXAMINE command or is otherwise selected read-only.
+
+                Even if a mailbox is selected, a SELECT, EXAMINE, or LOGOUT
+                command MAY be issued without previously issuing a CLOSE command.
+                The SELECT, EXAMINE, and LOGOUT commands implicitly close the
+                currently selected mailbox without doing an expunge.  However,
+                when many messages are deleted, a CLOSE-LOGOUT or CLOSE-SELECT
+                sequence is considerably faster than an EXPUNGE-LOGOUT or
+                EXPUNGE-SELECT because no untagged EXPUNGE responses (which the
+                client would probably ignore) are sent.
+
+                Example:    C: A341 CLOSE
+                            S: A341 OK CLOSE completed
+            */
+
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+            if(m_SelectedFolder != null){
+                WriteLine(cmdTag + " NO Error: This command is valid only in selected state.");
+
+                return;
+            }
+            // TODO:
+
+            throw new NotImplementedException();
+        }
+
+        #endregion
+//
+        #region method FETCH
+
+        private void FETCH(bool uid,string cmdTag,string cmdText)
+        {
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+            if(m_SelectedFolder != null){
+                WriteLine(cmdTag + " NO Error: This command is valid only in selected state.");
+
+                return;
+            }
+            // TODO:
+
+            throw new NotImplementedException();
+        }
+
+        #endregion
+//
+        #region method SEARCH
+
+        private void SEARCH(bool uid,string cmdTag,string cmdText)
+        {
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+            if(m_SelectedFolder != null){
+                WriteLine(cmdTag + " NO Error: This command is valid only in selected state.");
+
+                return;
+            }
+            // TODO:
+
+            throw new NotImplementedException();
+        }
+
+        #endregion
+//
+        #region method STORE
+
+        private void STORE(bool uid,string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.4.6. STORE Command.
+                Arguments:  sequence set
+                            message data item name
+                            value for message data item
+
+                Responses:  untagged responses: FETCH
+
+                Result:     OK - store completed
+                            NO - store error: can't store that data
+                            BAD - command unknown or arguments invalid
+
+                The STORE command alters data associated with a message in the
+                mailbox.  Normally, STORE will return the updated value of the
+                data with an untagged FETCH response.  A suffix of ".SILENT" in
+                the data item name prevents the untagged FETCH, and the server
+                SHOULD assume that the client has determined the updated value
+                itself or does not care about the updated value.
+
+                    Note: Regardless of whether or not the ".SILENT" suffix
+                    was used, the server SHOULD send an untagged FETCH
+                    response if a change to a message's flags from an
+                    external source is observed.  The intent is that the
+                    status of the flags is determinate without a race
+                    condition.
+
+                The currently defined data items that can be stored are:
+
+                FLAGS <flag list>
+                    Replace the flags for the message (other than \Recent) with the
+                    argument.  The new value of the flags is returned as if a FETCH
+                    of those flags was done.
+
+                FLAGS.SILENT <flag list>
+                    Equivalent to FLAGS, but without returning a new value.
+
+                +FLAGS <flag list>
+                    Add the argument to the flags for the message.  The new value
+                    of the flags is returned as if a FETCH of those flags was done.
+
+                +FLAGS.SILENT <flag list>
+                    Equivalent to +FLAGS, but without returning a new value.
+
+                -FLAGS <flag list>
+                    Remove the argument from the flags for the message.  The new
+                    value of the flags is returned as if a FETCH of those flags was
+                    done.
+
+                -FLAGS.SILENT <flag list>
+                    Equivalent to -FLAGS, but without returning a new value.
+
+                Example:    C: A003 STORE 2:4 +FLAGS (\Deleted)
+                            S: * 2 FETCH (FLAGS (\Deleted \Seen))
+                            S: * 3 FETCH (FLAGS (\Deleted))
+                            S: * 4 FETCH (FLAGS (\Deleted \Flagged \Seen))
+                            S: A003 OK STORE completed
+            */
+
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+            if(m_SelectedFolder != null){
+                WriteLine(cmdTag + " NO Error: This command is valid only in selected state.");
+
+                return;
+            }
+            // TODO:
+
+            throw new NotImplementedException();
+        }
+
+        #endregion
+//
+        #region method COPY
+
+        private void COPY(bool uid,string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.4.7. COPY Command.
+                Arguments:  sequence set
+                            mailbox name
+
+                Responses:  no specific responses for this command
+
+                Result:     OK - copy completed
+                            NO - copy error: can't copy those messages or to that
+                                 name
+                            BAD - command unknown or arguments invalid
+
+                The COPY command copies the specified message(s) to the end of the
+                specified destination mailbox.  The flags and internal date of the
+                message(s) SHOULD be preserved, and the Recent flag SHOULD be set,
+                in the copy.
+
+                If the destination mailbox does not exist, a server SHOULD return
+                an error.  It SHOULD NOT automatically create the mailbox.  Unless
+                it is certain that the destination mailbox can not be created, the
+                server MUST send the response code "[TRYCREATE]" as the prefix of
+                the text of the tagged NO response.  This gives a hint to the
+                client that it can attempt a CREATE command and retry the COPY if
+                the CREATE is successful.
+
+                If the COPY command is unsuccessful for any reason, server
+                implementations MUST restore the destination mailbox to its state
+                before the COPY attempt.
+
+                Example:    C: A003 COPY 2:4 MEETING
+                            S: A003 OK COPY completed
+            */
+
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+            if(m_SelectedFolder != null){
+                WriteLine(cmdTag + " NO Error: This command is valid only in selected state.");
+
+                return;
+            }
+            // TODO:
+
+            throw new NotImplementedException();
+        }
+
+        #endregion
+
+        #region method UID
+
+        private void UID(string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.4.8. UID Command.
+                Arguments:  command name
+                            command arguments
+
+                Responses:  untagged responses: FETCH, SEARCH
+
+                Result:     OK - UID command completed
+                            NO - UID command error
+                            BAD - command unknown or arguments invalid
+
+                The UID command has two forms.  In the first form, it takes as its
+                arguments a COPY, FETCH, or STORE command with arguments
+                appropriate for the associated command.  However, the numbers in
+                the sequence set argument are unique identifiers instead of
+                message sequence numbers.  Sequence set ranges are permitted, but
+                there is no guarantee that unique identifiers will be contiguous.
+
+                A non-existent unique identifier is ignored without any error
+                message generated.  Thus, it is possible for a UID FETCH command
+                to return an OK without any data or a UID COPY or UID STORE to
+                return an OK without performing any operations.
+
+                In the second form, the UID command takes a SEARCH command with
+                SEARCH command arguments.  The interpretation of the arguments is
+                the same as with SEARCH; however, the numbers returned in a SEARCH
+                response for a UID SEARCH command are unique identifiers instead
+                of message sequence numbers.  For example, the command UID SEARCH
+                1:100 UID 443:557 returns the unique identifiers corresponding to
+                the intersection of two sequence sets, the message sequence number
+                range 1:100 and the UID range 443:557.
+
+                    Note: in the above example, the UID range 443:557
+                    appears.  The same comment about a non-existent unique
+                    identifier being ignored without any error message also
+                    applies here.  Hence, even if neither UID 443 or 557
+                    exist, this range is valid and would include an existing
+                    UID 495.
+
+                Also note that a UID range of 559:* always includes the
+                UID of the last message in the mailbox, even if 559 is
+                higher than any assigned UID value.  This is because the
+                contents of a range are independent of the order of the
+                range endpoints.  Thus, any UID range with * as one of
+                the endpoints indicates at least one message (the
+                message with the highest numbered UID), unless the
+                mailbox is empty.
+
+                The number after the "*" in an untagged FETCH response is always a
+                message sequence number, not a unique identifier, even for a UID
+                command response.  However, server implementations MUST implicitly
+                include the UID message data item as part of any FETCH response
+                caused by a UID command, regardless of whether a UID was specified
+                as a message data item to the FETCH.
+
+                    Note: The rule about including the UID message data item as part
+                    of a FETCH response primarily applies to the UID FETCH and UID
+                    STORE commands, including a UID FETCH command that does not
+                    include UID as a message data item.  Although it is unlikely that
+                    the other UID commands will cause an untagged FETCH, this rule
+                    applies to these commands as well.
+
+                Example:    C: A999 UID FETCH 4827313:4828442 FLAGS
+                            S: * 23 FETCH (FLAGS (\Seen) UID 4827313)
+                            S: * 24 FETCH (FLAGS (\Seen) UID 4827943)
+                            S: * 25 FETCH (FLAGS (\Seen) UID 4828442)
+                            S: A999 OK UID FETCH completed
+            */
+
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+            if(m_SelectedFolder == null){
+                WriteLine(cmdTag + " NO Error: This command is valid only in selected state.");
+
+                return;
+            }
+
+            string[] cmd_cmtText = cmdText.Split(new char[]{' '},2);
+                        
+            if(string.Equals(cmd_cmtText[0],"COPY",StringComparison.InvariantCultureIgnoreCase)){
+                COPY(true,cmdTag,cmd_cmtText[1]);
+            }
+            else if(string.Equals(cmd_cmtText[0],"FETCH",StringComparison.InvariantCultureIgnoreCase)){
+                FETCH(true,cmdTag,cmd_cmtText[1]);
+            }
+            else if(string.Equals(cmd_cmtText[0],"STORE",StringComparison.InvariantCultureIgnoreCase)){
+                STORE(true,cmdTag,cmd_cmtText[1]);
+            }
+            else if(string.Equals(cmd_cmtText[0],"SEARCH",StringComparison.InvariantCultureIgnoreCase)){
+                SEARCH(true,cmdTag,cmd_cmtText[1]);
+            }
+            else{
+                WriteLine(cmdTag + " BAD Error in arguments.");
+            }
+        }
+
+        #endregion
+//
+        #region method EXPUNGE
+
+        private void EXPUNGE(string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.4.3. EXPUNGE Command.
+                Arguments:  none
+
+                Responses:  untagged responses: EXPUNGE
+
+                Result:     OK - expunge completed
+                            NO - expunge failure: can't expunge (e.g., permission
+                                 denied)
+                            BAD - command unknown or arguments invalid
+
+                The EXPUNGE command permanently removes all messages that have the
+                \Deleted flag set from the currently selected mailbox.  Before
+                returning an OK to the client, an untagged EXPUNGE response is
+                sent for each message that is removed.
+
+                Example:    C: A202 EXPUNGE
+                            S: * 3 EXPUNGE
+                            S: * 3 EXPUNGE
+                            S: * 5 EXPUNGE
+                            S: * 8 EXPUNGE
+                            S: A202 OK EXPUNGE completed
+
+                    Note: In this example, messages 3, 4, 7, and 11 had the
+                    \Deleted flag set.  See the description of the EXPUNGE
+                    response for further explanation.
+            */
+
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+            if(m_SelectedFolder != null){
+                WriteLine(cmdTag + " NO Error: This command is valid only in selected state.");
+
+                return;
+            }
+            // TODO:
+
+            throw new NotImplementedException();
+        }
+
+        #endregion
+//
+        #region method IDLE
+
+        private void IDLE(string cmdTag,string cmdText)
+        {
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+            // TODO:
+
+            throw new NotImplementedException();
+        }
+
+        #endregion
+
+
+        #region method CAPABILITY
+
+        private void CAPABILITY(string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.1.1. CAPABILITY Command.
+                Arguments:  none
+
+                Responses:  REQUIRED untagged response: CAPABILITY
+
+                Result:     OK - capability completed
+                            BAD - command unknown or arguments invalid
+
+                The CAPABILITY command requests a listing of capabilities that the
+                server supports.  The server MUST send a single untagged
+                CAPABILITY response with "IMAP4rev1" as one of the listed
+                capabilities before the (tagged) OK response.
+
+                A capability name which begins with "AUTH=" indicates that the
+                server supports that particular authentication mechanism.  All
+                such names are, by definition, part of this specification.  For
+                example, the authorization capability for an experimental
+                "blurdybloop" authenticator would be "AUTH=XBLURDYBLOOP" and not
+                "XAUTH=BLURDYBLOOP" or "XAUTH=XBLURDYBLOOP".
+
+                Other capability names refer to extensions, revisions, or
+                amendments to this specification.  See the documentation of the
+                CAPABILITY response for additional information.  No capabilities,
+                beyond the base IMAP4rev1 set defined in this specification, are
+                enabled without explicit client action to invoke the capability.
+
+                Client and server implementations MUST implement the STARTTLS,
+                LOGINDISABLED, and AUTH=PLAIN (described in [IMAP-TLS])
+                capabilities.  See the Security Considerations section for
+                important information.
+
+                See the section entitled "Client Commands -
+                Experimental/Expansion" for information about the form of site or
+                implementation-specific capabilities.
+
+                Example:    C: abcd CAPABILITY
+                            S: * CAPABILITY IMAP4rev1 STARTTLS AUTH=GSSAPI LOGINDISABLED
+                            S: abcd OK CAPABILITY completed
+                            C: efgh STARTTLS
+                            S: efgh OK STARTLS completed
+                            <TLS negotiation, further commands are under [TLS] layer>
+                            C: ijkl CAPABILITY
+                            S: * CAPABILITY IMAP4rev1 AUTH=GSSAPI AUTH=PLAIN
+                            S: ijkl OK CAPABILITY completed
+            */
+
+            StringBuilder response = new StringBuilder();
+            response.Append("* CAPABILITY");
+            if(!this.IsSecureConnection && this.Certificate != null){
+                response.Append(" STARTTLS");
+            }
+            foreach(string c in m_pCapabilities){
+                response.Append(" " + c);
+            }
+            foreach(AUTH_SASL_ServerMechanism auth in this.Authentications.Values){
+                response.Append(" AUTH=" + auth.Name);
+            }
+            response.Append("\r\n");
+            response.Append(cmdTag  + " OK CAPABILITY completed.\r\n");
+
+            WriteLine(response.ToString());
+        }
+
+        #endregion
+
+        #region method NOOP
+
+        private void NOOP(string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.1.2. NOOP Command.
+                Arguments:  none
+
+                Responses:  no specific responses for this command (but see below)
+
+                Result:     OK - noop completed
+                            BAD - command unknown or arguments invalid
+
+                The NOOP command always succeeds.  It does nothing.
+
+                Since any command can return a status update as untagged data, the
+                NOOP command can be used as a periodic poll for new messages or
+                message status updates during a period of inactivity (this is the
+                preferred method to do this).  The NOOP command can also be used
+                to reset any inactivity autologout timer on the server.
+
+                Example:    C: a002 NOOP
+                            S: a002 OK NOOP completed
+                            . . .
+                            C: a047 NOOP
+                            S: * 22 EXPUNGE
+                            S: * 23 EXISTS
+                            S: * 3 RECENT
+                            S: * 14 FETCH (FLAGS (\Seen \Deleted))
+                            S: a047 OK NOOP completed
+            */
+
+            // Store start time
+			long startTime = DateTime.Now.Ticks;
+
+            if(m_SelectedFolder != null){
+                SendFolderChanges();
+            }
+
+            WriteLine(cmdTag + " OK NOOP Completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds.\r\n");
+        }
+
+        #endregion
+
+        #region method LOGOUT
+
+        private void LOGOUT(string cmdTag,string cmdText)
+        {
+            /* RFC 3501 6.1.3. LOGOUT Command.
+                Arguments:  none
+
+                Responses:  REQUIRED untagged response: BYE
+
+                Result:     OK - logout completed
+                            BAD - command unknown or arguments invalid
+
+                The LOGOUT command informs the server that the client is done with
+                the connection.  The server MUST send a BYE untagged response
+                before the (tagged) OK response, and then close the network
+                connection.
+
+                Example:    C: A023 LOGOUT
+                            S: * BYE IMAP4rev1 Server logging out
+                            S: A023 OK LOGOUT completed
+                            (Server and client then close the connection)
+            */
+
+            try{
+                StringBuilder response = new StringBuilder();
+                response.Append("* BYE IMAP4rev1 Server logging out.\r\n");
+                response.Append(cmdTag + " OK LOGOUT completed.");
+
+                WriteLine(response.ToString());
+            }
+            catch{
+            }
+            Disconnect();
+            Dispose();
+
+            throw new NotImplementedException();
+        }
+
+        #endregion
+
+
+        #region method WriteLine
+
+        /// <summary>
+        /// Sends and logs specified line to connected host.
+        /// </summary>
+        /// <param name="line">Line to send.</param>
+        private void WriteLine(string line)
+        {
+            if(line == null){
+                throw new ArgumentNullException("line");
+            }
+
+            int countWritten = this.TcpStream.WriteLine(line);
+            
+            // Log.
+            if(this.Server.Logger != null){
+                this.Server.Logger.AddWrite(this.ID,this.AuthenticatedUserIdentity,countWritten,line,this.LocalEndPoint,this.RemoteEndPoint);
+            }
+        }
+
+        #endregion
+
+        #region method LogAddText
+
+        /// <summary>
+        /// Logs specified text.
+        /// </summary>
+        /// <param name="text">text to log.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>text</b> is null reference.</exception>
+        public void LogAddText(string text)
+        {
+            if(text == null){
+                throw new ArgumentNullException("text");
+            }
+            
+            // Log
+            if(this.Server.Logger != null){
+                this.Server.Logger.AddText(this.ID,text);
+            }
+        }
+
+        #endregion
+//
+        #region method SendFolderChanges
+
+        /// <summary>
+        /// Sends currently selected folder changes versus current folder state.
+        /// </summary>
+        private void SendFolderChanges()
+        {
+            // TODO:
+
+            throw new NotImplementedException();
+        }
+
+        #endregion
+
+        #region method SupportsCap
+
+        /// <summary>
+        /// Gets if session supports specified capability.
+        /// </summary>
+        /// <param name="capability">Capability name.</param>
+        /// <returns>Returns true if session supports specified capability.</returns>
+        private bool SupportsCap(string capability)
+        {
+            foreach(string c in m_pCapabilities){
+                if(string.Equals(c,capability,StringComparison.InvariantCultureIgnoreCase)){
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        #endregion
+
+
+        #region Properties implementation
+
+        /// <summary>
+        /// Gets session owner IMAP server.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        public new IMAP_ServerN Server
+        {
+            get{
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return (IMAP_ServerN)base.Server;
+            }
+        }
+
+        /// <summary>
+        /// Gets supported SASL authentication methods collection.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        public Dictionary<string,AUTH_SASL_ServerMechanism> Authentications
+        {
+            get{
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return m_pAuthentications; 
+            }
+        }
+
+        /// <summary>
+        /// Gets number of bad commands happened on IMAP session.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        public int BadCommands
+        {
+            get{ 
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return m_BadCommands; 
+            }
+        }
+
+        /// <summary>
+        /// Gets authenticated user identity or null if user has not authenticated.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        public override GenericIdentity AuthenticatedUserIdentity
+        {
+	        get{
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+		        return m_pUser;
+	        }
+        }
+
+        /// <summary>
+        /// Gets session supported CAPABILITIES.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        public List<string> Capabilities
+        {
+            get{ 
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return m_pCapabilities; 
+            }
+        }
+
+        #endregion
+
+        #region Events implementation
+
+        /// <summary>
+        /// Is raised when session has started processing and needs to send "* OK ..." greeting or "* NO ..." error resposne to the connected client.
+        /// </summary>
+        public event EventHandler<IMAP_e_Started> Started = null;
+
+        #region method OnStarted
+
+        /// <summary>
+        /// Raises <b>Started</b> event.
+        /// </summary>
+        /// <param name="response">Default IMAP server response.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_Started OnStarted(IMAP_r_u_ServerStatus response)
+        {
+            IMAP_e_Started eArgs = new IMAP_e_Started(response);            
+            if(this.Started != null){                
+                this.Started(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle LOGIN command.
+        /// </summary>
+        public event EventHandler<IMAP_e_Login> Login = null;
+
+        #region method OnLogin
+
+        /// <summary>
+        /// Raises <b>Login</b> event.
+        /// </summary>
+        /// <param name="user">User name.</param>
+        /// <param name="password">Password.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_Login OnLogin(string user,string password)
+        {
+            IMAP_e_Login eArgs = new IMAP_e_Login(user,password);            
+            if(this.Login != null){                
+                this.Login(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle NAMESPACE command.
+        /// </summary>
+        public event EventHandler<IMAP_e_Namespace> Namespace = null;
+
+        #region method OnNamespace
+
+        /// <summary>
+        /// Raises <b>Namespace</b> event.
+        /// </summary>
+        /// <param name="response">Default IMAP server response.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_Namespace OnNamespace(IMAP_r_ServerStatus response)
+        {
+            IMAP_e_Namespace eArgs = new IMAP_e_Namespace(response);            
+            if(this.Namespace != null){                
+                this.Namespace(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle LIST command.
+        /// </summary>
+        public event EventHandler<IMAP_e_List> List = null;
+
+        #region method OnList
+
+        /// <summary>
+        /// Raises <b>List</b> event.
+        /// </summary>
+        /// <param name="refName">Folder reference name.</param>
+        /// <param name="folder">Folder filter.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_List OnList(string refName,string folder)
+        {
+            IMAP_e_List eArgs = new IMAP_e_List(refName,folder);
+            if(this.List != null){
+                this.List(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle CREATE command.
+        /// </summary>
+        public event EventHandler<IMAP_e_Folder> Create = null;
+
+        #region method OnCreate
+
+        /// <summary>
+        /// Raises <b>Create</b> event.
+        /// </summary>
+        /// <param name="cmdTag">Command tag.</param>
+        /// <param name="folder">Folder name with optional path.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_Folder OnCreate(string cmdTag,string folder)
+        {
+            IMAP_e_Folder eArgs = new IMAP_e_Folder(cmdTag,folder);
+            if(this.Create != null){
+                this.Create(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle DELETE command.
+        /// </summary>
+        public event EventHandler<IMAP_e_Folder> Delete = null;
+
+        #region method OnDelete
+
+        /// <summary>
+        /// Raises <b>Delete</b> event.
+        /// </summary>
+        /// <param name="cmdTag">Command tag.</param>
+        /// <param name="folder">Folder name with optional path.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_Folder OnDelete(string cmdTag,string folder)
+        {
+            IMAP_e_Folder eArgs = new IMAP_e_Folder(cmdTag,folder);
+            if(this.Delete != null){
+                this.Delete(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle RENAME command.
+        /// </summary>
+        public event EventHandler<IMAP_e_Rename> Rename = null;
+
+        #region method OnRename
+
+        /// <summary>
+        /// Raises <b>Rename</b> event.
+        /// </summary>
+        /// <param name="cmdTag">Command tag.</param>
+        /// <param name="currentFolder">Current folder name with optional path.</param>
+        /// <param name="newFolder">New folder name with optional path.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_Rename OnRename(string cmdTag,string currentFolder,string newFolder)
+        {
+            IMAP_e_Rename eArgs = new IMAP_e_Rename(cmdTag,currentFolder,newFolder);
+            if(this.Rename != null){
+                this.Rename(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle LSUB command.
+        /// </summary>
+        public event EventHandler<IMAP_e_LSub> LSub = null;
+
+        #region method OnLSub
+
+        /// <summary>
+        /// Raises <b>LSub</b> event.
+        /// </summary>
+        /// <param name="refName">Folder reference name.</param>
+        /// <param name="folder">Folder filter.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_LSub OnLSub(string refName,string folder)
+        {
+            IMAP_e_LSub eArgs = new IMAP_e_LSub(refName,folder);
+            if(this.LSub != null){
+                this.LSub(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle SUBSCRIBE command.
+        /// </summary>
+        public event EventHandler<IMAP_e_Folder> Subscribe = null;
+
+        #region method OnSubscribe
+
+        /// <summary>
+        /// Raises <b>Subscribe</b> event.
+        /// </summary>
+        /// <param name="cmdTag">Command tag.</param>
+        /// <param name="folder">Folder name with optional path.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_Folder OnSubscribe(string cmdTag,string folder)
+        {
+            IMAP_e_Folder eArgs = new IMAP_e_Folder(cmdTag,folder);
+            if(this.Subscribe != null){
+                this.Subscribe(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle SUBSCRIBE command.
+        /// </summary>
+        public event EventHandler<IMAP_e_Folder> Unsubscribe = null;
+
+        #region method OnUnsubscribe
+
+        /// <summary>
+        /// Raises <b>OnUnsubscribe</b> event.
+        /// </summary>
+        /// <param name="cmdTag">Command tag.</param>
+        /// <param name="folder">Folder name with optional path.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_Folder OnUnsubscribe(string cmdTag,string folder)
+        {
+            IMAP_e_Folder eArgs = new IMAP_e_Folder(cmdTag,folder);
+            if(this.Unsubscribe != null){
+                this.Unsubscribe(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+                
+        /// <summary>
+        /// Is raised when IMAP session needs to handle SELECT command.
+        /// </summary>
+        public event EventHandler<IMAP_e_Select> Select = null;
+
+        #region method OnSelect
+
+        /// <summary>
+        /// Raises <b>OnUnsubscribe</b> event.
+        /// </summary>
+        /// <param name="cmdTag">Command tag.</param>
+        /// <param name="folder">Folder name with optional path.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_Select OnSelect(string cmdTag,string folder)
+        {
+            IMAP_e_Select eArgs = new IMAP_e_Select(folder);
+            if(this.Select != null){
+                this.Select(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        #region method OnGetMessagesInfo
+
+        private IMAP_e_MessagesInfo OnGetMessagesInfo(string folder)
+        {
+            // TODO:
+            IMAP_e_MessagesInfo eArgs = new IMAP_e_MessagesInfo(folder);
+
+            return eArgs;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle APPEND command.
+        /// </summary>
+        public event EventHandler<IMAP_e_Append> Append = null;
+
+        #region method OnAppend
+
+        /// <summary>
+        /// Raises <b>StoreMessage</b> event.
+        /// </summary>
+        /// <param name="folder">Folder name with optional path.</param>
+        /// <param name="flags">Message flags.</param>
+        /// <param name="date">Message IMAP internal date.</param>
+        /// <param name="size">Message size in bytes.</param>
+        /// <param name="response">Default IMAP server response.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_Append OnAppend(string folder,string[] flags,DateTime date,int size,IMAP_r_ServerStatus response)
+        {
+            IMAP_e_Append eArgs = new IMAP_e_Append(folder,flags,date,size,response);
+            if(this.Append != null){
+                this.Append(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle GETQUOTAROOT command.
+        /// </summary>
+        public event EventHandler<IMAP_e_GetQuotaRoot> GetQuotaRoot = null;
+
+        #region method OnGetGuotaRoot
+
+        /// <summary>
+        /// Raises <b>GetQuotaRoot</b> event.
+        /// </summary>
+        /// <param name="folder">Folder name with optional path.</param>
+        /// <param name="response">Default IMAP server response.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_GetQuotaRoot OnGetGuotaRoot(string folder,IMAP_r_ServerStatus response)
+        {
+            IMAP_e_GetQuotaRoot eArgs = new IMAP_e_GetQuotaRoot(folder,response);
+            if(this.GetQuotaRoot != null){
+                this.GetQuotaRoot(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle GETQUOTA command.
+        /// </summary>
+        public event EventHandler<IMAP_e_GetQuota> GetQuota = null;
+
+        #region method OnGetQuota
+
+        /// <summary>
+        /// Raises <b>GetQuota</b> event.
+        /// </summary>
+        /// <param name="quotaRoot">Quota root name.</param>
+        /// <param name="response">Default IMAP server response.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_GetQuota OnGetQuota(string quotaRoot,IMAP_r_ServerStatus response)
+        {
+            IMAP_e_GetQuota eArgs = new IMAP_e_GetQuota(quotaRoot,response);
+            if(this.GetQuota != null){
+                this.GetQuota(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle GETACL command.
+        /// </summary>
+        public event EventHandler<IMAP_e_GetAcl> GetAcl = null;
+
+        #region method OnGetAcl
+
+        /// <summary>
+        /// Raises <b>GetAcl</b> event.
+        /// </summary>
+        /// <param name="folder">Folder name with optional path.</param>
+        /// <param name="response">Default IMAP server response.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_GetAcl OnGetAcl(string folder,IMAP_r_ServerStatus response)
+        {
+            IMAP_e_GetAcl eArgs = new IMAP_e_GetAcl(folder,response);
+            if(this.GetAcl != null){
+                this.GetAcl(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle SETACL command.
+        /// </summary>
+        public event EventHandler<IMAP_e_SetAcl> SetAcl = null;
+
+        #region method OnSetAcl
+
+        /// <summary>
+        /// Raises <b>SetAcl</b> event.
+        /// </summary>
+        /// <param name="folder">Folder name with optional path.</param>
+        /// <param name="identifier">ACL identifier (normally user or group name).</param>
+        /// <param name="rights">Identifier rights.</param>
+        /// <param name="response">Default IMAP server response.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_SetAcl OnSetAcl(string folder,string identifier,string rights,IMAP_r_ServerStatus response)
+        {
+            IMAP_e_SetAcl eArgs = new IMAP_e_SetAcl(folder,identifier,rights,response);
+            if(this.SetAcl != null){
+                this.SetAcl(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle DELETEACL command.
+        /// </summary>
+        public event EventHandler<IMAP_e_DeleteAcl> DeleteAcl = null;
+
+        #region method OnDeleteAcl
+
+        /// <summary>
+        /// Raises <b>DeleteAcl</b> event.
+        /// </summary>
+        /// <param name="folder">Folder name with optional path.</param>
+        /// <param name="identifier">ACL identifier (normally user or group name).</param>
+        /// <param name="response">Default IMAP server response.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_DeleteAcl OnDeleteAcl(string folder,string identifier,IMAP_r_ServerStatus response)
+        {
+            IMAP_e_DeleteAcl eArgs = new IMAP_e_DeleteAcl(folder,identifier,response);
+            if(this.DeleteAcl != null){
+                this.DeleteAcl(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle LISTRIGHTS command.
+        /// </summary>
+        public event EventHandler<IMAP_e_ListRights> ListRights = null;
+
+        #region method OnListRights
+
+        // <summary>
+        /// Raises <b>ListRights</b> event.
+        /// </summary>
+        /// <param name="folder">Folder name with optional path.</param>
+        /// <param name="identifier">ACL identifier (normally user or group name).</param>
+        /// <param name="response">Default IMAP server response.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_ListRights OnListRights(string folder,string identifier,IMAP_r_ServerStatus response)
+        {
+            IMAP_e_ListRights eArgs = new IMAP_e_ListRights(folder,identifier,response);
+            if(this.ListRights != null){
+                this.ListRights(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle MYRIGHTS command.
+        /// </summary>
+        public event EventHandler<IMAP_e_MyRights> MyRights = null;
+
+        #region method OnMyRights
+
+        /// <summary>
+        /// Raises <b>MyRights</b> event.
+        /// </summary>
+        /// <param name="folder">Folder name with optional path.</param>
+        /// <param name="response">Default IMAP server response.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_MyRights OnMyRights(string folder,IMAP_r_ServerStatus response)
+        {
+            IMAP_e_MyRights eArgs = new IMAP_e_MyRights(folder,response);
+            if(this.MyRights != null){
+                this.MyRights(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        #endregion
+    }
+}

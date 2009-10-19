@@ -7,6 +7,7 @@ namespace LumiSoft.Net.IO
     /// <summary>
     /// This class provides data for BeginWriteCallback delegate.
     /// </summary>
+    [Obsolete("Get rid of it.")]
     public class Write_EventArgs
     {
         private Exception m_pException = null;

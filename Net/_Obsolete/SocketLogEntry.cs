@@ -5,6 +5,7 @@ namespace LumiSoft.Net
 	/// <summary>
 	/// Socket log entry.
 	/// </summary>
+    [Obsolete("Get rid of it.")]
 	public class SocketLogEntry
 	{
 		private string             m_Text = "";

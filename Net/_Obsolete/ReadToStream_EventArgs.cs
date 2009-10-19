@@ -8,6 +8,7 @@ namespace LumiSoft.Net.IO
     /// <summary>
     /// This class provides data to asynchronous read to stream methods callback.
     /// </summary>
+    [Obsolete("Get rid of it.")]
     public class ReadToStream_EventArgs
     {
         private Exception m_pException = null;

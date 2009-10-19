@@ -8,6 +8,7 @@ namespace LumiSoft.Net.IO
     /// <summary>
     /// This class provides data to asynchronous write from stream methods callback.
     /// </summary>
+    [Obsolete("Get rid of it.")]
     public class WriteStream_EventArgs
     {
         private Exception m_pException   = null;

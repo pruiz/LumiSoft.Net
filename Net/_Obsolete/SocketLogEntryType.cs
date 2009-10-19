@@ -5,6 +5,7 @@ namespace LumiSoft.Net
 	/// <summary>
 	/// Log entry type.
 	/// </summary>
+    [Obsolete("Get rid of it.")]
 	public enum SocketLogEntryType
 	{
 		/// <summary>

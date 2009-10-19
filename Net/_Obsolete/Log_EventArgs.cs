@@ -6,6 +6,7 @@ namespace LumiSoft.Net
 	/// <summary>
 	/// Provides data for the SessionLog event.
 	/// </summary>
+    [Obsolete("Get rid of it.")]
 	public class Log_EventArgs
 	{
 		private SocketLogger m_pLoggger     = null;
