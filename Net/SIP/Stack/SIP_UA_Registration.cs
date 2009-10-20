@@ -127,7 +127,10 @@ namespace LumiSoft.Net.SIP.Stack
         {   
             m_pFlow = e.ClientTransaction.Flow;
        
-            if(e.Response.StatusCodeType == SIP_StatusCodeType.Success){
+            if(e.Response.StatusCodeType == SIP_StatusCodeType.Provisional){
+                return;
+            }
+            else if(e.Response.StatusCodeType == SIP_StatusCodeType.Success){
                 m_pContacts.Clear();
                 foreach(SIP_t_ContactParam c in e.Response.Contact.GetAllValues()){
                     m_pContacts.Add(c.Address.Uri);
