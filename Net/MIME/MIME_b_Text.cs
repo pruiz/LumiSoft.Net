@@ -113,7 +113,13 @@ namespace LumiSoft.Net.MIME
                 return Encoding.ASCII;
             }
             else{
-                return Encoding.GetEncoding(this.Entity.ContentType.Param_Charset);
+                // Handle custome/extended charsets, just remove "x-" from start.
+                if(this.Entity.ContentType.Param_Charset.ToLower().StartsWith("x-")){
+                    return Encoding.GetEncoding(this.Entity.ContentType.Param_Charset.Substring(2));
+                }
+                else{
+                    return Encoding.GetEncoding(this.Entity.ContentType.Param_Charset);
+                }
             }
         }
 
