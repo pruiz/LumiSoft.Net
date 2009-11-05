@@ -2272,7 +2272,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected, not-authenticated or not-selected state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
-        public void Fetch(bool uid,IMAP_SequenceSet seqSet,IMAP_Client_FetchArg[] items,IMAP_Client_FetchHandler handler)
+        public void Fetch(bool uid,IMAP_SequenceSet seqSet,IMAP_Fetch_DataItem[] items,IMAP_Client_FetchHandler handler)
         {
             if(seqSet == null){
                 throw new ArgumentNullException("seqSet");
