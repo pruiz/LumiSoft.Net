@@ -8,26 +8,179 @@ using System.Security.Principal;
 using LumiSoft.Net.IO;
 using LumiSoft.Net.TCP;
 using LumiSoft.Net.AUTH;
+using LumiSoft.Net.MIME;
+using LumiSoft.Net.Mail;
 
 namespace LumiSoft.Net.IMAP.Server
 {
     /// <summary>
     /// This class implements IMAP server session. Defined RFC 3501.
     /// </summary>
-    public class IMAP_SessionN : TCP_ServerSession
+    public class IMAP_Session : TCP_ServerSession
     {
+        #region class _SelectedFolder
+
+        /// <summary>
+        /// This class holds selected folder data.
+        /// </summary>
+        private class _SelectedFolder
+        {
+            private string                 m_Folder        = null;
+            private bool                   m_IsReadOnly    = false;
+            private List<IMAP_MessageInfo> m_pMessagesInfo = null;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="folder">Folder name with optional path.</param>
+            /// <param name="isReadOnly">Specifies if folder is read only.</param>
+            /// <param name="messagesInfo">Messages info.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> or <b>messagesInfo</b> is null reference.</exception>
+            public _SelectedFolder(string folder,bool isReadOnly,List<IMAP_MessageInfo> messagesInfo)
+            {
+                if(folder == null){
+                    throw new ArgumentNullException("folder");
+                }
+                if(messagesInfo == null){
+                    throw new ArgumentNullException("messagesInfo");
+                }
+
+                m_Folder        = folder;
+                m_IsReadOnly    = isReadOnly;
+                m_pMessagesInfo = messagesInfo;
+            }
+                        
+
+            #region method Filter
+
+            /// <summary>
+            /// Gets messages which match to the specified sequence set.
+            /// </summary>
+            /// <param name="uid">Specifies if sequence set contains UID or sequence numbers.</param>
+            /// <param name="seqSet">Sequence set.</param>
+            /// <returns>Returns messages which match to the specified sequence set.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b> is null reference.</exception>
+            internal IMAP_MessageInfo[] Filter(bool uid,IMAP_SequenceSet seqSet)
+            {
+                if(seqSet == null){
+                    throw new ArgumentNullException("seqSet");
+                }
+
+                List<IMAP_MessageInfo> retVal = new List<IMAP_MessageInfo>();
+                for(int i=0;i<m_pMessagesInfo.Count;i++){
+                    IMAP_MessageInfo msgInfo = m_pMessagesInfo[i];                    
+                    if(uid){
+                        if(seqSet.Contains(msgInfo.UID)){
+                            retVal.Add(msgInfo);
+                        }
+                    }
+                    else{
+                        if(seqSet.Contains(i + 1)){
+                            retVal.Add(msgInfo);
+                        }
+                    }
+                }
+
+                return retVal.ToArray();
+            }
+
+            #endregion
+
+            #region method RemoveMessage
+
+            /// <summary>
+            /// Removes specified message from messages info.
+            /// </summary>
+            /// <param name="message">Message info.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>message</b> is null reference.</exception>
+            internal void RemoveMessage(IMAP_MessageInfo message)
+            {
+                if(message == null){
+                    throw new ArgumentNullException("message");
+                }
+
+                m_pMessagesInfo.Remove(message);
+            }
+
+            #endregion
+
+            #region method GetSeqNo
+
+            /// <summary>
+            /// Gets specified message info IMAP 1-absed sequence number.
+            /// </summary>
+            /// <param name="msgInfo">Message info.</param>
+            /// <returns>Returns specified message info IMAP 1-absed sequence number.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>msgInfo</b> is null reference.</exception>
+            internal int GetSeqNo(IMAP_MessageInfo msgInfo)
+            {
+                if(msgInfo == null){
+                    throw new ArgumentNullException("msgInfo");
+                }
+
+                return m_pMessagesInfo.IndexOf(msgInfo) + 1;
+            }
+
+            #endregion
+
+            #region method Reindex
+
+            /// <summary>
+            /// Reindexes messages sequence numbers.
+            /// </summary>
+            internal void Reindex()
+            {
+                for(int i=0;i<m_pMessagesInfo.Count;i++){
+                    m_pMessagesInfo[i].SeqNo = i + 1;
+                }
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets folder name with optional path.
+            /// </summary>
+            public string Folder
+            {
+                get{ return m_Folder; }
+            }
+
+            /// <summary>
+            /// Gets if folder is read-only.
+            /// </summary>
+            public bool IsReadOnly
+            {
+                get{ return m_IsReadOnly; }
+            }
+
+            /// <summary>
+            /// Gets messages info.
+            /// </summary>
+            internal IMAP_MessageInfo[] MessagesInfo
+            {
+                get{ return m_pMessagesInfo.ToArray(); }
+            }
+
+            #endregion
+        }
+
+        #endregion
+
         private Dictionary<string,AUTH_SASL_ServerMechanism> m_pAuthentications = null;
         private bool                                         m_SessionRejected  = false;
         private int                                          m_BadCommands      = 0;
         private List<string>                                 m_pCapabilities    = null;
         private char                                         m_FolderSeparator  = '/';
         private GenericIdentity                              m_pUser            = null;
-        private string                                       m_SelectedFolder   = null;
+        private _SelectedFolder                              m_pSelectedFolder  = null;
 
         /// <summary>
         /// Default constructor.
         /// </summary>
-        public IMAP_SessionN()
+        public IMAP_Session()
         {
             m_pAuthentications = new Dictionary<string,AUTH_SASL_ServerMechanism>(StringComparer.CurrentCultureIgnoreCase);
 
@@ -55,7 +208,7 @@ namespace LumiSoft.Net.IMAP.Server
                             S: * OK [ALERT] System shutdown in 10 minutes
                             S: A001 OK LOGIN Completed
             */
-            
+      
             try{
                 IMAP_r_u_ServerStatus response = null;
                 if(string.IsNullOrEmpty(this.Server.GreetingText)){
@@ -1346,7 +1499,7 @@ namespace LumiSoft.Net.IMAP.Server
         }
 
         #endregion
-//
+
         #region method STATUS
 
         private void STATUS(string cmdTag,string cmdText)
@@ -1426,13 +1579,71 @@ namespace LumiSoft.Net.IMAP.Server
 
                 return;
             }
-            // TODO:
 
-            throw new NotImplementedException();
+            string[] parts = cmdText.Split(new char[]{' '},2);
+            if(parts.Length != 2){
+                WriteLine(cmdTag + " BAD Error in arguments.");
+
+                return;
+            }
+
+            // Store start time
+			long startTime = DateTime.Now.Ticks;
+
+            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(parts[0]));
+            if(!(parts[1].StartsWith("(") && parts[1].EndsWith(")"))){
+                WriteLine(cmdTag + " BAD Error in arguments.");
+            }
+            else{
+                IMAP_e_Select eSelect = OnSelect(cmdTag,folder);
+                if(eSelect.ErrorResponse != null){
+                    WriteLine(eSelect.ErrorResponse.ToString());
+
+                    return;
+                }
+
+                IMAP_e_MessagesInfo eMessagesInfo = OnGetMessagesInfo(folder);
+                                
+                StringBuilder response = new StringBuilder();
+                response.Append("* STATUS \"" + TextUtils.UnQuoteString(parts[0]) + "\" (");
+                string[] statusItems = parts[1].Substring(1,parts[1].Length - 2).Split(' ');
+                for(int i=0;i<statusItems.Length;i++){
+                    if(i > 0){
+                        response.Append(" ");
+                    }
+
+                    string statusItem = statusItems[i];
+                    if(string.Equals(statusItem,"MESSAGES",StringComparison.InvariantCultureIgnoreCase)){
+                        response.Append("MESSAGES " + eMessagesInfo.Exists);
+                    }
+                    else if(string.Equals(statusItem,"RECENT",StringComparison.InvariantCultureIgnoreCase)){
+                        response.Append("RECENT " + eMessagesInfo.Recent);
+                    }
+                    else if(string.Equals(statusItem,"UIDNEXT",StringComparison.InvariantCultureIgnoreCase)){
+                        response.Append("UIDNEXT " + eMessagesInfo.UidNext);
+                    }
+                    else if(string.Equals(statusItem,"UIDVALIDITY",StringComparison.InvariantCultureIgnoreCase)){
+                        response.Append("UIDVALIDITY " + eSelect.FolderUID);
+                    }
+                    else if(string.Equals(statusItem,"UNSEEN",StringComparison.InvariantCultureIgnoreCase)){
+                        response.Append("UNSEEN " + eMessagesInfo.Unseen);
+                    }
+                    // Invalid status item.
+                    else{
+                        WriteLine(cmdTag + " BAD Error in arguments.");
+
+                        return;
+                    }
+                }
+                response.Append(")\r\n");
+                response.Append(cmdTag + " OK STATUS completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds.\r\n");
+
+                WriteLine(response.ToString());
+            }
         }
 
         #endregion
-//
+
         #region method SELECT
 
         private void SELECT(string cmdTag,string cmdText)
@@ -1523,14 +1734,19 @@ namespace LumiSoft.Net.IMAP.Server
                             S: A142 OK [READ-WRITE] SELECT completed
             */
 
+            // Store start time
+			long startTime = DateTime.Now.Ticks;
+
             if(!this.IsAuthenticated){
                 WriteLine(cmdTag + " NO Authentication required.");
 
                 return;
             }
-            
-            // Store start time
-			long startTime = DateTime.Now.Ticks;
+                        
+            // Unselect folder if any selected.
+            if(m_pSelectedFolder != null){
+                m_pSelectedFolder = null;
+            }
 
             string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
 
@@ -1541,7 +1757,7 @@ namespace LumiSoft.Net.IMAP.Server
                 IMAP_e_MessagesInfo eMessagesInfo = OnGetMessagesInfo(folder);
                 response.Append("* " + eMessagesInfo.Exists + " EXISTS\r\n");
                 response.Append("* " + eMessagesInfo.Recent + " RECENT\r\n");
-                response.Append("* OK [UNSEEN " + eMessagesInfo.Unseen + "] Message " + eMessagesInfo.Unseen + " is the first unseen.\r\n");
+                response.Append("* OK [UNSEEN " + eMessagesInfo.FirstUnseen + "] Message " + eMessagesInfo.Unseen + " is the first unseen.\r\n");
                 response.Append("* OK [UIDNEXT " + eMessagesInfo.UidNext + "] Predicted next message UID.\r\n");
                 if(e.FolderUID > 0){
                     response.Append("* OK [UIDVALIDITY " + e.FolderUID + "] Folder UID value.\r\n");
@@ -1570,7 +1786,8 @@ namespace LumiSoft.Net.IMAP.Server
 
                 WriteLine(response.ToString());
 
-                // TODO:
+                m_pSelectedFolder = new _SelectedFolder(folder,e.IsReadOnly,eMessagesInfo.MessagesInfo);
+                m_pSelectedFolder.Reindex();
             }
             else{
                 WriteLine(e.ErrorResponse.ToString());
@@ -1578,19 +1795,101 @@ namespace LumiSoft.Net.IMAP.Server
         }
 
         #endregion
-//
+
         #region method EXAMINE
 
         private void EXAMINE(string cmdTag,string cmdText)
         {
+            /* RFC 3501 6.3.2. EXAMINE Command.
+                Arguments:  mailbox name
+
+                Responses:  REQUIRED untagged responses: FLAGS, EXISTS, RECENT
+                            REQUIRED OK untagged responses:  UNSEEN,  PERMANENTFLAGS,
+                            UIDNEXT, UIDVALIDITY
+
+                Result:     OK - examine completed, now in selected state
+                            NO - examine failure, now in authenticated state: no
+                                 such mailbox, can't access mailbox
+                            BAD - command unknown or arguments invalid
+
+                The EXAMINE command is identical to SELECT and returns the same
+                output; however, the selected mailbox is identified as read-only.
+                No changes to the permanent state of the mailbox, including
+                per-user state, are permitted; in particular, EXAMINE MUST NOT
+                cause messages to lose the \Recent flag.
+
+                The text of the tagged OK response to the EXAMINE command MUST
+                begin with the "[READ-ONLY]" response code.
+
+                Example:    C: A932 EXAMINE blurdybloop
+                            S: * 17 EXISTS
+                            S: * 2 RECENT
+                            S: * OK [UNSEEN 8] Message 8 is first unseen
+                            S: * OK [UIDVALIDITY 3857529045] UIDs valid
+                            S: * OK [UIDNEXT 4392] Predicted next UID
+                            S: * FLAGS (\Answered \Flagged \Deleted \Seen \Draft)
+                            S: * OK [PERMANENTFLAGS ()] No permanent flags permitted
+                            S: A932 OK [READ-ONLY] EXAMINE completed
+            */
+
             if(!this.IsAuthenticated){
                 WriteLine(cmdTag + " NO Authentication required.");
 
                 return;
             }
-            // TODO:
+            
+            // Store start time
+			long startTime = DateTime.Now.Ticks;
 
-            throw new NotImplementedException();
+            // Unselect folder if any selected.
+            if(m_pSelectedFolder != null){
+                m_pSelectedFolder = null;
+            }
+
+            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+
+            IMAP_e_Select e = OnSelect(cmdTag,folder);
+            if(e.ErrorResponse == null){
+                StringBuilder response = new StringBuilder();
+
+                IMAP_e_MessagesInfo eMessagesInfo = OnGetMessagesInfo(folder);
+                response.Append("* " + eMessagesInfo.Exists + " EXISTS\r\n");
+                response.Append("* " + eMessagesInfo.Recent + " RECENT\r\n");
+                response.Append("* OK [UNSEEN " + eMessagesInfo.FirstUnseen + "] Message " + eMessagesInfo.Unseen + " is the first unseen.\r\n");
+                response.Append("* OK [UIDNEXT " + eMessagesInfo.UidNext + "] Predicted next message UID.\r\n");
+                if(e.FolderUID > 0){
+                    response.Append("* OK [UIDVALIDITY " + e.FolderUID + "] Folder UID value.\r\n");
+                }
+                if(e.Flags.Count > 0){
+                    response.Append("* FLAGS (");
+                    for(int i=0;i<e.Flags.Count;i++){
+                        if(i > 0){
+                            response.Append(" ");
+                        }
+                        response.Append(e.Flags[i]);
+                    }
+                    response.Append(")\r\n");
+                }
+                if(e.PermanentFlags.Count > 0){
+                    response.Append("* PERMANENTFLAGS (");
+                    for(int i=0;i<e.PermanentFlags.Count;i++){
+                        if(i > 0){
+                            response.Append(" ");
+                        }
+                        response.Append(e.PermanentFlags[i]);
+                    }
+                    response.Append(")\r\n");
+                }
+                response.Append(cmdTag + " OK [READ-ONLY] EXAMINE completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds.\r\n");
+
+                WriteLine(response.ToString());
+
+                m_pSelectedFolder = new _SelectedFolder(folder,e.IsReadOnly,eMessagesInfo.MessagesInfo);
+                m_pSelectedFolder.Reindex();
+            }
+            else{
+                WriteLine(e.ErrorResponse.ToString());
+            }
         }
 
         #endregion
@@ -2140,7 +2439,7 @@ namespace LumiSoft.Net.IMAP.Server
 
         #endregion
 
-//
+
         #region method CLOSE
 
         private void CLOSE(string cmdTag,string cmdText)
@@ -2179,14 +2478,15 @@ namespace LumiSoft.Net.IMAP.Server
 
                 return;
             }
-            if(m_SelectedFolder != null){
+            if(m_pSelectedFolder == null){
                 WriteLine(cmdTag + " NO Error: This command is valid only in selected state.");
 
                 return;
             }
-            // TODO:
 
-            throw new NotImplementedException();
+            m_pSelectedFolder = null;
+            
+            WriteLine(cmdTag + " OK CLOSE completed.");
         }
 
         #endregion
@@ -2195,19 +2495,780 @@ namespace LumiSoft.Net.IMAP.Server
 
         private void FETCH(bool uid,string cmdTag,string cmdText)
         {
+            /* RFC 3501. 6.4.5. FETCH Command.
+                Arguments:  sequence set
+                            message data item names or macro
+
+                Responses:  untagged responses: FETCH
+
+                Result:     OK - fetch completed
+                            NO - fetch error: can't fetch that data
+                            BAD - command unknown or arguments invalid
+
+                The FETCH command retrieves data associated with a message in the
+                mailbox.  The data items to be fetched can be either a single atom
+                or a parenthesized list.
+
+                Most data items, identified in the formal syntax under the
+                msg-att-static rule, are static and MUST NOT change for any
+                particular message.  Other data items, identified in the formal
+                syntax under the msg-att-dynamic rule, MAY change, either as a
+                result of a STORE command or due to external events.
+
+                    For example, if a client receives an ENVELOPE for a
+                    message when it already knows the envelope, it can
+                    safely ignore the newly transmitted envelope.
+
+                There are three macros which specify commonly-used sets of data
+                items, and can be used instead of data items.  A macro must be
+                used by itself, and not in conjunction with other macros or data
+                items.
+
+                ALL
+                    Macro equivalent to: (FLAGS INTERNALDATE RFC822.SIZE ENVELOPE)
+
+                FAST
+                    Macro equivalent to: (FLAGS INTERNALDATE RFC822.SIZE)
+
+                FULL
+                    Macro equivalent to: (FLAGS INTERNALDATE RFC822.SIZE ENVELOPE BODY)
+
+                The currently defined data items that can be fetched are:
+
+                BODY
+                    Non-extensible form of BODYSTRUCTURE.
+
+                BODY[<section>]<<partial>>
+                    The text of a particular body section.  The section
+                    specification is a set of zero or more part specifiers
+                    delimited by periods.  A part specifier is either a part number
+                    or one of the following: HEADER, HEADER.FIELDS,
+                    HEADER.FIELDS.NOT, MIME, and TEXT.  An empty section
+                    specification refers to the entire message, including the
+                    header.
+
+                    Every message has at least one part number.  Non-[MIME-IMB]
+                    messages, and non-multipart [MIME-IMB] messages with no
+                    encapsulated message, only have a part 1.
+
+                    Multipart messages are assigned consecutive part numbers, as
+                    they occur in the message.  If a particular part is of type
+                    message or multipart, its parts MUST be indicated by a period
+                    followed by the part number within that nested multipart part.
+
+                    A part of type MESSAGE/RFC822 also has nested part numbers,
+                    referring to parts of the MESSAGE part's body.
+
+                    The HEADER, HEADER.FIELDS, HEADER.FIELDS.NOT, and TEXT part
+                    specifiers can be the sole part specifier or can be prefixed by
+                    one or more numeric part specifiers, provided that the numeric
+                    part specifier refers to a part of type MESSAGE/RFC822.  The
+                    MIME part specifier MUST be prefixed by one or more numeric
+                    part specifiers.
+
+                    The HEADER, HEADER.FIELDS, and HEADER.FIELDS.NOT part
+                    specifiers refer to the [RFC-2822] header of the message or of
+                    an encapsulated [MIME-IMT] MESSAGE/RFC822 message.
+                    HEADER.FIELDS and HEADER.FIELDS.NOT are followed by a list of
+                    field-name (as defined in [RFC-2822]) names, and return a
+                    subset of the header.  The subset returned by HEADER.FIELDS
+                    contains only those header fields with a field-name that
+                    matches one of the names in the list; similarly, the subset
+                    returned by HEADER.FIELDS.NOT contains only the header fields
+                    with a non-matching field-name.  The field-matching is
+                    case-insensitive but otherwise exact.  Subsetting does not
+                    exclude the [RFC-2822] delimiting blank line between the header
+                    and the body; the blank line is included in all header fetches,
+                    except in the case of a message which has no body and no blank
+                    line.
+
+                    The MIME part specifier refers to the [MIME-IMB] header for
+                    this part.
+
+                    The TEXT part specifier refers to the text body of the message,
+                    omitting the [RFC-2822] header.
+
+                        Here is an example of a complex message with some of its
+                        part specifiers:
+
+                    HEADER     ([RFC-2822] header of the message)
+                    TEXT       ([RFC-2822] text body of the message) MULTIPART/MIXED
+                    1          TEXT/PLAIN
+                    2          APPLICATION/OCTET-STREAM
+                    3          MESSAGE/RFC822
+                    3.HEADER   ([RFC-2822] header of the message)
+                    3.TEXT     ([RFC-2822] text body of the message) MULTIPART/MIXED
+                    3.1        TEXT/PLAIN
+                    3.2        APPLICATION/OCTET-STREAM
+                    4          MULTIPART/MIXED
+                    4.1        IMAGE/GIF
+                    4.1.MIME   ([MIME-IMB] header for the IMAGE/GIF)
+                    4.2        MESSAGE/RFC822
+                    4.2.HEADER ([RFC-2822] header of the message)
+                    4.2.TEXT   ([RFC-2822] text body of the message) MULTIPART/MIXED
+                    4.2.1      TEXT/PLAIN
+                    4.2.2      MULTIPART/ALTERNATIVE
+                    4.2.2.1    TEXT/PLAIN
+                    4.2.2.2    TEXT/RICHTEXT
+            
+                    It is possible to fetch a substring of the designated text.
+                    This is done by appending an open angle bracket ("<"), the
+                    octet position of the first desired octet, a period, the
+                    maximum number of octets desired, and a close angle bracket
+                    (">") to the part specifier.  If the starting octet is beyond
+                    the end of the text, an empty string is returned.
+                    Any partial fetch that attempts to read beyond the end of the
+                    text is truncated as appropriate.  A partial fetch that starts
+                    at octet 0 is returned as a partial fetch, even if this
+                    truncation happened.
+
+                        Note: This means that BODY[]<0.2048> of a 1500-octet message
+                        will return BODY[]<0> with a literal of size 1500, not
+                        BODY[].
+
+                        Note: A substring fetch of a HEADER.FIELDS or
+                        HEADER.FIELDS.NOT part specifier is calculated after
+                        subsetting the header.
+
+                    The \Seen flag is implicitly set; if this causes the flags to
+                    change, they SHOULD be included as part of the FETCH responses.
+
+                BODY.PEEK[<section>]<<partial>>
+                    An alternate form of BODY[<section>] that does not implicitly
+                    set the \Seen flag.
+
+                BODYSTRUCTURE
+                    The [MIME-IMB] body structure of the message.  This is computed
+                    by the server by parsing the [MIME-IMB] header fields in the
+                    [RFC-2822] header and [MIME-IMB] headers.
+
+                ENVELOPE
+                    The envelope structure of the message.  This is computed by the
+                    server by parsing the [RFC-2822] header into the component
+                    parts, defaulting various fields as necessary.
+
+                FLAGS
+                    The flags that are set for this message.
+
+                INTERNALDATE
+                    The internal date of the message.
+
+                RFC822
+                    Functionally equivalent to BODY[], differing in the syntax of
+                    the resulting untagged FETCH data (RFC822 is returned).
+
+                RFC822.HEADER
+                    Functionally equivalent to BODY.PEEK[HEADER], differing in the
+                    syntax of the resulting untagged FETCH data (RFC822.HEADER is
+                    returned).
+
+                RFC822.SIZE
+                    The [RFC-2822] size of the message.
+
+                RFC822.TEXT
+                    Functionally equivalent to BODY[TEXT], differing in the syntax
+                    of the resulting untagged FETCH data (RFC822.TEXT is returned).
+                UID
+                    The unique identifier for the message.
+
+
+                Example:    C: A654 FETCH 2:4 (FLAGS BODY[HEADER.FIELDS (DATE FROM)])
+                            S: * 2 FETCH ....
+                            S: * 3 FETCH ....
+                            S: * 4 FETCH ....
+                            S: A654 OK FETCH completed
+            */
+
+            // Store start time
+			long startTime = DateTime.Now.Ticks;
+
             if(!this.IsAuthenticated){
                 WriteLine(cmdTag + " NO Authentication required.");
 
                 return;
             }
-            if(m_SelectedFolder != null){
+            if(m_pSelectedFolder == null){
                 WriteLine(cmdTag + " NO Error: This command is valid only in selected state.");
 
                 return;
             }
-            // TODO:
+            
+            string[] parts = cmdText.Split(new char[]{' '},2);
+            if(parts.Length != 2){
+                WriteLine(cmdTag + " BAD Error in arguments.");
 
-            throw new NotImplementedException();
+                return;
+            }
+
+            IMAP_SequenceSet seqSet = new IMAP_SequenceSet();
+            try{                
+                seqSet.Parse(parts[0]);
+            }
+            catch{
+                WriteLine(cmdTag + " BAD Error in arguments: Invalid 'sequence-set' value.");
+
+                return;
+            }
+
+            #region Parse data-items
+
+            List<IMAP_Fetch_DataItem> dataItems     = new List<IMAP_Fetch_DataItem>();
+            bool                      msgDataNeeded = false;
+
+            // Remove parenthesizes.
+            string dataItemsString = parts[1].Trim();
+            if(dataItemsString.StartsWith("(") && dataItemsString.EndsWith(")")){
+                dataItemsString = dataItemsString.Substring(1,dataItemsString.Length - 2).Trim();
+            }
+
+            // Replace macros.
+            dataItemsString = dataItemsString.Replace("ALL","FLAGS INTERNALDATE RFC822.SIZE ENVELOPE");
+            dataItemsString = dataItemsString.Replace("FAST","FLAGS INTERNALDATE RFC822.SIZE"); 
+            dataItemsString = dataItemsString.Replace("FULL","FLAGS INTERNALDATE RFC822.SIZE ENVELOPE BODY");
+
+            StringReader r = new StringReader(dataItemsString);
+
+            // Parse data-items.
+            while(r.Available > 0){
+                r.ReadToFirstChar();
+
+                #region BODY
+
+                if(r.StartsWith("BODY ",false) || r.EndsWith("BODY",false)){
+                    r.ReadWord();
+                    dataItems.Add(new IMAP_Fetch_DataItem_BodyS());
+                    msgDataNeeded = true;
+                }
+
+                #endregion
+
+                #region BODY[<section>]<<partial>> and BODY.PEEK[<section>]<<partial>>
+
+                else if(r.StartsWith("BODY[",false) || r.StartsWith("BODY.PEEK[",false)){
+                    bool peek = r.StartsWith("BODY.PEEK[",false);
+                    r.ReadWord();
+
+                    #region Parse <section>
+
+                    string section = r.ReadParenthesized();
+                                                                            
+                    // Full message wanted.
+                    if(string.IsNullOrEmpty(section)){
+                    }
+                    else{
+                        // Left-side part-items must be numbers, only last one may be (HEADER,HEADER.FIELDS,HEADER.FIELDS.NOT,MIME,TEXT).
+                    
+                        StringReader rSection = new StringReader(section);
+                        string remainingSection = rSection.ReadWord();
+                        while(remainingSection.Length > 0){
+                            string[] section_parts = remainingSection.Split(new char[]{'.'},2);
+                            // Not part number.
+                            if(!Net_Utils.IsInteger(section_parts[0])){
+                                // We must have one of the following values here (HEADER,HEADER.FIELDS,HEADER.FIELDS.NOT,MIME,TEXT).
+                                if(remainingSection.Equals("HEADER",StringComparison.InvariantCultureIgnoreCase)){                        
+                                }
+                                else if(remainingSection.Equals("HEADER.FIELDS",StringComparison.InvariantCultureIgnoreCase)){
+                                    rSection.ReadToFirstChar();
+                                    if(!rSection.StartsWith("(")){
+                                        WriteLine(cmdTag + " BAD Error in arguments.");
+
+                                        return;
+                                    }
+                                    rSection.ReadParenthesized();
+                                }
+                                else if(remainingSection.Equals("HEADER.FIELDS.NOT",StringComparison.InvariantCultureIgnoreCase)){
+                                    rSection.ReadToFirstChar();
+                                    if(!rSection.StartsWith("(")){
+                                        WriteLine(cmdTag + " BAD Error in arguments.");
+
+                                        return;
+                                    }
+                                    rSection.ReadParenthesized();
+                                }
+                                else if(remainingSection.Equals("MIME",StringComparison.InvariantCultureIgnoreCase)){
+                                }
+                                else if(remainingSection.Equals("TEXT",StringComparison.InvariantCultureIgnoreCase)){
+                                }
+                                // Unknown parts specifier.
+                                else{
+                                    WriteLine(cmdTag + " BAD Error in arguments.");
+
+                                    return;
+                                }
+
+                                break;
+                            }
+
+                            if(section_parts.Length == 2){
+                                remainingSection = section_parts[1];
+                            }
+                            else{
+                                remainingSection = "";
+                            }
+                        }
+                    }
+
+                    #endregion
+
+                    #region Parse <partial>
+
+                    int offset   = 0;
+                    int maxCount = 0;
+                    // Partial data wanted.
+                    if(r.StartsWith("<")){
+                        string[] origin = r.ReadParenthesized().Split('.');
+                        if(origin.Length > 2){
+                            WriteLine(cmdTag + " BAD Error in arguments.");
+
+                            return;
+                        }
+
+                        if(!int.TryParse(origin[0],out offset)){
+                            WriteLine(cmdTag + " BAD Error in arguments.");
+
+                            return;
+                        }
+                        if(origin.Length == 2){
+                            if(!int.TryParse(origin[1],out maxCount)){
+                                WriteLine(cmdTag + " BAD Error in arguments.");
+
+                                return;
+                            }
+                        }
+                    }
+
+                    #endregion
+
+                    if(peek){
+                        dataItems.Add(new IMAP_Fetch_DataItem_BodyPeek(section,offset,maxCount));
+                    }
+                    else{
+                        dataItems.Add(new IMAP_Fetch_DataItem_Body(section,offset,maxCount));
+                    }
+                    msgDataNeeded = true;
+                }
+
+                #endregion
+
+                #region BODYSTRUCTURE
+
+                else if(r.StartsWith("BODYSTRUCTURE",false)){
+                    r.ReadWord();
+                    dataItems.Add(new IMAP_Fetch_DataItem_BodyStructure());
+                    msgDataNeeded = true;
+                }
+
+                #endregion
+
+                #region ENVELOPE
+
+                else if(r.StartsWith("ENVELOPE",false)){
+                    r.ReadWord();
+                    dataItems.Add(new IMAP_Fetch_DataItem_Envelope());
+                    msgDataNeeded = true;
+                }
+
+                #endregion
+                
+                #region FLAGS
+
+                else if(r.StartsWith("FLAGS",false)){
+                    r.ReadWord();
+                    dataItems.Add(new IMAP_Fetch_DataItem_Flags());
+                }
+
+                #endregion
+
+                #region INTERNALDATE
+
+                else if(r.StartsWith("INTERNALDATE",false)){
+                    r.ReadWord();
+                    dataItems.Add(new IMAP_Fetch_DataItem_InternalDate());
+                }
+
+                #endregion
+
+                #region RFC822
+
+                else if(r.StartsWith("RFC822 ",false) || r.EndsWith("RFC822",false)){
+                    r.ReadWord();
+                    dataItems.Add(new IMAP_Fetch_DataItem_Rfc822());
+                    msgDataNeeded = true;
+                }
+
+                #endregion
+
+                #region RFC822.HEADER
+
+                else if(r.StartsWith("RFC822.HEADER",false)){
+                    r.ReadWord();
+                    dataItems.Add(new IMAP_Fetch_DataItem_Rfc822Header());
+                    msgDataNeeded = true;
+                }
+
+                #endregion
+
+                #region RFC822.SIZE
+
+                else if(r.StartsWith("RFC822.SIZE",false)){
+                    r.ReadWord();
+                    dataItems.Add(new IMAP_Fetch_DataItem_Rfc822Size());
+                }
+
+                #endregion
+
+                #region RFC822.TEXT
+
+                else if(r.StartsWith("RFC822.TEXT",false)){
+                    r.ReadWord();
+                    dataItems.Add(new IMAP_Fetch_DataItem_Rfc822Text());
+                    msgDataNeeded = true;
+                }
+
+                #endregion
+
+                #region UID
+
+                else if(r.StartsWith("UID",false)){
+                    r.ReadWord();
+                    dataItems.Add(new IMAP_Fetch_DataItem_Uid());
+                }
+
+                #endregion
+
+                #region Unknown data-item.
+
+                else{
+                    WriteLine(cmdTag + " BAD Error in arguments: Unknown FETCH data-item.");
+
+                    return;
+                }
+
+                #endregion
+            }
+
+            #endregion
+
+            // TODO:
+            // Header
+            // FullMessage
+            // Structure
+
+            IMAP_e_Fetch fetchEArgs = new IMAP_e_Fetch(m_pSelectedFolder.Filter(uid,seqSet),new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"FETCH command completed in %exectime seconds."));
+            fetchEArgs.NewMessageData += new EventHandler<IMAP_e_Fetch.e_NewMessageData>(delegate(object s,IMAP_e_Fetch.e_NewMessageData e){
+                StringBuilder reponseBuffer = new StringBuilder();
+                reponseBuffer.Append("* " + e.MessageInfo.SeqNo + " FETCH (");
+
+                Mail_Message message = null;
+                if(e.MessageData != null){
+                    message = Mail_Message.ParseFromStream(e.MessageData);
+                }
+
+                // Return requested data-items for the returned message.
+                for(int i=0;i<dataItems.Count;i++){
+                    IMAP_Fetch_DataItem dataItem = dataItems[i];
+                                        
+                    // Add data-items separator.
+                    if(i > 0){
+                        reponseBuffer.Append(" ");
+                    }
+                                       
+                    #region BODY
+
+                    if(dataItem is IMAP_Fetch_DataItem_BodyS){
+                        reponseBuffer.Append(ConstructBodyStructure(message,false));
+                    }
+
+                    #endregion
+
+                    #region BODY[<section>]<<partial>> and BODY.PEEK[<section>]<<partial>>
+
+                    else if(dataItem is IMAP_Fetch_DataItem_Body || dataItem is IMAP_Fetch_DataItem_BodyPeek){
+                        string section  = "";
+                        int    offset   = -1;
+                        int    maxCount = -1;
+                        if(dataItem is IMAP_Fetch_DataItem_Body){
+                            section = ((IMAP_Fetch_DataItem_Body)dataItem).Section;
+                        }
+                        else{
+                            section = ((IMAP_Fetch_DataItem_BodyPeek)dataItem).Section;
+                        }
+
+                        using(FileStream tmpFs = File.Create(Path.GetTempFileName())){
+                            // Empty section, full message wanted.
+                            if(string.IsNullOrEmpty(section)){
+                                message.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8);
+                                tmpFs.Position = 0;
+                            }
+                            // Message data part wanted.
+                            else{
+                                // Get specified MIME part.
+                                MIME_Entity entity = GetMimeEntity(message,ParsePartNumberFromSection(section));
+                                if(entity != null){
+                                    string partSpecifier = ParsePartSpecifierFromSection(section);
+
+                                    #region HEADER
+
+                                    if(string.Equals(partSpecifier,"HEADER",StringComparison.InvariantCultureIgnoreCase)){                                        
+                                        entity.Header.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8);
+                                        // All header fetches must include header terminator(CRLF).
+                                        if(tmpFs.Length >0 ){
+                                            tmpFs.WriteByte((byte)'\r');
+                                            tmpFs.WriteByte((byte)'\n');
+                                        }
+                                        tmpFs.Position = 0;
+                                    }
+
+                                    #endregion
+
+                                    #region HEADER.FIELDS
+
+                                    else if(string.Equals(partSpecifier,"HEADER.FIELDS",StringComparison.InvariantCultureIgnoreCase)){
+                                        string   fieldsString = section.Split(new char[]{' '},2)[1];
+                                        string[] fieldNames   = fieldsString.Substring(1,fieldsString.Length - 2).Split(' ');
+                                        foreach(string filedName in fieldNames){
+                                            MIME_h[] fields = entity.Header[filedName];
+                                            if(fields != null){
+                                                foreach(MIME_h field in fields){
+                                                    byte[] fieldBytes = Encoding.UTF8.GetBytes(field.ToString(new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8));
+                                                    tmpFs.Write(fieldBytes,0,fieldBytes.Length);
+                                                }
+                                            }
+                                        }
+                                        // All header fetches must include header terminator(CRLF).
+                                        if(tmpFs.Length >0 ){
+                                            tmpFs.WriteByte((byte)'\r');
+                                            tmpFs.WriteByte((byte)'\n');
+                                        }
+                                        tmpFs.Position = 0;
+                                    }
+
+                                    #endregion
+
+                                    #region HEADER.FIELDS.NOT
+
+                                    else if(string.Equals(partSpecifier,"HEADER.FIELDS.NOT",StringComparison.InvariantCultureIgnoreCase)){
+                                        string   fieldsString = section.Split(new char[]{' '},2)[1];
+                                        string[] fieldNames   = fieldsString.Substring(1,fieldsString.Length - 2).Split(' ');
+                                        foreach(MIME_h field in entity.Header){
+                                            bool contains = false;
+                                            foreach(string fieldName in fieldNames){
+                                                if(string.Equals(field.Name,fieldName,StringComparison.InvariantCultureIgnoreCase)){
+                                                    contains = true;
+                                                    break;
+                                                }
+                                            }
+
+                                            if(!contains){
+                                                byte[] fieldBytes = Encoding.UTF8.GetBytes(field.ToString(new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8));
+                                                tmpFs.Write(fieldBytes,0,fieldBytes.Length);
+                                            }
+                                        }
+                                        // All header fetches must include header terminator(CRLF).
+                                        if(tmpFs.Length >0 ){
+                                            tmpFs.WriteByte((byte)'\r');
+                                            tmpFs.WriteByte((byte)'\n');
+                                        }
+                                        tmpFs.Position = 0;
+                                    }
+
+                                    #endregion
+
+                                    #region MIME
+
+                                    else if(string.Equals(partSpecifier,"MIME",StringComparison.InvariantCultureIgnoreCase)){
+                                        entity.Header.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8);
+                                        // All header fetches must include header terminator(CRLF).
+                                        if(tmpFs.Length >0 ){
+                                            tmpFs.WriteByte((byte)'\r');
+                                            tmpFs.WriteByte((byte)'\n');
+                                        }
+                                        tmpFs.Position = 0;
+                                    }
+
+                                    #endregion
+
+                                    #region TEXT
+
+                                    else if(string.Equals(partSpecifier,"TEXT",StringComparison.InvariantCultureIgnoreCase)){
+                                        entity.Body.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8);
+                                        tmpFs.Position = 0;
+                                    }
+
+                                    #endregion
+
+                                    #region part-number only
+
+                                    else{
+                                        entity.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8);
+                                        tmpFs.Position = 0;
+                                    }
+
+                                    #endregion
+                                }
+                            }
+
+                            #region Send data
+
+                            string body_or_peek = (dataItem is IMAP_Fetch_DataItem_Body) ? "BODY" : "BODY.PEEK";
+
+                            // All data wanted.
+                            if(offset < 1){
+                                reponseBuffer.Append(body_or_peek + "[" + section + "] {" + tmpFs.Length + "}\r\n");
+                                WriteLine(reponseBuffer.ToString());
+                                reponseBuffer = new StringBuilder();
+
+                                this.TcpStream.WriteStream(tmpFs);
+                                LogAddWrite(tmpFs.Length,"Wrote " + tmpFs.Length + " bytes.");
+                            }
+                            // Partial data wanted.
+                            else{                                    
+                                // Offet out of range.
+                                if(offset >= tmpFs.Length){
+                                    reponseBuffer.Append(body_or_peek + "[" + section + "]<" + offset + "> \"\"");
+                                }
+                                else{
+                                    tmpFs.Position = offset;
+                                        
+                                    int count = maxCount > -1 ? (int)Math.Min(maxCount,tmpFs.Length - tmpFs.Position) : (int)(tmpFs.Length - tmpFs.Position);
+                                    reponseBuffer.Append(body_or_peek + "[" + section + "]<" + offset + "> {" + count + "}");
+                                    WriteLine(reponseBuffer.ToString());
+                                    reponseBuffer = new StringBuilder();
+
+                                    this.TcpStream.WriteStream(tmpFs,count);
+                                    LogAddWrite(tmpFs.Length,"Wrote " + count + " bytes.");
+                                }
+                            }
+
+                            #endregion
+                        }
+
+                        // Set Seen flag.
+                        if(!m_pSelectedFolder.IsReadOnly){
+                            // TODO:
+                        }
+                    }
+
+                    #endregion
+
+                    #region BODYSTRUCTURE
+
+                    else if(dataItem is IMAP_Fetch_DataItem_BodyStructure){
+                        reponseBuffer.Append(ConstructBodyStructure(message,true));
+                    }
+
+                    #endregion
+
+                    #region ENVELOPE
+
+                    else if(dataItem is IMAP_Fetch_DataItem_Envelope){
+                        reponseBuffer.Append(IMAP_Envelope.ConstructEnvelope(message));
+                    }
+
+                    #endregion
+
+                    #region FLAGS
+
+                    else if(dataItem is IMAP_Fetch_DataItem_Flags){
+                        reponseBuffer.Append("FLAGS " + e.MessageInfo.FlagsToImapString());
+                    }
+
+                    #endregion
+
+                    #region INTERNALDATE
+
+                    else if(dataItem is IMAP_Fetch_DataItem_InternalDate){
+                        reponseBuffer.Append("INTERNALDATE \"" + IMAP_Utils.DateTimeToString(e.MessageInfo.InternalDate) + "\"");
+                    }
+
+                    #endregion
+
+                    #region RFC822
+
+                    else if(dataItem is IMAP_Fetch_DataItem_Rfc822){
+                        using(FileStream tmpFs = File.Create(Path.GetTempFileName())){
+                            message.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8);
+                            tmpFs.Position = 0;
+
+                            reponseBuffer.Append("RFC822 {" + tmpFs.Length + "}\r\n");
+                            WriteLine(reponseBuffer.ToString());
+                            reponseBuffer = new StringBuilder();
+
+                            this.TcpStream.WriteStream(tmpFs);
+                            LogAddWrite(tmpFs.Length,"Wrote " + tmpFs.Length + " bytes.");
+                        }
+                    }
+
+                    #endregion
+
+                    #region RFC822.HEADER
+
+                    else if(dataItem is IMAP_Fetch_DataItem_Rfc822Header){
+                        MemoryStream ms = new MemoryStream();
+                        message.Header.ToStream(ms,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8);
+                        ms.Position = 0;
+
+                        reponseBuffer.Append("RFC822.HEADER {" + ms.Length + "}\r\n");
+                        WriteLine(reponseBuffer.ToString());
+                        reponseBuffer = new StringBuilder();
+
+                        this.TcpStream.WriteStream(ms);
+                        LogAddWrite(ms.Length,"Wrote " + ms.Length + " bytes.");
+                    }
+
+                    #endregion
+
+                    #region RFC822.SIZE
+
+                    else if(dataItem is IMAP_Fetch_DataItem_Rfc822Size){
+                        reponseBuffer.Append("RFC822.SIZE " + e.MessageInfo.Size);
+                    }
+
+                    #endregion
+
+                    #region RFC822.TEXT
+
+                    else if(dataItem is IMAP_Fetch_DataItem_Rfc822Text){
+                        using(FileStream tmpFs = File.Create(Path.GetTempFileName())){
+                            message.Body.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8);
+                            tmpFs.Position = 0;
+
+                            reponseBuffer.Append("RFC822.TEXT {" + tmpFs.Length + "}\r\n");
+                            WriteLine(reponseBuffer.ToString());
+                            reponseBuffer = new StringBuilder();
+
+                            this.TcpStream.WriteStream(tmpFs);
+                            LogAddWrite(tmpFs.Length,"Wrote " + tmpFs.Length + " bytes.");
+                        }
+                    }
+
+                    #endregion
+
+                    #region UID
+
+                    else if(dataItem is IMAP_Fetch_DataItem_Uid){ 
+                        reponseBuffer.Append("UID " + e.MessageInfo.UID);
+                    }
+
+                    #endregion
+                }
+
+                reponseBuffer.Append(")\r\n");
+                WriteLine(reponseBuffer.ToString());
+            });
+                        
+            // We have all needed data in message info.
+            if(!msgDataNeeded){
+                foreach(IMAP_MessageInfo msgInfo in m_pSelectedFolder.Filter(uid,seqSet)){
+                    fetchEArgs.AddData(msgInfo);
+                }
+            }
+            // Request messages data.
+            else{
+                OnFetch(fetchEArgs);
+            }
+                                    
+            WriteLine(fetchEArgs.Response.ToString().Replace("%exectime",((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2")));
         }
 
         #endregion
@@ -2221,7 +3282,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                 return;
             }
-            if(m_SelectedFolder != null){
+            if(m_pSelectedFolder != null){
                 WriteLine(cmdTag + " NO Error: This command is valid only in selected state.");
 
                 return;
@@ -2232,7 +3293,7 @@ namespace LumiSoft.Net.IMAP.Server
         }
 
         #endregion
-//
+
         #region method STORE
 
         private void STORE(bool uid,string cmdTag,string cmdText)
@@ -2294,23 +3355,99 @@ namespace LumiSoft.Net.IMAP.Server
                             S: A003 OK STORE completed
             */
 
+            // Store start time
+			long startTime = DateTime.Now.Ticks;
+
             if(!this.IsAuthenticated){
                 WriteLine(cmdTag + " NO Authentication required.");
 
                 return;
             }
-            if(m_SelectedFolder != null){
+            if(m_pSelectedFolder == null){
                 WriteLine(cmdTag + " NO Error: This command is valid only in selected state.");
 
                 return;
             }
-            // TODO:
 
-            throw new NotImplementedException();
+            string[] parts = cmdText.Split(new char[]{' '},3);
+            if(parts.Length != 3){
+                WriteLine(cmdTag + " BAD Error in arguments.");
+
+                return;
+            }
+
+            IMAP_SequenceSet seqSet = new IMAP_SequenceSet();
+            try{                
+                seqSet.Parse(parts[0]);
+            }
+            catch{
+                WriteLine(cmdTag + " BAD Error in arguments.");
+
+                return;
+            }
+         
+            IMAP_Flags_SetType setType;
+            bool               silent = false;
+            if(string.Equals(parts[1],"FLAGS",StringComparison.InvariantCultureIgnoreCase)){
+                setType = IMAP_Flags_SetType.Replace;
+            }
+            else if(string.Equals(parts[1],"FLAGS.SILENT",StringComparison.InvariantCultureIgnoreCase)){
+                setType = IMAP_Flags_SetType.Replace;
+                silent = true;
+            }
+            else if(string.Equals(parts[1],"+FLAGS",StringComparison.InvariantCultureIgnoreCase)){
+                setType = IMAP_Flags_SetType.Add;
+            }
+            else if(string.Equals(parts[1],"+FLAGS.SILENT",StringComparison.InvariantCultureIgnoreCase)){
+                setType = IMAP_Flags_SetType.Add;
+                silent = true;
+            }
+            else if(string.Equals(parts[1],"-FLAGS",StringComparison.InvariantCultureIgnoreCase)){
+                setType = IMAP_Flags_SetType.Remove;
+            }
+            else if(string.Equals(parts[1],"-FLAGS.SILENT",StringComparison.InvariantCultureIgnoreCase)){
+                setType = IMAP_Flags_SetType.Remove;
+                silent = true;
+            }
+            else{
+                WriteLine(cmdTag + " BAD Error in arguments.");
+
+                return;
+            }                       
+
+            if(!(parts[2].StartsWith("(") && parts[2].EndsWith(")"))){
+                WriteLine(cmdTag + " BAD Error in arguments.");
+
+                return;
+            }
+            List<string> flags = new List<string>();
+            foreach(string f in parts[2].Substring(1,parts[2].Length - 2).Split(' ')){
+                if(f.Length > 0 && !flags.Contains(f.Substring(1))){
+                    flags.Add(f.Substring(1));
+                }
+            }
+            
+            IMAP_r_ServerStatus response = null;
+            foreach(IMAP_MessageInfo msgInfo in m_pSelectedFolder.Filter(uid,seqSet)){
+                IMAP_e_Store e = OnStore(msgInfo,setType,flags.ToArray(),new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"COPY command completed in %exectime seconds."));
+                response = e.Response;
+                if(string.Equals(e.Response.ResponseCode,"OK",StringComparison.InvariantCultureIgnoreCase)){
+                    break;
+                }
+
+                // Update local message info flags value.
+                msgInfo.UpdateFlags(setType,flags.ToArray());
+
+                if(!silent){
+                    WriteLine("* " + m_pSelectedFolder.GetSeqNo(msgInfo) + " FETCH (FLAGS " + msgInfo.Flags.ToString() + ")");
+                }
+            }
+
+            WriteLine(response.ToString().Replace("%exectime",((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2")));
         }
 
         #endregion
-//
+
         #region method COPY
 
         private void COPY(bool uid,string cmdTag,string cmdText)
@@ -2352,14 +3489,36 @@ namespace LumiSoft.Net.IMAP.Server
 
                 return;
             }
-            if(m_SelectedFolder != null){
+            if(m_pSelectedFolder == null){
                 WriteLine(cmdTag + " NO Error: This command is valid only in selected state.");
 
                 return;
             }
-            // TODO:
 
-            throw new NotImplementedException();
+            string[] parts = cmdText.Split(new char[]{' '},2);
+            if(parts.Length != 2){
+                WriteLine(cmdTag + " BAD Error in arguments.");
+
+                return;
+            }
+            IMAP_SequenceSet seqSet = new IMAP_SequenceSet();
+            try{                
+                seqSet.Parse(parts[0]);
+            }
+            catch{
+                WriteLine(cmdTag + " BAD Error in arguments.");
+
+                return;
+            }
+            string targetFolder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(parts[1]));
+
+            IMAP_e_Copy e = OnCopy(
+                targetFolder,
+                m_pSelectedFolder.Filter(uid,seqSet),
+                new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"COPY completed.")
+            );
+
+            WriteLine(e.Response.ToString());
         }
 
         #endregion
@@ -2441,7 +3600,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                 return;
             }
-            if(m_SelectedFolder == null){
+            if(m_pSelectedFolder == null){
                 WriteLine(cmdTag + " NO Error: This command is valid only in selected state.");
 
                 return;
@@ -2467,7 +3626,7 @@ namespace LumiSoft.Net.IMAP.Server
         }
 
         #endregion
-//
+
         #region method EXPUNGE
 
         private void EXPUNGE(string cmdTag,string cmdText)
@@ -2504,14 +3663,23 @@ namespace LumiSoft.Net.IMAP.Server
 
                 return;
             }
-            if(m_SelectedFolder != null){
+            if(m_pSelectedFolder == null){
                 WriteLine(cmdTag + " NO Error: This command is valid only in selected state.");
 
                 return;
             }
-            // TODO:
+                 
+            for(int i=0;i<m_pSelectedFolder.MessagesInfo.Length;i++){
+                IMAP_MessageInfo msgInfo = m_pSelectedFolder.MessagesInfo[i];
+                if(msgInfo.ConatinsFlag("Deleted")){
+                    OnExpunge(msgInfo);
+                    m_pSelectedFolder.RemoveMessage(msgInfo);
 
-            throw new NotImplementedException();
+                    WriteLine("* " + (i + 1) + " EXPUNGE\r\n");
+                }
+            }
+            
+            WriteLine(cmdTag + " OK EXPUNGE completed.\r\n");
         }
 
         #endregion
@@ -2636,7 +3804,7 @@ namespace LumiSoft.Net.IMAP.Server
             // Store start time
 			long startTime = DateTime.Now.Ticks;
 
-            if(m_SelectedFolder != null){
+            if(m_pSelectedFolder != null){
                 SendFolderChanges();
             }
 
@@ -2708,6 +3876,34 @@ namespace LumiSoft.Net.IMAP.Server
 
         #endregion
 
+        #region method LogAddWrite
+
+        /// <summary>
+        /// Logs write operation.
+        /// </summary>
+        /// <param name="size">Number of bytes written.</param>
+        /// <param name="text">Log text.</param>
+        protected void LogAddWrite(long size,string text)
+        {
+            try{
+                if(this.Server.Logger != null){
+                    this.Server.Logger.AddWrite(
+                        this.ID,
+                        this.AuthenticatedUserIdentity,
+                        size,
+                        text,                        
+                        this.LocalEndPoint,
+                        this.RemoteEndPoint
+                    );
+                }
+            }
+            catch{
+                // We skip all logging errors, normally there shouldn't be any.
+            }
+        }
+
+        #endregion
+
         #region method LogAddText
 
         /// <summary>
@@ -2763,6 +3959,447 @@ namespace LumiSoft.Net.IMAP.Server
 
         #endregion
 
+        #region method ParsePartNumberFromSection
+
+        /// <summary>
+        /// Parses MIME part-number specifier from BODY[] section string.
+        /// </summary>
+        /// <param name="section">Section string.</param>
+        /// <returns>Returns part-number.</returns>
+        /// <exception cref="ArgumentNullException">Is raised wehn <b>section</b> is null reference.</exception>
+        private string ParsePartNumberFromSection(string section)
+        {
+            if(section == null){
+                throw new ArgumentNullException("section");
+            }
+
+            StringBuilder retVal = new StringBuilder();
+            string[] parts = section.Split('.');
+            foreach(string part in parts){
+                if(Net_Utils.IsInteger(part)){
+                    if(retVal.Length > 0){
+                        retVal.Append(".");
+                    }
+                    retVal.Append(part);
+                }
+                else{
+                    break;
+                }
+            }
+
+            return retVal.ToString();
+        }
+
+        #endregion
+
+        #region method ParsePartSpecifierFromSection
+
+        /// <summary>
+        /// Parses MIME part specifier from BODY[] section string.
+        /// </summary>
+        /// <param name="section">Section string.</param>
+        /// <returns>Returns specifier.</returns>
+        /// <exception cref="ArgumentNullException">Is raised wehn <b>section</b> is null reference.</exception>
+        private string ParsePartSpecifierFromSection(string section)
+        {
+            if(section == null){
+                throw new ArgumentNullException("section");
+            }
+
+            StringBuilder retVal = new StringBuilder();
+            string[] parts = section.Split(' ')[0].Split('.');
+            foreach(string part in parts){
+                if(!Net_Utils.IsInteger(part)){
+                    if(retVal.Length > 0){
+                        retVal.Append(".");
+                    }
+                    retVal.Append(part);
+                }
+            }
+
+            return retVal.ToString();
+        }
+
+        #endregion
+
+        #region method GetMimeEntity
+
+        /// <summary>
+		/// Gets specified mime entity. Returns null if specified mime entity doesn't exist.
+		/// </summary>
+		/// <param name="message">Mail message.</param>
+		/// <param name="partNumber">MIME part-number specifier. Nested mime entities are pointed by '.'. 
+		/// For example: 1,1.1,2.1, ... .</param>
+		/// <returns></returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>message</b> is null reference.</exception>
+		public MIME_Entity GetMimeEntity(Mail_Message message,string partNumber)
+		{
+            if(message == null){
+                throw new ArgumentNullException("message");
+            }
+            			
+			// For single part message there is only one entity with value 1.
+			// Example:
+			//		header
+			//		entity -> 1
+			
+			// For multipart message, entity counting starts from MainEntity.ChildEntities
+			// Example:
+			//		header
+			//		multipart/mixed
+			//			text/plain  -> 1
+			//			application/pdf  -> 2
+			//          ...
+
+            // TODO: nested rfc 822 message
+
+            if(partNumber == string.Empty){
+                return message;
+            }
+
+			// Single part
+			if(message.ContentType == null || message.ContentType.Type.ToLower() != "multipart"){
+				if(Convert.ToInt32(partNumber) == 1){
+					return message;
+				}
+				else{
+					return null;
+				}
+			}
+			// multipart
+			else{                
+				MIME_Entity entity = message;
+				string[] parts = partNumber.Split('.');
+				foreach(string part in parts){
+					int mEntryNo = Convert.ToInt32(part) - 1; // Enitites are zero base, mimeEntitySpecifier is 1 based.
+                    if(entity.Body is MIME_b_Multipart){
+                        MIME_b_Multipart multipart = (MIME_b_Multipart)entity.Body;
+                        if(mEntryNo > -1 && mEntryNo < multipart.BodyParts.Count){
+						    entity = multipart.BodyParts[mEntryNo];
+					    }
+                        else{
+                            return null;
+                        }
+                    }
+			        else{
+                        return null;
+                    }
+				}
+
+				return entity;
+			}			
+		}
+
+		#endregion
+
+        #region mehtod ConstructBodyStructure
+
+		/// <summary>
+		/// Constructs FETCH BODY and BODYSTRUCTURE response.
+		/// </summary>
+		/// <param name="message">Mail message.</param>
+		/// <param name="bodystructure">Specifies if to construct BODY or BODYSTRUCTURE.</param>
+		/// <returns></returns>
+		public string ConstructBodyStructure(Mail_Message message,bool bodystructure)
+		{			
+			if(bodystructure){
+				return "BODYSTRUCTURE " + ConstructParts(message,bodystructure);
+			}
+			else{
+				return "BODY " + ConstructParts(message,bodystructure);
+			}
+		}
+
+		/// <summary>
+		/// Constructs specified entity and it's childentities bodystructure string.
+		/// </summary>
+		/// <param name="entity">Mime entity.</param>
+		/// <param name="bodystructure">Specifies if to construct BODY or BODYSTRUCTURE.</param>
+		/// <returns></returns>
+		private string ConstructParts(MIME_Entity entity,bool bodystructure)
+		{
+			/* RFC 3501 7.4.2 BODYSTRUCTURE
+							  BODY A form of BODYSTRUCTURE without extension data.
+			  
+				A parenthesized list that describes the [MIME-IMB] body
+				structure of a message.  This is computed by the server by
+				parsing the [MIME-IMB] header fields, defaulting various fields
+				as necessary.
+
+				For example, a simple text message of 48 lines and 2279 octets
+				can have a body structure of: ("TEXT" "PLAIN" ("CHARSET"
+				"US-ASCII") NIL NIL "7BIT" 2279 48)
+
+				Multiple parts are indicated by parenthesis nesting.  Instead
+				of a body type as the first element of the parenthesized list,
+				there is a sequence of one or more nested body structures.  The
+				second element of the parenthesized list is the multipart
+				subtype (mixed, digest, parallel, alternative, etc.).
+					
+				For example, a two part message consisting of a text and a
+				BASE64-encoded text attachment can have a body structure of:
+				(("TEXT" "PLAIN" ("CHARSET" "US-ASCII") NIL NIL "7BIT" 1152
+				23)("TEXT" "PLAIN" ("CHARSET" "US-ASCII" "NAME" "cc.diff")
+				"<960723163407.20117h@cac.washington.edu>" "Compiler diff"
+				"BASE64" 4554 73) "MIXED")
+
+				Extension data follows the multipart subtype.  Extension data
+				is never returned with the BODY fetch, but can be returned with
+				a BODYSTRUCTURE fetch.  Extension data, if present, MUST be in
+				the defined order.  The extension data of a multipart body part
+				are in the following order:
+
+				body parameter parenthesized list
+					A parenthesized list of attribute/value pairs [e.g., ("foo"
+					"bar" "baz" "rag") where "bar" is the value of "foo", and
+					"rag" is the value of "baz"] as defined in [MIME-IMB].
+
+				body disposition
+					A parenthesized list, consisting of a disposition type
+					string, followed by a parenthesized list of disposition
+					attribute/value pairs as defined in [DISPOSITION].
+
+				body language
+					A string or parenthesized list giving the body language
+					value as defined in [LANGUAGE-TAGS].
+
+				body location
+					A string list giving the body content URI as defined in [LOCATION].
+
+				Any following extension data are not yet defined in this
+				version of the protocol.  Such extension data can consist of
+				zero or more NILs, strings, numbers, or potentially nested
+				parenthesized lists of such data.  Client implementations that
+				do a BODYSTRUCTURE fetch MUST be prepared to accept such
+				extension data.  Server implementations MUST NOT send such
+				extension data until it has been defined by a revision of this
+				protocol.
+
+				The basic fields of a non-multipart body part are in the
+				following order:
+
+				body type
+					A string giving the content media type name as defined in [MIME-IMB].
+				
+				body subtype
+					 A string giving the content subtype name as defined in [MIME-IMB].
+
+				body parameter parenthesized list
+					A parenthesized list of attribute/value pairs [e.g., ("foo"
+					"bar" "baz" "rag") where "bar" is the value of "foo" and
+					"rag" is the value of "baz"] as defined in [MIME-IMB].
+
+				body id
+					A string giving the content id as defined in [MIME-IMB].
+
+				body description
+					A string giving the content description as defined in [MIME-IMB].
+
+				body encoding
+					A string giving the content transfer encoding as defined in	[MIME-IMB].
+
+				body size
+					A number giving the size of the body in octets.  Note that
+					this size is the size in its transfer encoding and not the
+					resulting size after any decoding.
+
+				A body type of type MESSAGE and subtype RFC822 contains,
+				immediately after the basic fields, the envelope structure,
+				body structure, and size in text lines of the encapsulated
+				message.
+
+				A body type of type TEXT contains, immediately after the basic
+				fields, the size of the body in text lines.  Note that this
+				size is the size in its content transfer encoding and not the
+				resulting size after any decoding.
+
+				Extension data follows the basic fields and the type-specific
+				fields listed above.  Extension data is never returned with the
+				BODY fetch, but can be returned with a BODYSTRUCTURE fetch.
+				Extension data, if present, MUST be in the defined order.
+
+				The extension data of a non-multipart body part are in the
+				following order:
+
+				body MD5
+					A string giving the body MD5 value as defined in [MD5].
+					
+				body disposition
+					A parenthesized list with the same content and function as
+					the body disposition for a multipart body part.
+
+				body language
+					A string or parenthesized list giving the body language
+					value as defined in [LANGUAGE-TAGS].
+
+				body location
+					A string list giving the body content URI as defined in [LOCATION].
+
+				Any following extension data are not yet defined in this
+				version of the protocol, and would be as described above under
+				multipart extension data.
+			
+			
+				// We don't construct extention fields like rfc says:
+					Server implementations MUST NOT send such
+					extension data until it has been defined by a revision of this
+					protocol.
+			
+										
+				contentTypeMainMediaType - Example: 'TEXT'
+				contentTypeSubMediaType  - Example: 'PLAIN'
+				conentTypeParameters     - Example: '("CHARSET" "iso-8859-1" ...)'
+				contentID                - Content-ID: header field value.
+				contentDescription       - Content-Description: header field value.
+				contentEncoding          - Content-Transfer-Encoding: header field value.
+				contentSize              - mimeEntity ENCODED data size
+				[envelope]               - NOTE: included only if contentType = "message" !!!
+				[contentLines]           - number of ENCODED data lines. NOTE: included only if contentType = "text" !!!
+									   			
+				// Basic fields for multipart
+				(nestedMimeEntries) contentTypeSubMediaType
+												
+				// Basic fields for non-multipart
+				contentTypeMainMediaType contentTypeSubMediaType (conentTypeParameters) contentID contentDescription contentEncoding contentSize [envelope] [contentLine]
+
+			*/
+
+            MIME_Encoding_EncodedWord wordEncoder = new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8);
+            wordEncoder.Split = false;
+
+			StringBuilder retVal = new StringBuilder();
+			// Multipart message
+			if(entity.Body is MIME_b_Multipart){
+				retVal.Append("(");
+
+				// Construct child entities.
+				foreach(MIME_Entity childEntity in ((MIME_b_Multipart)entity.Body).BodyParts){
+					// Construct child entity. This can be multipart or non multipart.
+					retVal.Append(ConstructParts(childEntity,bodystructure));
+				}
+			
+				// Add contentTypeSubMediaType
+                if(entity.ContentType != null && entity.ContentType.SubType != null){
+                    retVal.Append(" \"" + entity.ContentType.SubType + "\"");
+                }
+                else{
+                    retVal.Append(" NIL");
+                }
+
+				retVal.Append(")");
+			}
+			// Single part message
+			else{
+				retVal.Append("(");
+
+				// NOTE: all header fields and parameters must in ENCODED form !!!
+
+				// Add contentTypeMainMediaType
+				if(entity.ContentType != null && entity.ContentType.Type != null){
+					retVal.Append("\"" + entity.ContentType.Type + "\"");
+				}
+				else{
+					retVal.Append("NIL");
+				}
+
+                // Add contentTypeSubMediaType
+                if(entity.ContentType != null && entity.ContentType.SubType != null){
+                    retVal.Append(" \"" + entity.ContentType.SubType + "\"");
+                }
+                else{
+                    retVal.Append(" NIL");
+                }
+
+				// conentTypeParameters - Syntax: {("name" SP "value" *(SP "name" SP "value"))}
+				if(entity.ContentType != null){
+                    if(entity.ContentType.Parameters.Count > 0){
+                        retVal.Append(" (");
+                        bool first = true;
+                        foreach(MIME_h_Parameter parameter in entity.ContentType.Parameters){
+                            // For the first item, don't add SP.
+                            if(first){
+                                first = false;
+                            }
+                            else{
+                                retVal.Append(" ");
+                            }
+
+                            retVal.Append("\"" + parameter.Name + "\" \"" + wordEncoder.Encode(parameter.Value) + "\"");
+                        }
+                        retVal.Append(")");
+                    }
+                    else{
+                        retVal.Append(" NIL");
+                    }
+				}
+				else{
+					retVal.Append(" NIL");
+				}
+
+				// contentID
+				string contentID = entity.ContentID;
+				if(contentID != null){
+					retVal.Append(" \"" + wordEncoder.Encode(contentID) + "\""); 
+				}
+				else{
+					retVal.Append(" NIL");
+				}
+
+				// contentDescription
+				string contentDescription = entity.ContentDescription;
+				if(contentDescription != null){
+					retVal.Append(" \"" + wordEncoder.Encode(contentDescription) + "\""); 
+				}
+				else{
+					retVal.Append(" NIL");
+				}
+
+				// contentEncoding
+				if(entity.ContentTransferEncoding != null){
+					retVal.Append(" \"" + wordEncoder.Encode(entity.ContentTransferEncoding) + "\""); 
+				}
+				else{
+					// If not specified, then must be 7bit.
+					retVal.Append(" \"7bit\"");
+				}
+
+				// contentSize
+				if(entity.Body is MIME_b_SinglepartBase){                    
+					retVal.Append(" " + ((MIME_b_SinglepartBase)entity.Body).EncodedData.Length.ToString());
+				}
+				else{
+					retVal.Append(" 0");
+				}
+
+				// envelope ---> FOR ContentType: message/rfc822 ONLY ###
+				if(entity.Body is MIME_b_MessageRfc822){                    
+					retVal.Append(" " + IMAP_Envelope.ConstructEnvelope(((MIME_b_MessageRfc822)entity.Body).Message));
+
+                    // TODO: BODYSTRUCTURE,LINES
+				}
+
+				// contentLines ---> FOR ContentType: text/xxx ONLY ###
+				if(entity.Body is MIME_b_Text){                    
+				    long lineCount = 0;
+					StreamLineReader r = new StreamLineReader(new MemoryStream(((MIME_b_SinglepartBase)entity.Body).EncodedData));
+					byte[] line = r.ReadLine();
+					while(line != null){
+						lineCount++;
+
+						line = r.ReadLine();
+					}
+						
+					retVal.Append(" " + lineCount.ToString());
+				}
+
+				retVal.Append(")");
+			}
+
+			return retVal.ToString();
+		}
+
+		#endregion
+
 
         #region Properties implementation
 
@@ -2770,14 +4407,14 @@ namespace LumiSoft.Net.IMAP.Server
         /// Gets session owner IMAP server.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
-        public new IMAP_ServerN Server
+        public new IMAP_Server Server
         {
             get{
                 if(this.IsDisposed){
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                return (IMAP_ServerN)base.Server;
+                return (IMAP_Server)base.Server;
             }
         }
 
@@ -3103,7 +4740,7 @@ namespace LumiSoft.Net.IMAP.Server
         #region method OnSelect
 
         /// <summary>
-        /// Raises <b>OnUnsubscribe</b> event.
+        /// Raises <b>Select</b> event.
         /// </summary>
         /// <param name="cmdTag">Command tag.</param>
         /// <param name="folder">Folder name with optional path.</param>
@@ -3120,12 +4757,24 @@ namespace LumiSoft.Net.IMAP.Server
 
         #endregion
 
+        /// <summary>
+        /// Is raised when IMAP session needs to get folder messages info.
+        /// </summary>
+        public event EventHandler<IMAP_e_MessagesInfo> GetMessagesInfo = null;
+
         #region method OnGetMessagesInfo
 
+        /// <summary>
+        /// Raises <b>GetMessagesInfo</b> event.
+        /// </summary>
+        /// <param name="folder">Folder name with optional path.</param>
+        /// <returns>Returns event args.</returns>
         private IMAP_e_MessagesInfo OnGetMessagesInfo(string folder)
         {
-            // TODO:
             IMAP_e_MessagesInfo eArgs = new IMAP_e_MessagesInfo(folder);
+            if(this.GetMessagesInfo != null){
+                this.GetMessagesInfo(this,eArgs);
+            }
 
             return eArgs;
         }
@@ -3332,6 +4981,103 @@ namespace LumiSoft.Net.IMAP.Server
             IMAP_e_MyRights eArgs = new IMAP_e_MyRights(folder,response);
             if(this.MyRights != null){
                 this.MyRights(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle FETCH command.
+        /// </summary>
+        public event EventHandler<IMAP_e_Fetch> Fetch = null;
+
+        #region method OnFetch
+
+        /// <summary>
+        /// Raises <b>Fetch</b> event.
+        /// </summary>
+        /// <param name="e">Event data.</param>
+        private void OnFetch(IMAP_e_Fetch e)
+        {
+            if(this.Fetch != null){
+                this.Fetch(this,e);
+            }
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle STORE command.
+        /// </summary>
+        public event EventHandler<IMAP_e_Store> Store = null;
+
+        #region method OnStore
+
+        /// <summary>
+        /// Raises <b>Store</b> event.
+        /// </summary>
+        /// <param name="msgInfo">Message info.</param>
+        /// <param name="setType">Flags set type.</param>
+        /// <param name="flags">Flags.</param>
+        /// <param name="response">Default IMAP server response.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_Store OnStore(IMAP_MessageInfo msgInfo,IMAP_Flags_SetType setType,string[] flags,IMAP_r_ServerStatus response)
+        {
+            IMAP_e_Store eArgs = new IMAP_e_Store(m_pSelectedFolder.Folder,msgInfo,setType,flags,response);
+            if(this.Store != null){
+                this.Store(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle COPY command.
+        /// </summary>
+        public event EventHandler<IMAP_e_Copy> Copy = null;
+
+        #region method OnCopy
+
+        /// <summary>
+        /// Raises <b>Copy</b> event.
+        /// </summary>
+        /// <param name="targetFolder">Target folder name with optional path.</param>
+        /// <param name="messagesInfo">Messages info.</param>
+        /// <param name="response">Default IMAP server response.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_Copy OnCopy(string targetFolder,IMAP_MessageInfo[] messagesInfo,IMAP_r_ServerStatus response)
+        {
+            IMAP_e_Copy eArgs = new IMAP_e_Copy(m_pSelectedFolder.Folder,targetFolder,messagesInfo,response);
+            if(this.Copy != null){
+                this.Copy(this,eArgs);
+            }
+
+            return eArgs;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP session needs to handle EXPUNGE command.
+        /// </summary>
+        public event EventHandler<IMAP_e_Expunge> Expunge = null;
+
+        #region method OnExpunge
+
+        /// <summary>
+        /// Raises <b>Expunge</b> event.
+        /// </summary>
+        /// <param name="msgInfo">Messgae info.</param>
+        /// <returns>Returns event args.</returns>
+        private IMAP_e_Expunge OnExpunge(IMAP_MessageInfo msgInfo)
+        {
+            IMAP_e_Expunge eArgs = new IMAP_e_Expunge(m_pSelectedFolder.Folder,msgInfo);
+            if(this.Expunge != null){
+                this.Expunge(this,eArgs);
             }
 
             return eArgs;

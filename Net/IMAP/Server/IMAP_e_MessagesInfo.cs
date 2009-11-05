@@ -5,7 +5,7 @@ using System.Text;
 namespace LumiSoft.Net.IMAP.Server
 {
     /// <summary>
-    /// 
+    /// This class provides data for <b cref="IMAP_Session.GetMessagesInfo">IMAP_Session.GetMessagesInfo</b> event.
     /// </summary>
     public class IMAP_e_MessagesInfo : EventArgs
     {
@@ -24,6 +24,8 @@ namespace LumiSoft.Net.IMAP.Server
             }
 
             m_Folder = folder;
+
+            m_pMessages = new List<IMAP_MessageInfo>();
         }
 
 
@@ -37,25 +39,99 @@ namespace LumiSoft.Net.IMAP.Server
             get{ return m_Folder; }
         }
 
+        /// <summary>
+        /// Gets messages info collection.
+        /// </summary>
+        public List<IMAP_MessageInfo> MessagesInfo
+        {
+            get{ return m_pMessages; }
+        }
 
+
+        /// <summary>
+        /// Gets messages count.
+        /// </summary>
         internal int Exists
         {
-            get{ return 0; }
+            get{ return m_pMessages.Count; }
         }
 
+        /// <summary>
+        /// Gets messages count with recent flag set.
+        /// </summary>
         internal int Recent
         {
-            get{ return 0; }
+            get{ 
+                int count = 0;
+                foreach(IMAP_MessageInfo m in m_pMessages){
+                    foreach(string flag in m.Flags){
+                        if(string.Equals(flag,"Recent",StringComparison.InvariantCultureIgnoreCase)){
+                            count++;
+                            break;
+                        }
+                    }
+                }
+
+                return count; 
+            }
         }
 
+        /// <summary>
+        /// Get messages first unseen message 1-based sequnece number.
+        /// </summary>
+        internal int FirstUnseen
+        {
+            get{
+                for(int i=0;i<m_pMessages.Count;i++){
+                    foreach(string flag in m_pMessages[i].Flags){
+                        if(string.Equals(flag,"Seen",StringComparison.InvariantCultureIgnoreCase)){
+                            return i + 1;
+                        }
+                    }
+                }
+
+                return 0; 
+            }
+        }
+
+        /// <summary>
+        /// Gets messages count with seen flag not set.
+        /// </summary>
         internal int Unseen
         {
-            get{ return 0; }
+            get{ 
+                int count = m_pMessages.Count;
+                foreach(IMAP_MessageInfo m in m_pMessages){
+                    foreach(string flag in m.Flags){
+                        if(string.Equals(flag,"Seen",StringComparison.InvariantCultureIgnoreCase)){
+                            count--;
+                            break;
+                        }
+                    }
+                }
+
+                return count; 
+            }
         }
 
-        internal int UidNext
+        /// <summary>
+        /// Gets next message predicted UID value.
+        /// </summary>
+        internal long UidNext
         {
-            get{ return 0; }
+            get{ 
+                long maxUID = 0;
+                foreach(IMAP_MessageInfo m in m_pMessages){
+                    if(m.UID > maxUID){
+                        maxUID = m.UID;
+                    }
+                }
+                if(maxUID > 0){
+                    maxUID++;
+                }
+
+                return maxUID; 
+            }
         }
 
         #endregion

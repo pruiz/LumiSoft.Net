@@ -10,7 +10,7 @@ namespace LumiSoft.Net.IMAP.Server
     /// <summary>
     /// This class implements IMAPv4 server. Defined RFC 3501.
     /// </summary>
-    public class IMAP_ServerN : TCP_Server<IMAP_SessionN>
+    public class IMAP_Server : TCP_Server<IMAP_Session>
     {
         private string m_GreetingText   = "";
         private int    m_MaxBadCommands = 30;
@@ -18,7 +18,7 @@ namespace LumiSoft.Net.IMAP.Server
         /// <summary>
         /// Default constructor.
         /// </summary>
-        public IMAP_ServerN()
+        public IMAP_Server()
         {
         }
 
@@ -32,7 +32,7 @@ namespace LumiSoft.Net.IMAP.Server
         /// <remarks>This method allows inhereted classes to report error message to connected client.
         /// Session will be disconnected after this method completes.
         /// </remarks>
-        protected override void OnMaxConnectionsExceeded(IMAP_SessionN session)
+        protected override void OnMaxConnectionsExceeded(IMAP_Session session)
         {
             session.TcpStream.WriteLine("* NO Client host rejected: too many connections, please try again later.");
         }
@@ -48,7 +48,7 @@ namespace LumiSoft.Net.IMAP.Server
         /// <remarks>This method allows inhereted classes to report error message to connected client.
         /// Session will be disconnected after this method completes.
         /// </remarks>
-        protected override void OnMaxConnectionsPerIPExceeded(IMAP_SessionN session)
+        protected override void OnMaxConnectionsPerIPExceeded(IMAP_Session session)
         {
             session.TcpStream.WriteLine("* NO Client host rejected: too many connections from your IP(" + session.RemoteEndPoint.Address + "), please try again later.");
         }

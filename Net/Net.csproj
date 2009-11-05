@@ -123,25 +123,26 @@
     <Compile Include="DNS\DNS_QType.cs" />
     <Compile Include="DNS\DNS_RCode.cs" />
     <Compile Include="IMAP\Client\IMAP_Client.cs" />
-    <Compile Include="IMAP\Client\IMAP_Client_FetchArg.cs" />
-    <Compile Include="IMAP\Client\IMAP_Client_FetchArg_Body.cs" />
-    <Compile Include="IMAP\Client\IMAP_Client_FetchArg_BodyPeek.cs" />
-    <Compile Include="IMAP\Client\IMAP_Client_FetchArg_BodyStructure.cs" />
-    <Compile Include="IMAP\Client\IMAP_Client_FetchArg_Envelope.cs" />
-    <Compile Include="IMAP\Client\IMAP_Client_FetchArg_Flags.cs" />
-    <Compile Include="IMAP\Client\IMAP_Client_FetchArg_InternalDate.cs" />
-    <Compile Include="IMAP\Client\IMAP_Client_FetchArg_Rfc822.cs" />
-    <Compile Include="IMAP\Client\IMAP_Client_FetchArg_Rfc822Header.cs" />
-    <Compile Include="IMAP\Client\IMAP_Client_FetchArg_Rfc822Size.cs" />
-    <Compile Include="IMAP\Client\IMAP_Client_FetchArg_Rfc822Text.cs" />
-    <Compile Include="IMAP\Client\IMAP_Client_FetchArg_Uid.cs" />
+    <Compile Include="IMAP\IMAP_Fetch_DataItem.cs" />
+    <Compile Include="IMAP\IMAP_Fetch_DataItem_Body.cs" />
+    <Compile Include="IMAP\IMAP_Fetch_DataItem_BodyPeek.cs" />
+    <Compile Include="IMAP\IMAP_Fetch_DataItem_BodyS.cs" />
+    <Compile Include="IMAP\IMAP_Fetch_DataItem_BodyStructure.cs" />
+    <Compile Include="IMAP\IMAP_Fetch_DataItem_Envelope.cs" />
+    <Compile Include="IMAP\IMAP_Fetch_DataItem_Flags.cs" />
+    <Compile Include="IMAP\IMAP_Fetch_DataItem_InternalDate.cs" />
+    <Compile Include="IMAP\IMAP_Fetch_DataItem_Rfc822.cs" />
+    <Compile Include="IMAP\IMAP_Fetch_DataItem_Rfc822Header.cs" />
+    <Compile Include="IMAP\IMAP_Fetch_DataItem_Rfc822Size.cs" />
+    <Compile Include="IMAP\IMAP_Fetch_DataItem_Rfc822Text.cs" />
+    <Compile Include="IMAP\IMAP_Fetch_DataItem_Uid.cs" />
     <Compile Include="IMAP\Client\IMAP_Client_FetchHandler.cs" />
     <Compile Include="IMAP\Client\IMAP_Client_Fetch_Body_EArgs.cs" />
     <Compile Include="IMAP\Client\IMAP_Client_Fetch_Rfc822_EArgs.cs" />
     <Compile Include="IMAP\Client\IMAP_Client_SelectedFolder.cs" />
     <Compile Include="IMAP\IMAP_Acl_Entry.cs" />
     <Compile Include="IMAP\IMAP_Envelope.cs" />
-    <Compile Include="IMAP\IMAP_e_DeleteAcl.cs" />
+    <Compile Include="IMAP\Server\IMAP_e_DeleteAcl.cs" />
     <Compile Include="IMAP\IMAP_Namespace_Entry.cs" />
     <Compile Include="IMAP\IMAP_Quota_Entry.cs" />
     <Compile Include="IMAP\IMAP_r.cs" />
@@ -160,6 +161,8 @@
     <Compile Include="IMAP\IMAP_r_u_QuotaRoot.cs" />
     <Compile Include="IMAP\IMAP_r_u_Status.cs" />
     <Compile Include="IMAP\Server\IMAP_e_Copy.cs" />
+    <Compile Include="IMAP\Server\IMAP_e_Expunge.cs" />
+    <Compile Include="IMAP\Server\IMAP_e_Fetch.cs" />
     <Compile Include="IMAP\Server\IMAP_e_Folder.cs" />
     <Compile Include="IMAP\Server\IMAP_e_GetAcl.cs" />
     <Compile Include="IMAP\Server\IMAP_e_GetQuotaRoot.cs" />
@@ -176,9 +179,10 @@
     <Compile Include="IMAP\Server\IMAP_e_SetAcl.cs" />
     <Compile Include="IMAP\Server\IMAP_e_Started.cs" />
     <Compile Include="IMAP\Server\IMAP_e_Append.cs" />
+    <Compile Include="IMAP\Server\IMAP_e_Store.cs" />
     <Compile Include="IMAP\Server\IMAP_MessageInfo.cs" />
-    <Compile Include="IMAP\Server\IMAP_ServerN.cs" />
-    <Compile Include="IMAP\Server\IMAP_SessionN.cs" />
+    <Compile Include="IMAP\Server\IMAP_Server.cs" />
+    <Compile Include="IMAP\Server\IMAP_Session.cs" />
     <Compile Include="IO\Base64.cs" />
     <Compile Include="IO\FifoBuffer.cs" />
     <Compile Include="IO\QuotedPrintableStream.cs" />
@@ -421,12 +425,6 @@
     <Compile Include="UDP\UDP_ProcessMode.cs" />
     <Compile Include="UDP\UDP_Server.cs" />
     <Compile Include="URI\AbsoluteUri.cs" />
-    <Compile Include="IMAP\Server\old\IMAP_eArgs_GetMessagesInfo.cs" />
-    <Compile Include="IMAP\Server\old\IMAP_eArgs_GetQuota.cs" />
-    <Compile Include="IMAP\Server\old\IMAP_eArgs_MessageItems.cs" />
-    <Compile Include="IMAP\Server\old\IMAP_Message.cs" />
-    <Compile Include="IMAP\Server\old\IMAP_MessageCollection.cs" />
-    <Compile Include="IMAP\Server\old\IMAP_MessageItems_enum.cs" />
     <Compile Include="DNS\Client\DNS_rr_A.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -497,63 +495,24 @@
     <Compile Include="IMAP\IMAP_SequenceSet.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="IMAP\Server\old\AuthUser_EventArgs.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="IMAP\Server\old\Folder_EventArgs.cs">
-      <SubType>Code</SubType>
-    </Compile>
     <None Include="_Obsolete\IMAP\IMAP_BODY_Entity.cs" />
-    <Compile Include="IMAP\Server\old\IMAP_eArgs_DELETEACL.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="IMAP\Server\old\IMAP_eArgs_GETACL.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="IMAP\Server\old\IMAP_eArgs_GetUserACL.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <None Include="IMAP\Server\old\IMAP_eArgs_Search.cs">
-      <SubType>Code</SubType>
-    </None>
-    <Compile Include="IMAP\Server\old\IMAP_eArgs_SETACL.cs">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="IMAP\IMAP_Flags_SetType.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="IMAP\Server\old\IMAP_Folder.cs">
+    <None Include="IMAP\Server\old\IMAP_SearchGroup.cs">
       <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="IMAP\Server\old\IMAP_Folders.cs">
+    </None>
+    <None Include="IMAP\Server\old\IMAP_SearchKey.cs">
       <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="IMAP\Server\old\IMAP_SearchGroup.cs">
+    </None>
+    <None Include="IMAP\Server\old\IMAP_SearchMatcher.cs">
       <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="IMAP\Server\old\IMAP_SearchKey.cs">
+    </None>
+    <None Include="IMAP\Server\old\IMAP_SelectedFolder.cs" />
+    <None Include="IMAP\Server\old\IMAP_Session.cs">
       <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="IMAP\Server\old\IMAP_SearchMatcher.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="IMAP\Server\old\IMAP_SelectedFolder.cs" />
-    <Compile Include="IMAP\Server\old\IMAP_Server.cs">
-      <SubType>Component</SubType>
-    </Compile>
-    <Compile Include="IMAP\Server\old\IMAP_Session.cs">
-      <SubType>Code</SubType>
-    </Compile>
+    </None>
     <Compile Include="IMAP\IMAP_Utils.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="IMAP\Server\old\Message_EventArgs.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="IMAP\Server\old\SharedRootFolders_EventArgs.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="IMAP\Server\old\_FetchHelper.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="IO\DataSizeExceededException.cs" />

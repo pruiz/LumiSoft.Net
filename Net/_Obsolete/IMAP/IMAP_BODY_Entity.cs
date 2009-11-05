@@ -37,6 +37,8 @@ namespace LumiSoft.Net.IMAP
         /// </summary>
         internal void Parse(string text)
         {
+            throw new NotImplementedException();
+            /*
             StringReader r = new StringReader(text);
             r.ReadToFirstChar();
 
@@ -140,7 +142,7 @@ namespace LumiSoft.Net.IMAP
                         m_ContentLines = Convert.ToInt32(contentLines);
                     }
                 }                
-            }            
+            }   */         
         }
 
         #endregion

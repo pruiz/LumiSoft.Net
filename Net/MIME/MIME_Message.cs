@@ -232,6 +232,7 @@ namespace LumiSoft.Net.MIME
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
+                /* REMOVE ME: 30.10.2009
                 List<MIME_Entity>  retVal        = new List<MIME_Entity>();
                 Queue<MIME_Entity> entitiesQueue = new Queue<MIME_Entity>();
                 entitiesQueue.Enqueue(this);
@@ -251,6 +252,28 @@ namespace LumiSoft.Net.MIME
                 }
 
                 return retVal.ToArray(); 
+                */
+
+                List<MIME_Entity>  retVal       = new List<MIME_Entity>();
+                List<MIME_Entity> entitiesQueue = new List<MIME_Entity>();
+                entitiesQueue.Add(this);
+            
+                while(entitiesQueue.Count > 0){
+                    MIME_Entity currentEntity = entitiesQueue[0];
+                    entitiesQueue.RemoveAt(0);
+        
+                    retVal.Add(currentEntity);
+
+                    // Current entity is multipart entity, add it's body-parts for processing.
+                    if(this.Body != null && currentEntity.Body.GetType().IsSubclassOf(typeof(MIME_b_Multipart))){
+                        MIME_EntityCollection bodyParts = ((MIME_b_Multipart)currentEntity.Body).BodyParts;
+                        for(int i=0;i<bodyParts.Count;i++){
+                            entitiesQueue.Insert(i,bodyParts[i]);
+                        }
+                    }                    
+                }
+
+                return retVal.ToArray();
             }
         }
 

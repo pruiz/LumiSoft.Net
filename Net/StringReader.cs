@@ -382,7 +382,7 @@ namespace LumiSoft.Net
 		/// Gets if source string starts with specified value. Compare is case-sensitive.
 		/// </summary>
 		/// <param name="value">Start string value.</param>
-		/// <returns></returns>
+		/// <returns>Returns true if source string starts with specified value.</returns>
 		public bool StartsWith(string value)
 		{
 			return m_SourceString.StartsWith(value);
@@ -393,7 +393,7 @@ namespace LumiSoft.Net
 		/// </summary>
 		/// <param name="value">Start string value.</param>
 		/// <param name="case_sensitive">Specifies if compare is case-sensitive.</param>
-		/// <returns></returns>
+		/// <returns>Returns true if source string starts with specified value.</returns>
 		public bool StartsWith(string value,bool case_sensitive)
 		{
 			if(case_sensitive){
@@ -401,6 +401,36 @@ namespace LumiSoft.Net
 			}
 			else{
 				return m_SourceString.ToLower().StartsWith(value.ToLower());
+			}
+		}
+
+		#endregion
+
+        #region method EndsWith
+
+        /// <summary>
+		/// Gets if source string ends with specified value. Compare is case-sensitive.
+		/// </summary>
+		/// <param name="value">Start string value.</param>
+		/// <returns>Returns true if source string ends with specified value.</returns>
+		public bool EndsWith(string value)
+		{
+			return m_SourceString.EndsWith(value);
+		}
+		
+		/// <summary>
+		/// Gets if source string ends with specified value.
+		/// </summary>
+		/// <param name="value">Start string value.</param>
+		/// <param name="case_sensitive">Specifies if compare is case-sensitive.</param>
+		/// <returns>Returns true if source string ends with specified value.</returns>
+		public bool EndsWith(string value,bool case_sensitive)
+		{
+			if(case_sensitive){
+				return m_SourceString.EndsWith(value);
+			}
+			else{
+				return m_SourceString.EndsWith(value,StringComparison.InvariantCultureIgnoreCase);
 			}
 		}
 
