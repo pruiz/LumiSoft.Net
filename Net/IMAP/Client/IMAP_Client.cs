@@ -2184,10 +2184,14 @@ namespace LumiSoft.Net.IMAP.Client
                 }
                 else{
                     this.TcpStream.Write(buffer,0,readedCount);
+                    countSent += readedCount;
                 }
             }
 
             LogAddWrite(count,"Wrote " + count + " bytes.");
+
+            // Send command line terminating CRLF.
+            WriteLine("\r\n");
 
             response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
