@@ -2163,7 +2163,7 @@ namespace LumiSoft.Net.IMAP.Client
                 command.Append(" (" + IMAP_Utils.MessageFlagsToString(flags) + ")");
             }
             if(internalDate != DateTime.MinValue){
-                command.Append(" " + IMAP_Utils.DateTimeToString(internalDate));
+                command.Append(" " + TextUtils.QuoteString(IMAP_Utils.DateTimeToString(internalDate)));
             }
             command.Append(" {" + count + "}\r\n");
 
