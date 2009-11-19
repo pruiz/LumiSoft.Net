@@ -22,6 +22,40 @@ namespace LumiSoft.Net.IMAP
         }
 
 
+        #region static method Parse
+
+        /// <summary>
+        /// Returns parsed IMAP SEARCH <b>SMALLER (string)</b> key.
+        /// </summary>
+        /// <param name="r">String reader.</param>
+        /// <returns>Returns parsed IMAP SEARCH <b>SMALLER (string)</b> key.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>r</b> is null reference.</exception>
+        /// <exception cref="ParseException">Is raised when parsing fails.</exception>
+        internal static IMAP_Search_Key_Smaller Parse(StringReader r)
+        {
+            if(r == null){
+                throw new ArgumentNullException("r");
+            }
+
+            string word = r.ReadWord();
+            if(!string.Equals(word,"SMALLER",StringComparison.InvariantCultureIgnoreCase)){
+                throw new ParseException("Parse error: Not a SEARCH 'SMALLER' key.");
+            }
+            string value = r.ReadWord();
+            if(value == null){
+                throw new ParseException("Parse error: Invalid 'SMALLER' value.");
+            }
+            int size = 0;
+            if(!int.TryParse(value,out size)){
+                throw new ParseException("Parse error: Invalid 'SMALLER' value.");
+            }
+
+            return new IMAP_Search_Key_Smaller(size);
+        }
+
+        #endregion
+
+
         #region override method ToString
 
         /// <summary>

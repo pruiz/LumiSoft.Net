@@ -27,6 +27,36 @@ namespace LumiSoft.Net.IMAP
         }
 
 
+        #region static method Parse
+
+        /// <summary>
+        /// Returns parsed IMAP SEARCH <b>FROM (string)</b> key.
+        /// </summary>
+        /// <param name="r">String reader.</param>
+        /// <returns>Returns parsed IMAP SEARCH <b>FROM (string)</b> key.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>r</b> is null reference.</exception>
+        /// <exception cref="ParseException">Is raised when parsing fails.</exception>
+        internal static IMAP_Search_Key_From Parse(StringReader r)
+        {
+            if(r == null){
+                throw new ArgumentNullException("r");
+            }
+
+            string word = r.ReadWord();
+            if(!string.Equals(word,"FROM",StringComparison.InvariantCultureIgnoreCase)){
+                throw new ParseException("Parse error: Not a SEARCH 'FROM' key.");
+            }
+            string value = r.ReadWord();
+            if(value == null){
+                throw new ParseException("Parse error: Invalid 'FROM' value.");
+            }
+
+            return new IMAP_Search_Key_From(value);
+        }
+
+        #endregion
+
+
         #region override method ToString
 
         /// <summary>

@@ -22,6 +22,40 @@ namespace LumiSoft.Net.IMAP
         }
 
 
+        #region static method Parse
+
+        /// <summary>
+        /// Returns parsed IMAP SEARCH <b>LAGER (string)</b> key.
+        /// </summary>
+        /// <param name="r">String reader.</param>
+        /// <returns>Returns parsed IMAP SEARCH <b>LAGER (string)</b> key.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>r</b> is null reference.</exception>
+        /// <exception cref="ParseException">Is raised when parsing fails.</exception>
+        internal static IMAP_Search_Key_Lager Parse(StringReader r)
+        {
+            if(r == null){
+                throw new ArgumentNullException("r");
+            }
+
+            string word = r.ReadWord();
+            if(!string.Equals(word,"LAGER",StringComparison.InvariantCultureIgnoreCase)){
+                throw new ParseException("Parse error: Not a SEARCH 'LAGER' key.");
+            }
+            string value = r.ReadWord();
+            if(value == null){
+                throw new ParseException("Parse error: Invalid 'LAGER' value.");
+            }
+            int size = 0;
+            if(!int.TryParse(value,out size)){
+                throw new ParseException("Parse error: Invalid 'LAGER' value.");
+            }
+
+            return new IMAP_Search_Key_Lager(size);
+        }
+
+        #endregion
+
+
         #region override method ToString
 
         /// <summary>

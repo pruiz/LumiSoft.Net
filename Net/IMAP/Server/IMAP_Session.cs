@@ -2018,6 +2018,12 @@ namespace LumiSoft.Net.IMAP.Server
                 WriteLine("+ Send message.");
 
                 this.TcpStream.ReadFixedCount(e.Stream,size);
+                LogAddRead(size,"Readed " + size + " bytes.");
+
+                // Read command line terminating CRLF.
+                SmartStream.ReadLineAsyncOP readLineOP = new SmartStream.ReadLineAsyncOP(new byte[32000],SizeExceededAction.JunkAndThrowException);
+                this.TcpStream.ReadLine(readLineOP,false);
+                LogAddRead(size,"");
 
                 // Raise Completed event.
                 e.OnCompleted();
@@ -3485,6 +3491,9 @@ namespace LumiSoft.Net.IMAP.Server
 
                 return;
             }
+
+            // See if we have optional CHARSET argument.
+
             // TODO:
 
             throw new NotImplementedException();
@@ -4069,6 +4078,34 @@ namespace LumiSoft.Net.IMAP.Server
             // Log.
             if(this.Server.Logger != null){
                 this.Server.Logger.AddWrite(this.ID,this.AuthenticatedUserIdentity,countWritten,line,this.LocalEndPoint,this.RemoteEndPoint);
+            }
+        }
+
+        #endregion
+
+        #region method LogAddRead
+
+        /// <summary>
+        /// Logs read operation.
+        /// </summary>
+        /// <param name="size">Number of bytes read.</param>
+        /// <param name="text">Log text.</param>
+        protected void LogAddRead(long size,string text)
+        {
+            try{
+                if(this.Server.Logger != null){
+                    this.Server.Logger.AddRead(
+                        this.ID,
+                        this.AuthenticatedUserIdentity,
+                        size,
+                        text,                        
+                        this.LocalEndPoint,
+                        this.RemoteEndPoint
+                    );
+                }
+            }
+            catch{
+                // We skip all logging errors, normally there shouldn't be any.
             }
         }
 

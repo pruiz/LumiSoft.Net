@@ -143,6 +143,7 @@
     <Compile Include="IMAP\IMAP_Acl_Entry.cs" />
     <Compile Include="IMAP\IMAP_Envelope.cs" />
     <Compile Include="IMAP\IMAP_Search_Key.cs" />
+    <Compile Include="IMAP\IMAP_Search_Key_And.cs" />
     <Compile Include="IMAP\IMAP_Search_Key_Answered.cs" />
     <Compile Include="IMAP\IMAP_Search_Key_Bcc.cs" />
     <Compile Include="IMAP\IMAP_Search_Key_Before.cs" />
@@ -156,8 +157,10 @@
     <Compile Include="IMAP\IMAP_Search_Key_Keyword.cs" />
     <Compile Include="IMAP\IMAP_Search_Key_Lager.cs" />
     <Compile Include="IMAP\IMAP_Search_Key_New.cs" />
+    <Compile Include="IMAP\IMAP_Search_Key_Not.cs" />
     <Compile Include="IMAP\IMAP_Search_Key_Old.cs" />
     <Compile Include="IMAP\IMAP_Search_Key_On.cs" />
+    <Compile Include="IMAP\IMAP_Search_Key_Or.cs" />
     <Compile Include="IMAP\IMAP_Search_Key_Recent.cs" />
     <Compile Include="IMAP\IMAP_Search_Key_Seen.cs" />
     <Compile Include="IMAP\IMAP_Search_Key_SentBefore.cs" />

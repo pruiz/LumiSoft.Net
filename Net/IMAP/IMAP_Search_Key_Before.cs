@@ -15,11 +15,48 @@ namespace LumiSoft.Net.IMAP
         /// <summary>
         /// Default constructor.
         /// </summary>
-        /// <param name="date">Message date.</param>
+        /// <param name="date">Message internal date.</param>
         public IMAP_Search_Key_Before(DateTime date)
         {
             m_Date = date;
         }
+
+
+        #region static method Parse
+
+        /// <summary>
+        /// Returns parsed IMAP SEARCH <b>BEFORE (string)</b> key.
+        /// </summary>
+        /// <param name="r">String reader.</param>
+        /// <returns>Returns parsed IMAP SEARCH <b>BEFORE (string)</b> key.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>r</b> is null reference.</exception>
+        /// <exception cref="ParseException">Is raised when parsing fails.</exception>
+        internal static IMAP_Search_Key_Before Parse(StringReader r)
+        {
+            if(r == null){
+                throw new ArgumentNullException("r");
+            }
+
+            string word = r.ReadWord();
+            if(!string.Equals(word,"BEFORE",StringComparison.InvariantCultureIgnoreCase)){
+                throw new ParseException("Parse error: Not a SEARCH 'BEFORE' key.");
+            }
+            string value = r.ReadWord();
+            if(value == null){
+                throw new ParseException("Parse error: Invalid 'BEFORE' value.");
+            }
+            DateTime date;
+            try{
+                date = IMAP_Utils.ParseDate(value);
+            }
+            catch{
+                throw new ParseException("Parse error: Invalid 'BEFORE' value.");
+            }
+
+            return new IMAP_Search_Key_Before(date);
+        }
+
+        #endregion
 
 
         #region override method ToString

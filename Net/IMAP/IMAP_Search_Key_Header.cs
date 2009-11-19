@@ -39,6 +39,40 @@ namespace LumiSoft.Net.IMAP
         }
 
 
+        #region static method Parse
+
+        /// <summary>
+        /// Returns parsed IMAP SEARCH <b>HEADER (field-name) (string)</b> key.
+        /// </summary>
+        /// <param name="r">String reader.</param>
+        /// <returns>Returns parsed IMAP SEARCH <b>HEADER (field-name) (string)</b> key.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>r</b> is null reference.</exception>
+        /// <exception cref="ParseException">Is raised when parsing fails.</exception>
+        internal static IMAP_Search_Key_Header Parse(StringReader r)
+        {
+            if(r == null){
+                throw new ArgumentNullException("r");
+            }
+
+            string word = r.ReadWord();
+            if(!string.Equals(word,"HEADER",StringComparison.InvariantCultureIgnoreCase)){
+                throw new ParseException("Parse error: Not a SEARCH 'HEADER' key.");
+            }
+            string fieldName = r.ReadWord();
+            if(fieldName == null){
+                throw new ParseException("Parse error: Invalid 'HEADER' field-name value.");
+            }
+            string value = r.ReadWord();
+            if(value == null){
+                throw new ParseException("Parse error: Invalid 'HEADER' string value.");
+            }
+
+            return new IMAP_Search_Key_Header(fieldName,value);
+        }
+
+        #endregion
+
+
         #region override method ToString
 
         /// <summary>

@@ -28,6 +28,39 @@ namespace LumiSoft.Net.IMAP
         }
 
 
+        #region static method Parse
+
+        /// <summary>
+        /// Returns parsed IMAP SEARCH <b>sequence-set</b> key.
+        /// </summary>
+        /// <param name="r">String reader.</param>
+        /// <returns>Returns parsed IMAP SEARCH <b>sequence-set</b> key.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>r</b> is null reference.</exception>
+        /// <exception cref="ParseException">Is raised when parsing fails.</exception>
+        internal static IMAP_Search_Key_SeqSet Parse(StringReader r)
+        {
+            if(r == null){
+                throw new ArgumentNullException("r");
+            }
+
+            string value = r.ReadWord();
+            if(value == null){
+                throw new ParseException("Parse error: Invalid 'sequence-set' value.");
+            }
+            IMAP_SequenceSet seqSet = new IMAP_SequenceSet();
+            try{
+                seqSet.Parse(value);
+            }
+            catch{
+                throw new ParseException("Parse error: Invalid 'sequence-set' value.");
+            }
+
+            return new IMAP_Search_Key_SeqSet(seqSet);
+        }
+
+        #endregion
+
+
         #region override method ToString
 
         /// <summary>

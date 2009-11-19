@@ -28,6 +28,37 @@ namespace LumiSoft.Net.IMAP
             m_Value = value;
         }
 
+
+        #region static method Parse
+
+        /// <summary>
+        /// Returns parsed IMAP SEARCH <b>BODY (string)</b> key.
+        /// </summary>
+        /// <param name="r">String reader.</param>
+        /// <returns>Returns parsed IMAP SEARCH <b>BODY (string)</b> key.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>r</b> is null reference.</exception>
+        /// <exception cref="ParseException">Is raised when parsing fails.</exception>
+        internal static IMAP_Search_Key_Body Parse(StringReader r)
+        {
+            if(r == null){
+                throw new ArgumentNullException("r");
+            }
+
+            string word = r.ReadWord();
+            if(!string.Equals(word,"BODY",StringComparison.InvariantCultureIgnoreCase)){
+                throw new ParseException("Parse error: Not a SEARCH 'BODY' key.");
+            }
+            string value = r.ReadWord();
+            if(value == null){
+                throw new ParseException("Parse error: Invalid 'BODY' value.");
+            }
+
+            return new IMAP_Search_Key_Body(value);
+        }
+
+        #endregion
+
+
         #region override method ToString
 
         /// <summary>

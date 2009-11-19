@@ -23,6 +23,43 @@ namespace LumiSoft.Net.IMAP
         }
 
 
+        #region static method Parse
+
+        /// <summary>
+        /// Returns parsed IMAP SEARCH <b>SINCE (string)</b> key.
+        /// </summary>
+        /// <param name="r">String reader.</param>
+        /// <returns>Returns parsed IMAP SEARCH <b>SINCE (string)</b> key.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>r</b> is null reference.</exception>
+        /// <exception cref="ParseException">Is raised when parsing fails.</exception>
+        internal static IMAP_Search_Key_Since Parse(StringReader r)
+        {
+            if(r == null){
+                throw new ArgumentNullException("r");
+            }
+
+            string word = r.ReadWord();
+            if(!string.Equals(word,"SINCE",StringComparison.InvariantCultureIgnoreCase)){
+                throw new ParseException("Parse error: Not a SEARCH 'SINCE' key.");
+            }
+            string value = r.ReadWord();
+            if(value == null){
+                throw new ParseException("Parse error: Invalid 'SINCE' value.");
+            }
+            DateTime date;
+            try{
+                date = IMAP_Utils.ParseDate(value);
+            }
+            catch{
+                throw new ParseException("Parse error: Invalid 'SINCE' value.");
+            }
+
+            return new IMAP_Search_Key_Since(date);
+        }
+
+        #endregion
+
+
         #region override method ToString
 
         /// <summary>
