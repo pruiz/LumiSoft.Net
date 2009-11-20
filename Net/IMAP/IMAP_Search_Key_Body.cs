@@ -10,7 +10,7 @@ namespace LumiSoft.Net.IMAP
     /// <remarks>Messages that contain the specified string in the body of the message.
     /// NOTE: IMAP server may skip MIME entities with binary.
     /// </remarks>
-    public class IMAP_Search_Key_Body
+    public class IMAP_Search_Key_Body : IMAP_Search_Key
     {
         private string m_Value = "";
 

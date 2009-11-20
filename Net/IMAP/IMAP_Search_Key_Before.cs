@@ -8,7 +8,7 @@ namespace LumiSoft.Net.IMAP
     /// This class represents IMAP SEARCH <b>BEFORE (date)</b> key. Defined in RFC 3501 6.4.4.
     /// </summary>
     /// <remarks>Messages whose internal date (disregarding time and timezone) is earlier than the specified date.</remarks>
-    public class IMAP_Search_Key_Before
+    public class IMAP_Search_Key_Before : IMAP_Search_Key
     {
         private DateTime m_Date;
 

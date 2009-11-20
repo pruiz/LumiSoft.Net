@@ -9,7 +9,7 @@ namespace LumiSoft.Net.IMAP
     /// </summary>
     /// <remarks>Messages with unique identifiers corresponding to the specified
     /// unique identifier set.  Sequence set ranges are permitted.</remarks>
-    public class IMAP_Search_Key_Uid
+    public class IMAP_Search_Key_Uid : IMAP_Search_Key
     {
         private IMAP_SequenceSet m_pSeqSet = null;
 

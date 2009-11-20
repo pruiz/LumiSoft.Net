@@ -4,7 +4,79 @@ using System.Text;
 
 namespace LumiSoft.Net.IMAP
 {
-    class IMAP_Search_Key_Not
+    /// <summary>
+    /// This class represents IMAP SEARCH <b>NOT (search-key)</b> key. Defined in RFC 3501 6.4.4.
+    /// </summary>
+    /// <remarks>Messages that do not match the specified search key.</remarks>
+    public class IMAP_Search_Key_Not : IMAP_Search_Key
     {
+        private IMAP_Search_Key m_pSearchKey = null;
+
+        /// <summary>
+        /// Default constructor.
+        /// </summary>
+        /// <param name="key">Search KEY.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>key</b> is null reference.</exception>
+        public IMAP_Search_Key_Not(IMAP_Search_Key key)
+        {
+            if(key == null){
+                throw new ArgumentNullException("key");
+            }
+
+            m_pSearchKey = key;
+        }
+
+
+        #region static method Parse
+
+        /// <summary>
+        /// Returns parsed IMAP SEARCH <b>NOT (search-key)</b> key.
+        /// </summary>
+        /// <param name="r">String reader.</param>
+        /// <returns>Returns parsed IMAP SEARCH <b>NOT (search-key)</b> key.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>r</b> is null reference.</exception>
+        /// <exception cref="ParseException">Is raised when parsing fails.</exception>
+        internal static IMAP_Search_Key_Not Parse(StringReader r)
+        {
+            if(r == null){
+                throw new ArgumentNullException("r");
+            }
+
+            string word = r.ReadWord();
+            if(!string.Equals(word,"NOT",StringComparison.InvariantCultureIgnoreCase)){
+                throw new ParseException("Parse error: Not a SEARCH 'NOT' key.");
+            }
+
+            return new IMAP_Search_Key_Not(IMAP_Search_Key.ParseKey(r));
+        }
+
+        #endregion
+
+
+        #region override method ToString
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString()
+        {
+            return "NOT " + m_pSearchKey.ToString();
+        }
+
+        #endregion
+
+
+        #region Properties implementation
+
+        /// <summary>
+        /// Gets search KEY.
+        /// </summary>
+        public IMAP_Search_Key SearchKey
+        {
+            get{ return m_pSearchKey; }
+        }
+
+        #endregion
     }
 }

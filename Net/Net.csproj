@@ -143,7 +143,7 @@
     <Compile Include="IMAP\IMAP_Acl_Entry.cs" />
     <Compile Include="IMAP\IMAP_Envelope.cs" />
     <Compile Include="IMAP\IMAP_Search_Key.cs" />
-    <Compile Include="IMAP\IMAP_Search_Key_And.cs" />
+    <Compile Include="IMAP\IMAP_Search_Key_Group.cs" />
     <Compile Include="IMAP\IMAP_Search_Key_Answered.cs" />
     <Compile Include="IMAP\IMAP_Search_Key_Bcc.cs" />
     <Compile Include="IMAP\IMAP_Search_Key_Before.cs" />
@@ -212,6 +212,7 @@
     <Compile Include="IMAP\Server\IMAP_e_Namespace.cs" />
     <Compile Include="IMAP\Server\IMAP_e_GetQuota.cs" />
     <Compile Include="IMAP\Server\IMAP_e_Rename.cs" />
+    <Compile Include="IMAP\Server\IMAP_e_Search.cs" />
     <Compile Include="IMAP\Server\IMAP_e_Select.cs" />
     <Compile Include="IMAP\Server\IMAP_e_SetAcl.cs" />
     <Compile Include="IMAP\Server\IMAP_e_Started.cs" />

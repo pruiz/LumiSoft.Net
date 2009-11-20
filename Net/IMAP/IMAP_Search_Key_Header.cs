@@ -14,7 +14,7 @@ namespace LumiSoft.Net.IMAP
     /// have a header line with the specified field-name regardless of
     /// the contents.
     /// </remarks>
-    public class IMAP_Search_Key_Header
+    public class IMAP_Search_Key_Header : IMAP_Search_Key
     {
         private string m_FieldName = "";
         private string m_Value     = "";

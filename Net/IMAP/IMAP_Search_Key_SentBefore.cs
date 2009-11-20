@@ -9,7 +9,7 @@ namespace LumiSoft.Net.IMAP
     /// </summary>
     /// <remarks>Messages whose [RFC-2822] Date: header (disregarding time and
     /// timezone) is earlier than the specified date.</remarks>
-    public class IMAP_Search_Key_SentBefore
+    public class IMAP_Search_Key_SentBefore : IMAP_Search_Key
     {
         private DateTime m_Date;
 

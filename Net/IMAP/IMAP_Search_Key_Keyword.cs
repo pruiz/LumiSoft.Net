@@ -8,7 +8,7 @@ namespace LumiSoft.Net.IMAP
     /// This class represents IMAP SEARCH <b>KEYWORD (flag)</b> key. Defined in RFC 3501 6.4.4.
     /// </summary>
     /// <remarks>Messages with the specified keyword flag set.</remarks>
-    public class IMAP_Search_Key_Keyword
+    public class IMAP_Search_Key_Keyword : IMAP_Search_Key
     {
         private string m_Value = "";
 

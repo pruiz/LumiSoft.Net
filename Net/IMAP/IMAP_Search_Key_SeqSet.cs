@@ -9,7 +9,7 @@ namespace LumiSoft.Net.IMAP
     /// </summary>
     /// <remarks>Messages with message sequence numbers corresponding to the
     /// specified message sequence number set.</remarks>
-    public class IMAP_Search_Key_SeqSet
+    public class IMAP_Search_Key_SeqSet : IMAP_Search_Key
     {
         private IMAP_SequenceSet m_pSeqSet = null;
 

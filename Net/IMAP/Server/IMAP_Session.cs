@@ -3486,17 +3486,48 @@ namespace LumiSoft.Net.IMAP.Server
 
                 return;
             }
-            if(m_pSelectedFolder != null){
+            if(m_pSelectedFolder == null){
                 WriteLine(cmdTag + " NO Error: This command is valid only in selected state.");
 
                 return;
             }
 
+            // Store start time
+			long startTime = DateTime.Now.Ticks;
+
+            StringReader r = new StringReader(cmdText);
+
             // See if we have optional CHARSET argument.
+            if(r.StartsWith("CHARSET",false)){
+                r.ReadWord();
 
-            // TODO:
+                string charset = r.ReadWord();
+                if((!string.Equals(charset,"US-ASCII",StringComparison.InvariantCultureIgnoreCase) || string.Equals(charset,"UTF-8",StringComparison.InvariantCultureIgnoreCase))){
+                    WriteLine(cmdTag + " NO [BADCHARSET (US-ASCII UTF-8)] Not supported charset.");
 
-            throw new NotImplementedException();
+                    return;
+                }
+            }
+
+            try{
+                IMAP_Search_Key_Group criteria = IMAP_Search_Key_Group.Parse(r);
+                
+                bool isFirst = true;
+                IMAP_e_Search searchArgs = new IMAP_e_Search(criteria);
+                searchArgs.Matched += new EventHandler(delegate(object s,EventArgs e){
+                    if(isFirst){
+
+                        isFirst = false;
+                    }
+                    // TODO: Add matched messages.
+                });
+                OnSearch(searchArgs);
+
+                WriteLine(cmdTag + " OK SEARCH completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds.\r\n");
+            }
+            catch{
+                WriteLine(cmdTag + " BAD Error in arguments.");
+            }            
         }
 
         #endregion
@@ -5238,6 +5269,26 @@ namespace LumiSoft.Net.IMAP.Server
         {
             if(this.Fetch != null){
                 this.Fetch(this,e);
+            }
+        }
+
+        #endregion
+                
+        /// <summary>
+        /// Is raised when IMAP session needs to handle SEARCH command.
+        /// </summary>
+        public event EventHandler<IMAP_e_Search> Search = null;
+
+        #region method OnSearch
+
+        /// <summary>
+        /// Raises <b>Search</b> event.
+        /// </summary>
+        /// <param name="e">Event args.</param>
+        private void OnSearch(IMAP_e_Search e)
+        {
+            if(this.Search != null){
+                this.Search(this,e);
             }
         }
 

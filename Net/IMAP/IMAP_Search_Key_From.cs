@@ -8,7 +8,7 @@ namespace LumiSoft.Net.IMAP
     /// This class represents IMAP SEARCH <b>FROM (string)</b> key. Defined in RFC 3501 6.4.4.
     /// </summary>
     /// <remarks>Messages that contain the specified string in the message header FROM field.</remarks>
-    public class IMAP_Search_Key_From
+    public class IMAP_Search_Key_From : IMAP_Search_Key
     {
         private string m_Value = "";
 
