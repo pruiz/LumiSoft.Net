@@ -44,7 +44,7 @@ namespace LumiSoft.Net.IMAP
 
             r.ReadToFirstChar();
             while(r.Available > 0){
-                retVal.m_pKeys.Add(IMAP_Search_Key.ParseKey(new StringReader(r.ReadParenthesized())));
+                retVal.m_pKeys.Add(IMAP_Search_Key.ParseKey(r));
             }
 
             return retVal;
