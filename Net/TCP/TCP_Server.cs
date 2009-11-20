@@ -314,9 +314,10 @@ namespace LumiSoft.Net.TCP
 
                         if(ioCompletion_asyncSockets){
                             SocketAsyncEventArgs eArgs = new SocketAsyncEventArgs();
+                            eArgs.UserToken = listeningPoint;
                             eArgs.Completed += delegate(object s,SocketAsyncEventArgs e){
                                 if(e.SocketError == SocketError.Success){
-                                    ProcessConnection(e.AcceptSocket,bind);
+                                    ProcessConnection(e.AcceptSocket,((ListeningPoint)eArgs.UserToken).BindInfo);
                                 }
 
                                 // Start accepting new connection.
