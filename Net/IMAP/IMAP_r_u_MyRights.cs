@@ -9,8 +9,8 @@ namespace LumiSoft.Net.IMAP
     /// </summary>
     public class IMAP_Response_MyRights : IMAP_r_u
     {
-        private string     m_FolderName = "";
-        private List<char> m_pRights    = null;
+        private string m_FolderName = "";
+        private string m_pRights    = null;
 
         /// <summary>
         /// Default constructor.
@@ -19,7 +19,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="rights">Rights values.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        public IMAP_Response_MyRights(string folder,char[] rights)
+        public IMAP_Response_MyRights(string folder,string rights)
         {
             if(folder == null){
                 throw new ArgumentNullException("folder");
@@ -30,10 +30,7 @@ namespace LumiSoft.Net.IMAP
 
             m_FolderName = folder;
             
-            m_pRights = new List<char>();
-            if(rights != null){
-                m_pRights.AddRange(rights);
-            }
+            m_pRights = rights;
         }
 
 
@@ -74,7 +71,7 @@ namespace LumiSoft.Net.IMAP
             r.ReadWord();
 
             string folder = IMAP_Utils.Decode_IMAP_UTF7_String(r.ReadWord(true));
-            char[] rights = r.ReadToEnd().Trim().ToCharArray();
+            string rights = r.ReadToEnd().Trim();
 
             return new IMAP_Response_MyRights(folder,rights);
         }
@@ -93,7 +90,7 @@ namespace LumiSoft.Net.IMAP
             // Example:    S: * MYRIGHTS INBOX rwiptsldaex
 
             StringBuilder retVal = new StringBuilder();
-            retVal.Append("* MYRIGHTS \"" + m_FolderName + "\" \"" + new String(m_pRights.ToArray()) + "\"\r\n");
+            retVal.Append("* MYRIGHTS \"" + m_FolderName + "\" \"" + m_pRights + "\"\r\n");
 
             return retVal.ToString();
         }
@@ -114,7 +111,7 @@ namespace LumiSoft.Net.IMAP
         /// <summary>
         /// Gets rights list.
         /// </summary>
-        public List<char> Rights
+        public string Rights
         {
             get{ return m_pRights; }
         }

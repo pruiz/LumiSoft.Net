@@ -251,7 +251,7 @@ namespace LumiSoft.Net.IMAP
             wordEncoder.Split = false;
 
 			StringBuilder retVal = new StringBuilder();
-			retVal.Append("(");
+			retVal.Append("ENVELOPE (");
 
 			// date
             try{

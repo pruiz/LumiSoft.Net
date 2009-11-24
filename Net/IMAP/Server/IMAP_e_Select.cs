@@ -9,6 +9,7 @@ namespace LumiSoft.Net.IMAP.Server
     /// </summary>
     public class IMAP_e_Select : EventArgs
     {
+        private string              m_CmdTag          = null;
         private IMAP_r_ServerStatus m_pResponse       = null;
         private string              m_Folder          = null;
         private bool                m_IsReadOnly      = false;
@@ -19,14 +20,19 @@ namespace LumiSoft.Net.IMAP.Server
         /// <summary>
         /// Default constructor.
         /// </summary>
+        /// <param name="cmdTag">Command tag.</param>
         /// <param name="folder">Folder name with optional path.</param>
-        /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> is null reference.</exception>
-        internal IMAP_e_Select(string folder)
+        /// <exception cref="ArgumentNullException">Is raised when <b>cmdTag</b> or <b>folder</b> is null reference.</exception>
+        internal IMAP_e_Select(string cmdTag,string folder)
         {
+            if(cmdTag == null){
+                throw new ArgumentNullException("cmdTag");
+            }
             if(folder == null){
                 throw new ArgumentNullException("folder");
             }
 
+            m_CmdTag = cmdTag;
             m_Folder = folder;
 
             m_pFlags = new List<string>();
@@ -39,6 +45,14 @@ namespace LumiSoft.Net.IMAP.Server
 
 
         #region Properties implementation
+
+        /// <summary>
+        /// Gets command tag.
+        /// </summary>
+        public string CmdTag
+        {
+            get{ return m_CmdTag; }
+        }
 
         /// <summary>
         /// Gets or sets IMAP server error response to this operation. Value means no error.

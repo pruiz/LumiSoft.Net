@@ -107,10 +107,10 @@ namespace LumiSoft.Net.IMAP.Server
             #region method GetSeqNo
 
             /// <summary>
-            /// Gets specified message info IMAP 1-absed sequence number.
+            /// Gets specified message info IMAP 1-based sequence number.
             /// </summary>
             /// <param name="msgInfo">Message info.</param>
-            /// <returns>Returns specified message info IMAP 1-absed sequence number.</returns>
+            /// <returns>Returns specified message info IMAP 1-based sequence number.</returns>
             /// <exception cref="ArgumentNullException">Is raised when <b>msgInfo</b> is null reference.</exception>
             internal int GetSeqNo(IMAP_MessageInfo msgInfo)
             {
@@ -119,6 +119,22 @@ namespace LumiSoft.Net.IMAP.Server
                 }
 
                 return m_pMessagesInfo.IndexOf(msgInfo) + 1;
+            }
+
+            /// <summary>
+            /// Gets specified message IMAP 1-based sequence number.
+            /// </summary>
+            /// <param name="uid">Message UID.</param>
+            /// <returns>Returns specified message info IMAP 1-based sequence number or -1 if no such message.</returns>
+            internal int GetSeqNo(long uid)
+            {
+                foreach(IMAP_MessageInfo msgInfo in m_pMessagesInfo){
+                    if(msgInfo.UID == uid){
+                        return msgInfo.SeqNo;
+                    }
+                }
+                
+                return -1;
             }
 
             #endregion
@@ -185,7 +201,7 @@ namespace LumiSoft.Net.IMAP.Server
             m_pAuthentications = new Dictionary<string,AUTH_SASL_ServerMechanism>(StringComparer.CurrentCultureIgnoreCase);
 
             m_pCapabilities = new List<string>();
-            m_pCapabilities.AddRange(new string[]{"IMAP4rev1","NAMESPACE","QUOTA","ACL"});
+            m_pCapabilities.AddRange(new string[]{"IMAP4rev1","NAMESPACE","QUOTA","ACL","IDLE"});
         }
 
 
@@ -464,7 +480,7 @@ namespace LumiSoft.Net.IMAP.Server
                     EXPUNGE(cmdTag,args);
                 }
                 else if(cmd == "IDLE"){
-                    IDLE(cmdTag,args);
+                    readNextCommand = IDLE(cmdTag,args);
                 }
                 else if(cmd == "CAPABILITY"){
                     CAPABILITY(cmdTag,args);
@@ -1757,7 +1773,9 @@ namespace LumiSoft.Net.IMAP.Server
                 IMAP_e_MessagesInfo eMessagesInfo = OnGetMessagesInfo(folder);
                 response.Append("* " + eMessagesInfo.Exists + " EXISTS\r\n");
                 response.Append("* " + eMessagesInfo.Recent + " RECENT\r\n");
-                response.Append("* OK [UNSEEN " + eMessagesInfo.FirstUnseen + "] Message " + eMessagesInfo.Unseen + " is the first unseen.\r\n");
+                if(eMessagesInfo.FirstUnseen > -1){
+                    response.Append("* OK [UNSEEN " + eMessagesInfo.FirstUnseen + "] Message " + eMessagesInfo.FirstUnseen + " is the first unseen.\r\n");
+                }
                 response.Append("* OK [UIDNEXT " + eMessagesInfo.UidNext + "] Predicted next message UID.\r\n");
                 if(e.FolderUID > 0){
                     response.Append("* OK [UIDVALIDITY " + e.FolderUID + "] Folder UID value.\r\n");
@@ -1855,7 +1873,9 @@ namespace LumiSoft.Net.IMAP.Server
                 IMAP_e_MessagesInfo eMessagesInfo = OnGetMessagesInfo(folder);
                 response.Append("* " + eMessagesInfo.Exists + " EXISTS\r\n");
                 response.Append("* " + eMessagesInfo.Recent + " RECENT\r\n");
-                response.Append("* OK [UNSEEN " + eMessagesInfo.FirstUnseen + "] Message " + eMessagesInfo.Unseen + " is the first unseen.\r\n");
+                if(eMessagesInfo.FirstUnseen > -1){
+                    response.Append("* OK [UNSEEN " + eMessagesInfo.FirstUnseen + "] Message " + eMessagesInfo.FirstUnseen + " is the first unseen.\r\n");
+                }
                 response.Append("* OK [UIDNEXT " + eMessagesInfo.UidNext + "] Predicted next message UID.\r\n");
                 if(e.FolderUID > 0){
                     response.Append("* OK [UIDVALIDITY " + e.FolderUID + "] Folder UID value.\r\n");
@@ -2255,10 +2275,22 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }
 
+            string rights = parts[2];
+            IMAP_Flags_SetType setType = IMAP_Flags_SetType.Replace;
+            if(rights.StartsWith("+")){
+                setType = IMAP_Flags_SetType.Add;
+                rights = rights.Substring(1);
+            }
+            else if(rights.StartsWith("-")){
+                setType = IMAP_Flags_SetType.Remove;
+                rights = rights.Substring(1);
+            }
+
             IMAP_e_SetAcl e = OnSetAcl(
                 IMAP_Utils.Decode_IMAP_UTF7_String(parts[0]),
                 IMAP_Utils.Decode_IMAP_UTF7_String(parts[1]),
-                parts[2],
+                setType,
+                rights,
                 new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"SETACL command completed.")
             );
 
@@ -2490,6 +2522,13 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }
 
+            if(m_pSelectedFolder != null && !m_pSelectedFolder.IsReadOnly){
+                foreach(IMAP_MessageInfo msgInfo in m_pSelectedFolder.MessagesInfo){
+                    if(msgInfo.ConatinsFlag("Deleted")){
+                        OnExpunge(msgInfo,new IMAP_r_ServerStatus("dummy","OK","This is CLOSE command expunge, so this response is not used."));
+                    }
+                }
+            }
             m_pSelectedFolder = null;
             
             WriteLine(cmdTag + " OK CLOSE completed.");
@@ -2964,6 +3003,8 @@ namespace LumiSoft.Net.IMAP.Server
 
             #endregion
 
+            UpdateSelectedFolderAndSendChanges();
+
             IMAP_e_Fetch fetchEArgs = new IMAP_e_Fetch(
                 m_pSelectedFolder.Filter(uid,seqSet),
                 fetchDataType,
@@ -3121,11 +3162,9 @@ namespace LumiSoft.Net.IMAP.Server
 
                             #region Send data
 
-                            string body_or_peek = (dataItem is IMAP_Fetch_DataItem_Body) ? "BODY" : "BODY.PEEK";
-
                             // All data wanted.
                             if(offset < 1){
-                                reponseBuffer.Append(body_or_peek + "[" + section + "] {" + tmpFs.Length + "}\r\n");
+                                reponseBuffer.Append("BODY[" + section + "] {" + tmpFs.Length + "}\r\n");
                                 WriteLine(reponseBuffer.ToString());
                                 reponseBuffer = new StringBuilder();
 
@@ -3136,13 +3175,13 @@ namespace LumiSoft.Net.IMAP.Server
                             else{                                    
                                 // Offet out of range.
                                 if(offset >= tmpFs.Length){
-                                    reponseBuffer.Append(body_or_peek + "[" + section + "]<" + offset + "> \"\"");
+                                    reponseBuffer.Append("BODY[" + section + "]<" + offset + "> \"\"");
                                 }
                                 else{
                                     tmpFs.Position = offset;
                                         
                                     int count = maxCount > -1 ? (int)Math.Min(maxCount,tmpFs.Length - tmpFs.Position) : (int)(tmpFs.Length - tmpFs.Position);
-                                    reponseBuffer.Append(body_or_peek + "[" + section + "]<" + offset + "> {" + count + "}");
+                                    reponseBuffer.Append("BODY[" + section + "]<" + offset + "> {" + count + "}");
                                     WriteLine(reponseBuffer.ToString());
                                     reponseBuffer = new StringBuilder();
 
@@ -3264,7 +3303,7 @@ namespace LumiSoft.Net.IMAP.Server
                     #endregion
                 }
 
-                reponseBuffer.Append(")\r\n");
+                reponseBuffer.Append(")\r\n");            
                 WriteLine(reponseBuffer.ToString());
             });
                         
@@ -3283,7 +3322,7 @@ namespace LumiSoft.Net.IMAP.Server
         }
 
         #endregion
-//
+
         #region method SEARCH
 
         private void SEARCH(bool uid,string cmdTag,string cmdText)
@@ -3511,17 +3550,33 @@ namespace LumiSoft.Net.IMAP.Server
 
             try{
                 IMAP_Search_Key_Group criteria = IMAP_Search_Key_Group.Parse(r);
-                
-                bool isFirst = true;
-                IMAP_e_Search searchArgs = new IMAP_e_Search(criteria);
-                searchArgs.Matched += new EventHandler(delegate(object s,EventArgs e){
-                    if(isFirst){
 
-                        isFirst = false;
+                UpdateSelectedFolderAndSendChanges();
+                
+                StringBuilder logBuffer = new StringBuilder();                
+                this.TcpStream.Write("* SEARCH");
+                logBuffer.Append("* SEARCH");
+
+                IMAP_e_Search searchArgs = new IMAP_e_Search(criteria);
+                searchArgs.Matched += new EventHandler<EventArgs<long>>(delegate(object s,EventArgs<long> e){
+                    if(uid){
+                        this.TcpStream.Write(" " + e.Value);
+                        logBuffer.Append(" " + e.Value);
                     }
-                    // TODO: Add matched messages.
+                    else{
+                        // Search sequence-number for that message.
+                        int seqNo = m_pSelectedFolder.GetSeqNo(e.Value);
+                        if(seqNo != -1){
+                            this.TcpStream.Write(" " + seqNo);
+                            logBuffer.Append(" " + seqNo);
+                        }
+                    }                    
                 });
                 OnSearch(searchArgs);
+
+                this.TcpStream.Write("\r\n");
+                logBuffer.Append("\r\n");
+                this.LogAddWrite(logBuffer.Length,logBuffer.ToString());
 
                 WriteLine(cmdTag + " OK SEARCH completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds.\r\n");
             }
@@ -3665,11 +3720,11 @@ namespace LumiSoft.Net.IMAP.Server
                 }
             }
             
-            IMAP_r_ServerStatus response = null;
+            IMAP_r_ServerStatus response = new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"STORE command completed in %exectime seconds.");
             foreach(IMAP_MessageInfo msgInfo in m_pSelectedFolder.Filter(uid,seqSet)){
-                IMAP_e_Store e = OnStore(msgInfo,setType,flags.ToArray(),new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"COPY command completed in %exectime seconds."));
+                IMAP_e_Store e = OnStore(msgInfo,setType,flags.ToArray(),response);
                 response = e.Response;
-                if(string.Equals(e.Response.ResponseCode,"OK",StringComparison.InvariantCultureIgnoreCase)){
+                if(!string.Equals(e.Response.ResponseCode,"OK",StringComparison.InvariantCultureIgnoreCase)){
                     break;
                 }
 
@@ -3749,6 +3804,8 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }
             string targetFolder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(parts[1]));
+
+            UpdateSelectedFolderAndSendChanges();
 
             IMAP_e_Copy e = OnCopy(
                 targetFolder,
@@ -3906,34 +3963,152 @@ namespace LumiSoft.Net.IMAP.Server
 
                 return;
             }
-                 
+
+            // Store start time
+			long startTime = DateTime.Now.Ticks;
+            
+            IMAP_r_ServerStatus response = new IMAP_r_ServerStatus(cmdTag,"OK","EXPUNGE completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds.");
             for(int i=0;i<m_pSelectedFolder.MessagesInfo.Length;i++){
                 IMAP_MessageInfo msgInfo = m_pSelectedFolder.MessagesInfo[i];
                 if(msgInfo.ConatinsFlag("Deleted")){
-                    OnExpunge(msgInfo);
+                    IMAP_e_Expunge e = OnExpunge(msgInfo,response);
+                    // Expunge failed.
+                    if(!string.Equals(e.Response.ResponseCode,"OK",StringComparison.InvariantCultureIgnoreCase)){
+                        WriteLine(e.Response.ToString());
+                        response = e.Response;
+
+                        return;
+                    }
                     m_pSelectedFolder.RemoveMessage(msgInfo);
 
                     WriteLine("* " + (i + 1) + " EXPUNGE\r\n");
                 }
             }
             
-            WriteLine(cmdTag + " OK EXPUNGE completed.\r\n");
+            WriteLine(response.ToString());
         }
 
         #endregion
-//
+
         #region method IDLE
 
-        private void IDLE(string cmdTag,string cmdText)
+        private bool IDLE(string cmdTag,string cmdText)
         {
+            /* RFC 2177 3. IDLE Command.
+                Arguments:  none
+
+                Responses:  continuation data will be requested; the client sends
+                            the continuation data "DONE" to end the command
+
+                Result:     OK - IDLE completed after client sent "DONE"
+                            NO - failure: the server will not allow the IDLE
+                            command at this time
+                BAD - command unknown or arguments invalid
+
+                The IDLE command may be used with any IMAP4 server implementation
+                that returns "IDLE" as one of the supported capabilities to the
+                CAPABILITY command.  If the server does not advertise the IDLE
+                capability, the client MUST NOT use the IDLE command and must poll
+                for mailbox updates.  In particular, the client MUST continue to be
+                able to accept unsolicited untagged responses to ANY command, as
+                specified in the base IMAP specification.
+
+                The IDLE command is sent from the client to the server when the
+                client is ready to accept unsolicited mailbox update messages.  The
+                server requests a response to the IDLE command using the continuation
+                ("+") response.  The IDLE command remains active until the client
+                responds to the continuation, and as long as an IDLE command is
+                active, the server is now free to send untagged EXISTS, EXPUNGE, and
+                other messages at any time.
+
+                The IDLE command is terminated by the receipt of a "DONE"
+                continuation from the client; such response satisfies the server's
+                continuation request.  At that point, the server MAY send any
+                remaining queued untagged responses and then MUST immediately send
+                the tagged response to the IDLE command and prepare to process other
+                commands. As in the base specification, the processing of any new
+                command may cause the sending of unsolicited untagged responses,
+                subject to the ambiguity limitations.  The client MUST NOT send a
+                command while the server is waiting for the DONE, since the server
+                will not be able to distinguish a command from a continuation.
+
+                The server MAY consider a client inactive if it has an IDLE command
+                running, and if such a server has an inactivity timeout it MAY log
+                the client off implicitly at the end of its timeout period.  Because
+                of that, clients using IDLE are advised to terminate the IDLE and
+                re-issue it at least every 29 minutes to avoid being logged off.
+                This still allows a client to receive immediate mailbox updates even
+                though it need only "poll" at half hour intervals.
+
+                Example:    C: A001 SELECT INBOX
+                            S: * FLAGS (Deleted Seen)
+                            S: * 3 EXISTS
+                            S: * 0 RECENT
+                            S: * OK [UIDVALIDITY 1]
+                            S: A001 OK SELECT completed
+                            C: A002 IDLE
+                            S: + idling
+                            ...time passes; new mail arrives...
+                            S: * 4 EXISTS
+                            C: DONE
+                            S: A002 OK IDLE terminated
+                            ...another client expunges message 2 now...
+                            C: A003 FETCH 4 ALL
+                            S: * 4 FETCH (...)
+                            S: A003 OK FETCH completed
+                            C: A004 IDLE
+                            S: * 2 EXPUNGE
+                            S: * 3 EXISTS
+                            S: + idling
+                            ...time passes; another client expunges message 3...
+                            S: * 3 EXPUNGE
+                            S: * 2 EXISTS
+                            ...time passes; new mail arrives...
+                            S: * 3 EXISTS
+                            C: DONE
+                            S: A004 OK IDLE terminated
+                            C: A005 FETCH 3 ALL
+                            S: * 3 FETCH (...)
+                            S: A005 OK FETCH completed
+            */
+
             if(!this.IsAuthenticated){
                 WriteLine(cmdTag + " NO Authentication required.");
 
-                return;
+                return true;
             }
-            // TODO:
 
-            throw new NotImplementedException();
+            WriteLine("+ idling");
+
+            TimerEx timer = new TimerEx(30000,true);
+            timer.Elapsed += new System.Timers.ElapsedEventHandler(delegate(object sender,System.Timers.ElapsedEventArgs e){
+                UpdateSelectedFolderAndSendChanges();
+            });
+            timer.Enabled = true;
+
+
+            // Read client response. 
+            SmartStream.ReadLineAsyncOP readLineOP = new SmartStream.ReadLineAsyncOP(new byte[32000],SizeExceededAction.JunkAndThrowException);
+            readLineOP.Completed += new EventHandler<EventArgs<SmartStream.ReadLineAsyncOP>>(delegate(object sender,EventArgs<SmartStream.ReadLineAsyncOP> e){
+                if(string.Equals(readLineOP.LineUtf8,"DONE",StringComparison.InvariantCultureIgnoreCase)){
+                    timer.Dispose();
+
+                    WriteLine(cmdTag + " OK IDLE terminated.\r\n");
+                    BeginReadCmd();
+                }
+            });
+            if(this.TcpStream.ReadLine(readLineOP,true)){
+                if(string.Equals(readLineOP.LineUtf8,"DONE",StringComparison.InvariantCultureIgnoreCase)){
+                    timer.Dispose();
+
+                    WriteLine(cmdTag + " OK IDLE terminated.\r\n");
+                    BeginReadCmd();
+
+                    return true;
+                }                
+            }
+            
+            return false;            
         }
 
         #endregion
@@ -4043,7 +4218,7 @@ namespace LumiSoft.Net.IMAP.Server
 			long startTime = DateTime.Now.Ticks;
 
             if(m_pSelectedFolder != null){
-                SendFolderChanges();
+                UpdateSelectedFolderAndSendChanges();
             }
 
             WriteLine(cmdTag + " OK NOOP Completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds.\r\n");
@@ -4190,17 +4365,49 @@ namespace LumiSoft.Net.IMAP.Server
         }
 
         #endregion
-//
-        #region method SendFolderChanges
+
+        #region method UpdateSelectedFolderAndSendChanges
 
         /// <summary>
-        /// Sends currently selected folder changes versus current folder state.
+        /// Updates current slected folder status and sends currently selected folder changes versus current folder state.
         /// </summary>
-        private void SendFolderChanges()
+        private void UpdateSelectedFolderAndSendChanges()
         {
-            // TODO:
+            if(m_pSelectedFolder == null){
+                return;
+            }
+                        
+            IMAP_e_MessagesInfo e = OnGetMessagesInfo(m_pSelectedFolder.Folder);
+            
+            int currentExists = m_pSelectedFolder.MessagesInfo.Length;
+            // Create ID indexed lookup table for new messages.
+            Dictionary<string,string> newMessagesLookup = new Dictionary<string,string>();
+            foreach(IMAP_MessageInfo msgInfo in e.MessagesInfo){
+                newMessagesLookup.Add(msgInfo.ID,null);
+            }
+            
+            StringBuilder retVal = new StringBuilder();
+            // Check deleted messages, send "* n EXPUNGE" for each deleted message.
+            foreach(IMAP_MessageInfo msgInfo in m_pSelectedFolder.MessagesInfo){
+                // Message deleted.
+                if(!newMessagesLookup.ContainsKey(msgInfo.ID)){
+                    retVal.Append("* " + m_pSelectedFolder.GetSeqNo(msgInfo) + " EXPUNGE\r\n");
+                    m_pSelectedFolder.RemoveMessage(msgInfo);
+                }
+            }
 
-            throw new NotImplementedException();
+            // Send EXISTS if current count differs from existing.
+            if(currentExists != e.MessagesInfo.Count){
+                retVal.Append("* " + e.MessagesInfo.Count + " EXISTS\r\n");
+            }
+
+            // Send STATUS change responses.
+            if(retVal.Length > 0){
+                WriteLine(retVal.ToString());
+
+                // Create new selected folder based on new messages info.
+                m_pSelectedFolder = new _SelectedFolder(m_pSelectedFolder.Folder,m_pSelectedFolder.IsReadOnly,e.MessagesInfo);
+            }
         }
 
         #endregion
@@ -4744,6 +4951,21 @@ namespace LumiSoft.Net.IMAP.Server
             }
         }
 
+        /// <summary>
+        /// Gets selected folder name with optional path. Value null means no selected folder.
+        /// </summary>
+        public string SelectedFolderName
+        {
+            get{ 
+                if(m_pSelectedFolder == null){
+                    return null;
+                }
+                else{
+                    return m_pSelectedFolder.Folder; 
+                }
+            }
+        }
+
         #endregion
 
         #region Events implementation
@@ -5013,7 +5235,7 @@ namespace LumiSoft.Net.IMAP.Server
         /// <returns>Returns event args.</returns>
         private IMAP_e_Select OnSelect(string cmdTag,string folder)
         {
-            IMAP_e_Select eArgs = new IMAP_e_Select(folder);
+            IMAP_e_Select eArgs = new IMAP_e_Select(cmdTag,folder);
             if(this.Select != null){
                 this.Select(this,eArgs);
             }
@@ -5162,12 +5384,13 @@ namespace LumiSoft.Net.IMAP.Server
         /// </summary>
         /// <param name="folder">Folder name with optional path.</param>
         /// <param name="identifier">ACL identifier (normally user or group name).</param>
+        /// <param name="flagsSetType">Flags set type.</param>
         /// <param name="rights">Identifier rights.</param>
         /// <param name="response">Default IMAP server response.</param>
         /// <returns>Returns event args.</returns>
-        private IMAP_e_SetAcl OnSetAcl(string folder,string identifier,string rights,IMAP_r_ServerStatus response)
+        private IMAP_e_SetAcl OnSetAcl(string folder,string identifier,IMAP_Flags_SetType flagsSetType,string rights,IMAP_r_ServerStatus response)
         {
-            IMAP_e_SetAcl eArgs = new IMAP_e_SetAcl(folder,identifier,rights,response);
+            IMAP_e_SetAcl eArgs = new IMAP_e_SetAcl(folder,identifier,flagsSetType,rights,response);
             if(this.SetAcl != null){
                 this.SetAcl(this,eArgs);
             }
@@ -5358,10 +5581,11 @@ namespace LumiSoft.Net.IMAP.Server
         /// Raises <b>Expunge</b> event.
         /// </summary>
         /// <param name="msgInfo">Messgae info.</param>
+        /// <param name="response">Default IMAP server response.</param>
         /// <returns>Returns event args.</returns>
-        private IMAP_e_Expunge OnExpunge(IMAP_MessageInfo msgInfo)
+        private IMAP_e_Expunge OnExpunge(IMAP_MessageInfo msgInfo,IMAP_r_ServerStatus response)
         {
-            IMAP_e_Expunge eArgs = new IMAP_e_Expunge(m_pSelectedFolder.Folder,msgInfo);
+            IMAP_e_Expunge eArgs = new IMAP_e_Expunge(m_pSelectedFolder.Folder,msgInfo,response);
             if(this.Expunge != null){
                 this.Expunge(this,eArgs);
             }

@@ -77,7 +77,7 @@ namespace LumiSoft.Net.IMAP.Server
         }
 
         /// <summary>
-        /// Get messages first unseen message 1-based sequnece number.
+        /// Get messages first unseen message 1-based sequnece number. Returns -1 if no umseen messages.
         /// </summary>
         internal int FirstUnseen
         {
@@ -90,7 +90,7 @@ namespace LumiSoft.Net.IMAP.Server
                     }
                 }
 
-                return 0; 
+                return -1; 
             }
         }
 
@@ -126,10 +126,8 @@ namespace LumiSoft.Net.IMAP.Server
                         maxUID = m.UID;
                     }
                 }
-                if(maxUID > 0){
-                    maxUID++;
-                }
-
+                maxUID++;
+                
                 return maxUID; 
             }
         }

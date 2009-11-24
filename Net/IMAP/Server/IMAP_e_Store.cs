@@ -36,10 +36,11 @@ namespace LumiSoft.Net.IMAP.Server
                 throw new ArgumentNullException("flags");
             }
 
-            m_Folder   = folder;
-            m_pMsgInfo = msgInfo;
-            m_SetType  = flagsSetType;
-            m_pFlags   = flags;
+            m_pResponse = response;
+            m_Folder    = folder;
+            m_pMsgInfo  = msgInfo;
+            m_SetType   = flagsSetType;
+            m_pFlags    = flags;
         }
 
 

@@ -538,16 +538,6 @@
     <Compile Include="IMAP\IMAP_Flags_SetType.cs">
       <SubType>Code</SubType>
     </Compile>
-    <None Include="IMAP\Server\old\IMAP_SearchGroup.cs">
-      <SubType>Code</SubType>
-    </None>
-    <None Include="IMAP\Server\old\IMAP_SearchKey.cs">
-      <SubType>Code</SubType>
-    </None>
-    <None Include="IMAP\Server\old\IMAP_SearchMatcher.cs">
-      <SubType>Code</SubType>
-    </None>
-    <None Include="IMAP\Server\old\IMAP_SelectedFolder.cs" />
     <None Include="IMAP\Server\old\IMAP_Session.cs">
       <SubType>Code</SubType>
     </None>

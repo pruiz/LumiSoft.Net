@@ -12,6 +12,7 @@ namespace LumiSoft.Net.IMAP.Server
         private IMAP_r_ServerStatus m_pResponse  = null;
         private string              m_Folder     = null;
         private string              m_Identifier = null;
+        private IMAP_Flags_SetType  m_SetType    = IMAP_Flags_SetType.Replace;
         private string              m_Rights     = null;
 
         /// <summary>
@@ -19,10 +20,11 @@ namespace LumiSoft.Net.IMAP.Server
         /// </summary>
         /// <param name="folder">Folder name with optional path.</param>
         /// <param name="identifier">ACL identifier (normally user or group name).</param>
+        /// <param name="flagsSetType">Flags set type.</param>
         /// <param name="rights">Identifier rights.</param>
         /// <param name="response">Default IMAP server response.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b>,<b>identifier</b>,<b>rights</b> or <b>response</b> is null reference.</exception>
-        internal IMAP_e_SetAcl(string folder,string identifier,string rights,IMAP_r_ServerStatus response)
+        internal IMAP_e_SetAcl(string folder,string identifier,IMAP_Flags_SetType flagsSetType,string rights,IMAP_r_ServerStatus response)
         {
             if(folder == null){
                 throw new ArgumentNullException("folder");
@@ -40,6 +42,7 @@ namespace LumiSoft.Net.IMAP.Server
             m_pResponse  = response;
             m_Folder     = folder;
             m_Identifier = identifier;
+            m_SetType    = flagsSetType;
             m_Rights     = rights;
         }
 
@@ -77,6 +80,14 @@ namespace LumiSoft.Net.IMAP.Server
         public string Identifier
         {
             get{ return m_Identifier; }
+        }
+
+        /// <summary>
+        /// Gets flags set type.
+        /// </summary>
+        public IMAP_Flags_SetType FlagsSetType
+        {
+            get{ return m_SetType; }
         }
 
         /// <summary>

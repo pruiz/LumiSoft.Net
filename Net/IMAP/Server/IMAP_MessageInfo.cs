@@ -113,35 +113,10 @@ namespace LumiSoft.Net.IMAP.Server
             }
 
             if(setType == IMAP_Flags_SetType.Add){
-                List<string> newFlags = new List<string>();
-                // Add new flags.
-                newFlags.AddRange(flags);
-                // Add old flags which doesn't already exist.
-                foreach(string flag in m_pFlags){
-                    if(!newFlags.Contains(flag)){
-                        newFlags.Add(flag);
-                    }
-                }
-
-                m_pFlags = newFlags.ToArray();
+                m_pFlags = IMAP_Utils.MessageFlagsAdd(m_pFlags,flags);
             }
             else if(setType == IMAP_Flags_SetType.Remove){
-                List<string> newFlags = new List<string>();
-                foreach(string flag in m_pFlags){
-                    bool remove = false;
-                    foreach(string flagToRemove in flags){
-                        if(string.Equals(flag,flagToRemove,StringComparison.InvariantCultureIgnoreCase)){
-                            remove = true;
-                            break;
-                        }
-                    }
-
-                    if(!remove){
-                        newFlags.Add(flag);
-                    }
-                }
-
-                m_pFlags = newFlags.ToArray();
+                m_pFlags = IMAP_Utils.MessageFlagsRemove(m_pFlags,flags);
             }
             else{
                 m_pFlags = flags;

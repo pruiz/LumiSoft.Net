@@ -7,6 +7,9 @@ namespace LumiSoft.Net.IMAP.Server
     /// <summary>
     /// This class provides data for <b cref="IMAP_Session.Search">IMAP_Session.Search</b> event.
     /// </summary>
+    /// <remarks>
+    /// IMAP SEARCH handler application should provide message UID per each search criteria matched message
+    /// by calling <see cref="IMAP_e_Search.AddMessage(long)"/> method.</remarks>
     public class IMAP_e_Search : EventArgs
     {
         private IMAP_Search_Key m_pCriteria = null;
@@ -26,9 +29,18 @@ namespace LumiSoft.Net.IMAP.Server
         }
 
 
-        //public void AddMessage(int seqNo,long uid)
-        //{
-        //}
+        #region method AddMessage
+
+        /// <summary>
+        /// Adds message which matches search criteria.
+        /// </summary>
+        /// <param name="uid">Message UID value.</param>
+        public void AddMessage(long uid)
+        {
+            OnMatched(uid);
+        }
+
+        #endregion
 
 
         #region Properties implementation
@@ -45,7 +57,25 @@ namespace LumiSoft.Net.IMAP.Server
 
         #region Events implementation
                 
-        internal event EventHandler Matched = null;
+        /// <summary>
+        /// Is raised when new message matches search criteria.
+        /// </summary>
+        internal event EventHandler<EventArgs<long>> Matched = null;
+
+        #region method OnMatched
+
+        /// <summary>
+        /// Raises <b>Matched</b> event.
+        /// </summary>
+        /// <param name="uid">Message UID.</param>
+        private void OnMatched(long uid)
+        {
+            if(this.Matched != null){
+                this.Matched(this,new EventArgs<long>(uid));
+            }
+        }
+
+        #endregion
 
         #endregion
     }

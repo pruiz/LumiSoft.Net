@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text;
+using System.Collections.Generic;
 
 namespace LumiSoft.Net.IMAP
 {
@@ -73,10 +74,88 @@ namespace LumiSoft.Net.IMAP
 
 		#endregion
 
+        #region static method MessageFlagsAdd
 
-		#region method ACL_to_String
+        /// <summary>
+        /// Adds specified flags to flags list.
+        /// </summary>
+        /// <param name="flags">Current message flags.</param>
+        /// <param name="flagsToAdd">Flags to add.</param>
+        /// <returns>Returns new flags.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>flags</b> or <b>flagsToAdd</b> is null reference.</exception>
+        public static string[] MessageFlagsAdd(string[] flags,string[] flagsToAdd)
+        {
+            if(flags == null){
+                throw new ArgumentNullException("flags");
+            }
+            if(flagsToAdd == null){
+                throw new ArgumentNullException("flagsToAdd");
+            }
 
-		/// <summary>
+            List<string> retVal = new List<string>();
+            retVal.AddRange(flags);
+
+            foreach(string flagToAdd in flagsToAdd){
+                bool contains = false;
+                foreach(string flag in flags){
+                    if(string.Equals(flag,flag,StringComparison.InvariantCultureIgnoreCase)){
+                        contains = true;
+                        break;
+                    }
+                }
+
+                if(!contains){
+                    retVal.Add(flagToAdd);
+                }
+            }
+
+            return retVal.ToArray();
+        }
+
+        #endregion
+
+        #region static method MessageFlagsRemove
+
+        /// <summary>
+        /// Removes specified flags from message flags list.
+        /// </summary>
+        /// <param name="flags">Message flags.</param>
+        /// <param name="flagsToRemove">Message flags to remove.</param>
+        /// <returns>Returns new message flags.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>flags</b> or <b>flagsToRemove</b> is null reference.</exception>
+        public static string[] MessageFlagsRemove(string[] flags,string[] flagsToRemove)
+        {
+            if(flags == null){
+                throw new ArgumentNullException("flags");
+            }
+            if(flagsToRemove == null){
+                throw new ArgumentNullException("flagsToRemove");
+            }
+
+            List<string> retVal = new List<string>();
+            foreach(string flag in flags){
+                bool remove = false;
+                foreach(string flagToRemove in flagsToRemove){
+                    if(string.Equals(flag,flagToRemove,StringComparison.InvariantCultureIgnoreCase)){
+                        remove = true;
+                        break;
+                    }
+                }
+
+                if(!remove){
+                    retVal.Add(flag);
+                }
+            }
+
+            return retVal.ToArray();
+        }
+
+        #endregion
+
+
+        #region method ACL_to_String
+
+        /// <summary>
 		/// Converts IMAP_ACL_Flags to string.
 		/// </summary>
 		/// <param name="flags">Flags to convert.</param>
