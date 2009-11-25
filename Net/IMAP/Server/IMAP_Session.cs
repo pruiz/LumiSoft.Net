@@ -3735,7 +3735,7 @@ namespace LumiSoft.Net.IMAP.Server
                 msgInfo.UpdateFlags(setType,flags.ToArray());
 
                 if(!silent){
-                    WriteLine("* " + m_pSelectedFolder.GetSeqNo(msgInfo) + " FETCH (FLAGS " + msgInfo.Flags.ToString() + ")");
+                    WriteLine("* " + m_pSelectedFolder.GetSeqNo(msgInfo) + " FETCH (FLAGS " + msgInfo.FlagsToImapString() + ")");
                 }
             }
 
