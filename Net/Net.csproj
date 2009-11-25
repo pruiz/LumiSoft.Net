@@ -538,9 +538,6 @@
     <Compile Include="IMAP\IMAP_Flags_SetType.cs">
       <SubType>Code</SubType>
     </Compile>
-    <None Include="IMAP\Server\old\IMAP_Session.cs">
-      <SubType>Code</SubType>
-    </None>
     <Compile Include="IMAP\IMAP_Utils.cs">
       <SubType>Code</SubType>
     </Compile>
