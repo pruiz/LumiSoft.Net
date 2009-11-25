@@ -74,9 +74,9 @@ namespace LumiSoft.Net.IMAP
             else if(r.StartsWith("KEYWORD",false)){
                 return IMAP_Search_Key_Keyword.Parse(r);
             }
-            // LAGER
-            else if(r.StartsWith("LAGER",false)){
-                return IMAP_Search_Key_Lager.Parse(r);
+            // LARGER
+            else if(r.StartsWith("LARGER",false)){
+                return IMAP_Search_Key_Larger.Parse(r);
             }
             // NEW
             else if(r.StartsWith("NEW",false)){
@@ -125,6 +125,18 @@ namespace LumiSoft.Net.IMAP
             // SINCE
             else if(r.StartsWith("SINCE",false)){
                 return IMAP_Search_Key_Since.Parse(r);
+            }
+            // SMALLER
+            else if(r.StartsWith("SMALLER",false)){
+                return IMAP_Search_Key_Smaller.Parse(r);
+            }
+            // SUBJECT
+            else if(r.StartsWith("SUBJECT",false)){
+                return IMAP_Search_Key_Subject.Parse(r);
+            }
+            // TEXT
+            else if(r.StartsWith("TEXT",false)){
+                return IMAP_Search_Key_Text.Parse(r);
             }
             // TO
             else if(r.StartsWith("TO",false)){

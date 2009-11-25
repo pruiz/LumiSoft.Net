@@ -258,6 +258,10 @@ namespace LumiSoft.Net.IMAP
             /* RFC 3501. IMAP date format. 
 			    date-time       = DQUOTE date-day-fixed "-" date-month "-" date-year SP time SP zone DQUOTE
 				date            = day-month-year
+                date-day-fixed  = (SP DIGIT) / 2DIGIT
+                                ; Fixed-format version of date-day
+                date-month      = "Jan" / "Feb" / "Mar" / "Apr" / "May" / "Jun" /
+                                  "Jul" / "Aug" / "Sep" / "Oct" / "Nov" / "Dec"
 				time            = 2DIGIT ":" 2DIGIT ":" 2DIGIT
 			*/
             if(date.IndexOf('-') > -1){

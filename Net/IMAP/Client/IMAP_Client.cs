@@ -520,6 +520,8 @@ namespace LumiSoft.Net.IMAP.Client
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
+
+            m_pAuthenticatedUser = new GenericIdentity(TextUtils.QuoteString(user),"IMAP-LOGIN");
         }
 
         #endregion
