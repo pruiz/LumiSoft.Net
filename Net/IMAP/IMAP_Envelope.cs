@@ -55,11 +55,129 @@ namespace LumiSoft.Net.IMAP
         #region static method Parse
 
         /// <summary>
+        /// Parses IMAP ENVELOPE from string.
+        /// </summary>
+        /// <param name="r">String reader.</param>
+        /// <returns>Returns parsed IMAP ENVELOPE string.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>r</b> is null reference.</exception>
+        public static IMAP_Envelope Parse(StringReader r)
+        {
+            if(r == null){
+                throw new ArgumentNullException("r");
+            }
+
+            /* RFC 3501 7.4.2 ENVELOPE.
+                A parenthesized list that describes the envelope structure of a
+                message.  This is computed by the server by parsing the
+                [RFC-2822] header into the component parts, defaulting various
+                fields as necessary.
+
+                The fields of the envelope structure are in the following
+                order: date, subject, from, sender, reply-to, to, cc, bcc,
+                in-reply-to, and message-id.  The date, subject, in-reply-to,
+                and message-id fields are strings.  The from, sender, reply-to,
+                to, cc, and bcc fields are parenthesized lists of address
+                structures.
+
+                An address structure is a parenthesized list that describes an
+                electronic mail address.  The fields of an address structure
+                are in the following order: personal name, [SMTP]
+                at-domain-list (source route), mailbox name, and host name.
+
+                [RFC-2822] group syntax is indicated by a special form of
+                address structure in which the host name field is NIL.  If the
+                mailbox name field is also NIL, this is an end of group marker
+                (semi-colon in RFC 822 syntax).  If the mailbox name field is
+                non-NIL, this is a start of group marker, and the mailbox name
+                field holds the group name phrase.
+
+                If the Date, Subject, In-Reply-To, and Message-ID header lines
+                are absent in the [RFC-2822] header, the corresponding member
+                of the envelope is NIL; if these header lines are present but
+                empty the corresponding member of the envelope is the empty
+                string.
+
+                    Note: some servers may return a NIL envelope member in the
+                    "present but empty" case.  Clients SHOULD treat NIL and
+                    empty string as identical.
+
+                    Note: [RFC-2822] requires that all messages have a valid
+                    Date header.  Therefore, the date member in the envelope can
+                    not be NIL or the empty string.
+
+                    Note: [RFC-2822] requires that the In-Reply-To and
+                    Message-ID headers, if present, have non-empty content.
+                    Therefore, the in-reply-to and message-id members in the
+                    envelope can not be the empty string.
+
+                If the From, To, cc, and bcc header lines are absent in the
+                [RFC-2822] header, or are present but empty, the corresponding
+                member of the envelope is NIL.
+
+                If the Sender or Reply-To lines are absent in the [RFC-2822]
+                header, or are present but empty, the server sets the
+                corresponding member of the envelope to be the same value as
+                the from member (the client is not expected to know to do
+                this).
+
+                    Note: [RFC-2822] requires that all messages have a valid
+                    From header.  Therefore, the from, sender, and reply-to
+                    members in the envelope can not be NIL.
+            */
+
+            // Eat "ENVELOPE".
+            r.ReadWord();             
+            r.ReadToFirstChar();
+            // Eat starting "(".
+            r.ReadSpecifiedLength(1);
+
+            // Read "date".
+            DateTime date = DateTime.MinValue;
+            string dateS = r.ReadWord();            
+            if(dateS != null){
+                date = MIME_Utils.ParseRfc2822DateTime(dateS);
+            }
+
+            // Read "subject".
+            string subject = r.ReadWord();
+
+            // Read "from"
+            Mail_t_Address[] from = ReadAddresses(r);
+            
+            //Read "sender"
+            Mail_t_Address[] sender = ReadAddresses(r);
+            
+            // Read "reply-to"
+            Mail_t_Address[] replyTo = ReadAddresses(r);
+            
+            // Read "to"
+            Mail_t_Address[] to = ReadAddresses(r);
+            
+            // Read "cc"
+            Mail_t_Address[] cc = ReadAddresses(r);
+            
+            // Read "bcc"
+            Mail_t_Address[] bcc = ReadAddresses(r);
+            
+            // Read "in-reply-to"
+            string inReplyTo = r.ReadWord();
+            
+            // Read "message-id"
+            string messageID = r.ReadWord();
+
+            // Eat ending ")".
+            r.ReadToFirstChar();
+            r.ReadSpecifiedLength(1);
+
+            return new IMAP_Envelope(date,subject,from,sender,replyTo,to,cc,bcc,inReplyTo,messageID);
+        }
+
+        /// <summary>
         /// Parses IMAP FETCH ENVELOPE data-item.
         /// </summary>
         /// <param name="fetchReader">Fetch reader.</param>
         /// <returns>Returns parsed IMAP FETCH ENVELOPE data-item.</returns>
-        /// <exception cref="ArgumentNullException">Is raised when <b>fetchReader</b> is null reference value.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>fetchReader</b> is null reference.</exception>
         internal static IMAP_Envelope Parse(IMAP_Client._FetchResponseReader fetchReader)
         {
             if(fetchReader == null){
@@ -352,6 +470,68 @@ namespace LumiSoft.Net.IMAP
 
 
         #region static method ReadAddresses
+
+        /// <summary>
+        /// Reads parenthesized list of addresses.
+        /// </summary>
+        /// <param name="r">String reader.</param>
+        /// <returns>Returns read addresses.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>r</b> is null reference.</exception>
+        private static Mail_t_Address[] ReadAddresses(StringReader r)
+        {
+            if(r == null){
+                throw new ArgumentNullException("r");
+            }
+
+            /* RFC 3501 7.4.2. 
+                An address structure is a parenthesized list that describes an
+                electronic mail address.  The fields of an address structure
+                are in the following order: personal name, [SMTP]
+                at-domain-list (source route), mailbox name, and host name.
+
+                [RFC-2822] group syntax is indicated by a special form of
+                address structure in which the host name field is NIL.  If the
+                mailbox name field is also NIL, this is an end of group marker
+                (semi-colon in RFC 822 syntax).  If the mailbox name field is
+                non-NIL, this is a start of group marker, and the mailbox name
+                field holds the group name phrase.
+            */
+            
+            r.ReadToFirstChar();
+            if(r.StartsWith("NIL",false)){
+                r.ReadWord();
+
+                return null;
+            }
+            else{
+                List<Mail_t_Address> retVal = new List<Mail_t_Address>();
+                // Eat addresses starting "(".
+                r.ReadSpecifiedLength(1);
+
+                while(r.Available > 0){
+                    // We have addresses ending ")".
+                    if(r.StartsWith(")")){
+                        r.ReadSpecifiedLength(1);
+                        break;
+                    }
+
+                    // Eat address starting "(".
+                    r.ReadSpecifiedLength(1);
+
+                    string personalName = r.ReadWord();
+                    string atDomainList = r.ReadWord();
+                    string mailboxName  = r.ReadWord();
+                    string hostName     = r.ReadWord();
+
+                    retVal.Add(new Mail_t_Mailbox(personalName,mailboxName + "@" + hostName));
+
+                    // Eat address ending ")".
+                    r.ReadSpecifiedLength(1);
+                }
+
+                return retVal.ToArray();
+            }
+        }
 
         /// <summary>
         /// Reads parenthesized list of addresses.

@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP LSUB response. Defined in RFC 3501 7.2.3.
     /// </summary>
-    public class IMAP_Response_LSub : IMAP_r_u
+    public class IMAP_r_u_LSub : IMAP_r_u
     {
         private string   m_FolderName        = "";
         private char     m_Delimiter         = '/';
@@ -21,7 +21,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="attributes">Folder attributes.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        public IMAP_Response_LSub(string folder,char delimiter,string[] attributes)
+        public IMAP_r_u_LSub(string folder,char delimiter,string[] attributes)
         {
             if(folder == null){
                 throw new ArgumentNullException("folder");
@@ -46,7 +46,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="lSubResponse">LSub response string.</param>
         /// <returns>Returns parsed lsub response.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>lSubResponse</b> is null reference.</exception>
-        public static IMAP_Response_LSub Parse(string lSubResponse)
+        public static IMAP_r_u_LSub Parse(string lSubResponse)
         {
             if(lSubResponse == null){
                 throw new ArgumentNullException("lSubResponse");
@@ -75,7 +75,37 @@ namespace LumiSoft.Net.IMAP
             string delimiter  = r.ReadWord();
             string folder     = TextUtils.UnQuoteString(IMAP_Utils.Decode_IMAP_UTF7_String(r.ReadToEnd().Trim()));
 
-            return new IMAP_Response_LSub(folder,delimiter[0],attributes == string.Empty ? new string[0] : attributes.Split(' '));
+            return new IMAP_r_u_LSub(folder,delimiter[0],attributes == string.Empty ? new string[0] : attributes.Split(' '));
+        }
+
+        #endregion
+
+
+        #region override method ToString
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString()
+        {
+            // Example:    S: * LSUB (\Noselect) "/" ~/Mail/foo
+
+            StringBuilder retVal = new StringBuilder();
+            retVal.Append("* LSUB (");
+            if(m_pFolderAttributes != null){
+                for(int i=0;i<m_pFolderAttributes.Length;i++){
+                    if(i > 0){
+                        retVal.Append(" ");
+                    }
+                    retVal.Append(m_pFolderAttributes[i]);
+                }
+            }
+            retVal.Append(") ");
+            retVal.Append("\"" + m_Delimiter + "\" ");
+            retVal.Append("\"" + m_FolderName + "\"\r\n");
+
+            return retVal.ToString();
         }
 
         #endregion

@@ -11,7 +11,7 @@ namespace LumiSoft.Net.IMAP.Server
     {
         private string              m_FolderReferenceName = null;
         private string              m_FolderFilter        = null;
-        private List<IMAP_r_u_List> m_pFolders            = null;
+        private List<IMAP_r_u_LSub> m_pFolders            = null;
 
         /// <summary>
         /// Default constructor.
@@ -23,7 +23,7 @@ namespace LumiSoft.Net.IMAP.Server
             m_FolderReferenceName = referenceName;
             m_FolderFilter        = folderFilter;
 
-            m_pFolders = new List<IMAP_r_u_List>();
+            m_pFolders = new List<IMAP_r_u_LSub>();
         }
 
 
@@ -55,7 +55,7 @@ namespace LumiSoft.Net.IMAP.Server
         /// <summary>
         /// Gets IMAP folders collection.
         /// </summary>
-        public List<IMAP_r_u_List> Folders
+        public List<IMAP_r_u_LSub> Folders
         {
             get{ return m_pFolders; }
         }

@@ -1070,7 +1070,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// is the last character of a mailbox name argument, matching levels
         /// of hierarchy are also returned.
         /// </remarks>
-        public IMAP_Response_LSub[] GetSubscribedFolders(string filter)
+        public IMAP_r_u_LSub[] GetSubscribedFolders(string filter)
         {            
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
@@ -1124,7 +1124,7 @@ namespace LumiSoft.Net.IMAP.Client
                 SendCommand((m_CommandIndex++).ToString("d5") + " LSUB \"\" \"*\"\r\n");
             }
             
-            List<IMAP_Response_LSub> retVal  = new List<IMAP_Response_LSub>();
+            List<IMAP_r_u_LSub> retVal  = new List<IMAP_r_u_LSub>();
             IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,retVal,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
@@ -2873,7 +2873,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="nspace">List where to store NAMESPACE command result. This value can be null.</param>
         /// <param name="fetchHandler">Fetch data-items handler.</param>
         /// <returns>Returns command completion status response.</returns>
-        private IMAP_r_ServerStatus ReadResponse(List<IMAP_r_u_Capability> capability,IMAP_Client_SelectedFolder folderInfo,List<int> search,List<IMAP_r_u_List> list,List<IMAP_Response_LSub> lsub,List<IMAP_r_u_Acl> acl,List<IMAP_Response_MyRights> myRights,List<IMAP_r_u_ListRights> listRights,List<IMAP_r_u_Status> status,List<IMAP_r_u_Quota> quota,List<IMAP_r_u_QuotaRoot> quotaRoot,List<IMAP_r_u_Namespace> nspace,IMAP_Client_FetchHandler fetchHandler)
+        private IMAP_r_ServerStatus ReadResponse(List<IMAP_r_u_Capability> capability,IMAP_Client_SelectedFolder folderInfo,List<int> search,List<IMAP_r_u_List> list,List<IMAP_r_u_LSub> lsub,List<IMAP_r_u_Acl> acl,List<IMAP_Response_MyRights> myRights,List<IMAP_r_u_ListRights> listRights,List<IMAP_r_u_Status> status,List<IMAP_r_u_Quota> quota,List<IMAP_r_u_QuotaRoot> quotaRoot,List<IMAP_r_u_Namespace> nspace,IMAP_Client_FetchHandler fetchHandler)
         {
             /* RFC 3501 2.2.2.
                 The protocol receiver of an IMAP4rev1 client reads a response line
@@ -2992,7 +2992,7 @@ namespace LumiSoft.Net.IMAP.Client
 
                     else if(word.Equals("LSUB",StringComparison.InvariantCultureIgnoreCase)){
                         if(lsub != null){
-                            lsub.Add(IMAP_Response_LSub.Parse(responseLine));
+                            lsub.Add(IMAP_r_u_LSub.Parse(responseLine));
                         }
                     }
 

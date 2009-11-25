@@ -139,43 +139,49 @@ namespace LumiSoft.Net.IMAP
             // Example:    S: * NAMESPACE (("" "/")) NIL (("Public Folders/" "/"))
 
             StringBuilder retVal = new StringBuilder();
-            retVal.Append("* NAMESPACE (");
+            retVal.Append("* NAMESPACE ");
             if(m_pPersonalNamespaces != null && m_pPersonalNamespaces.Length > 0){
+                retVal.Append("(");
                 for(int i=0;i<m_pPersonalNamespaces.Length;i++){
                     if(i > 0){
                         retVal.Append(" ");
                     }
                     retVal.Append("(\"" + m_pPersonalNamespaces[i].NamespaceName + "\" \"" + m_pPersonalNamespaces[i].HierarchyDelimiter + "\")");
                 }
+                retVal.Append(")");
             }
             else{
                 retVal.Append("NIL");
             }
             retVal.Append(" ");
             if(m_pOtherUsersNamespaces != null && m_pOtherUsersNamespaces.Length > 0){
+                retVal.Append("(");
                 for(int i=0;i<m_pOtherUsersNamespaces.Length;i++){
                     if(i > 0){
                         retVal.Append(" ");
                     }
                     retVal.Append("(\"" + m_pOtherUsersNamespaces[i].NamespaceName + "\" \"" + m_pOtherUsersNamespaces[i].HierarchyDelimiter + "\")");
                 }
+                retVal.Append(")");
             }
             else{
                 retVal.Append("NIL");
             }
             retVal.Append(" ");
             if(m_pSharedNamespaces != null && m_pSharedNamespaces.Length > 0){
+                retVal.Append("(");
                 for(int i=0;i<m_pSharedNamespaces.Length;i++){
                     if(i > 0){
                         retVal.Append(" ");
                     }
                     retVal.Append("(\"" + m_pSharedNamespaces[i].NamespaceName + "\" \"" + m_pSharedNamespaces[i].HierarchyDelimiter + "\")");
                 }
+                retVal.Append(")");
             }
             else{
                 retVal.Append("NIL");
             }
-            retVal.Append(")\r\n");
+            retVal.Append("\r\n");
             
 
             return retVal.ToString();
@@ -187,7 +193,7 @@ namespace LumiSoft.Net.IMAP
         #region Properties implementation
 
         /// <summary>
-        /// Gets personal namespaces.
+        /// Gets personal namespaces. Value null means not specified.
         /// </summary>
         public IMAP_Namespace_Entry[] PersonalNamespaces
         {
@@ -195,7 +201,7 @@ namespace LumiSoft.Net.IMAP
         }
 
         /// <summary>
-        /// Gets other users namespaces.
+        /// Gets other users namespaces. Value null means not specified.
         /// </summary>
         public IMAP_Namespace_Entry[] OtherUsersNamespaces
         {
@@ -203,7 +209,7 @@ namespace LumiSoft.Net.IMAP
         }
 
         /// <summary>
-        /// Gets shared namespaces.
+        /// Gets shared namespaces. Value null means not specified.
         /// </summary>
         public IMAP_Namespace_Entry[] SharedNamespaces
         {

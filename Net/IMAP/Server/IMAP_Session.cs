@@ -377,6 +377,11 @@ namespace LumiSoft.Net.IMAP.Server
                 }
                                 
                 string[] cmd_args = Encoding.UTF8.GetString(op.Buffer,0,op.LineBytesInBuffer).Split(new char[]{' '},3);
+                if(cmd_args.Length < 2){                    
+                    WriteLine("* BAD Error: command '" + op.LineUtf8 + "' not recognized.");
+
+                    return true;
+                }
                 string   cmdTag   = cmd_args[0];
                 string   cmd      = cmd_args[1].ToUpperInvariant();
                 string   args     = cmd_args.Length == 3 ? cmd_args[2] : "";
@@ -501,7 +506,7 @@ namespace LumiSoft.Net.IMAP.Server
                          Disconnect();
                          return false;
                      }
-                     
+                   
                      WriteLine(cmdTag + " BAD Error: command '" + cmd + "' not recognized.");
                  }
              }
@@ -915,7 +920,7 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }
 
-            IMAP_e_Namespace e = OnNamespace(new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"NAMESPACE command completed."));
+            IMAP_e_Namespace e = OnNamespace(new IMAP_r_ServerStatus(cmdTag,"OK","NAMESPACE command completed."));
 
             StringBuilder retVal = new StringBuilder();
             if(e.NamespaceResponse != null){
@@ -1176,13 +1181,9 @@ namespace LumiSoft.Net.IMAP.Server
 
             string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
             
-            IMAP_e_Folder e = OnCreate(cmdTag,folder);
-            if(e.Response == null){
-                WriteLine(cmdTag + " NO Internal server error: IMAP Server application didn't return any resposne.");
-            }
-            else{
-                WriteLine(e.Response.ToString());
-            }
+            IMAP_e_Folder e = OnCreate(cmdTag,folder,new IMAP_r_ServerStatus(cmdTag,"OK","CREATE command completed."));
+
+            WriteLine(e.Response.ToString());            
         }
 
         #endregion
@@ -1251,13 +1252,9 @@ namespace LumiSoft.Net.IMAP.Server
 
             string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
             
-            IMAP_e_Folder e = OnDelete(cmdTag,folder);
-            if(e.Response == null){
-                WriteLine(cmdTag + " NO Internal server error: IMAP Server application didn't return any resposne.");
-            }
-            else{
-                WriteLine(e.Response.ToString());
-            }
+            IMAP_e_Folder e = OnDelete(cmdTag,folder,new IMAP_r_ServerStatus(cmdTag,"OK","DELETE command completed."));
+
+            WriteLine(e.Response.ToString());            
         }
 
         #endregion
@@ -1412,7 +1409,7 @@ namespace LumiSoft.Net.IMAP.Server
             StringBuilder response = new StringBuilder();
             
             IMAP_e_LSub e = OnLSub(refName,folder);
-            foreach(IMAP_r_u_List r in e.Folders){
+            foreach(IMAP_r_u_LSub r in e.Folders){
                 response.Append(r.ToString());
             }
                                     
@@ -1464,13 +1461,9 @@ namespace LumiSoft.Net.IMAP.Server
 
             string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
             
-            IMAP_e_Folder e = OnSubscribe(cmdTag,folder);
-            if(e.Response == null){
-                WriteLine(cmdTag + " NO Internal server error: IMAP Server application didn't return any resposne.");
-            }
-            else{
-                WriteLine(e.Response.ToString());
-            }
+            IMAP_e_Folder e = OnSubscribe(cmdTag,folder,new IMAP_r_ServerStatus(cmdTag,"OK","SUBSCRIBE command completed."));
+            
+            WriteLine(e.Response.ToString());
         }
 
         #endregion
@@ -1505,13 +1498,9 @@ namespace LumiSoft.Net.IMAP.Server
 
             string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
             
-            IMAP_e_Folder e = OnUnsubscribe(cmdTag,folder);
-            if(e.Response == null){
-                WriteLine(cmdTag + " NO Internal server error: IMAP Server application didn't return any resposne.");
-            }
-            else{
-                WriteLine(e.Response.ToString());
-            }
+            IMAP_e_Folder e = OnUnsubscribe(cmdTag,folder,new IMAP_r_ServerStatus(cmdTag,"OK","UNSUBSCRIBE command completed."));
+            
+            WriteLine(e.Response.ToString());            
         }
 
         #endregion
@@ -1791,14 +1780,14 @@ namespace LumiSoft.Net.IMAP.Server
                     response.Append(")\r\n");
                 }
                 if(e.PermanentFlags.Count > 0){
-                    response.Append("* PERMANENTFLAGS (");
+                    response.Append("* OK [PERMANENTFLAGS (");
                     for(int i=0;i<e.PermanentFlags.Count;i++){
                         if(i > 0){
                             response.Append(" ");
                         }
                         response.Append(e.PermanentFlags[i]);
                     }
-                    response.Append(")\r\n");
+                    response.Append(")] Avaliable permanent flags.\r\n");
                 }
                 response.Append(cmdTag + " OK [" + (e.IsReadOnly ? "READ-ONLY" : "READ-WRITE") + "] SELECT completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds.\r\n");
 
@@ -1891,14 +1880,14 @@ namespace LumiSoft.Net.IMAP.Server
                     response.Append(")\r\n");
                 }
                 if(e.PermanentFlags.Count > 0){
-                    response.Append("* PERMANENTFLAGS (");
+                    response.Append("* OK [PERMANENTFLAGS (");
                     for(int i=0;i<e.PermanentFlags.Count;i++){
                         if(i > 0){
                             response.Append(" ");
                         }
                         response.Append(e.PermanentFlags[i]);
                     }
-                    response.Append(")\r\n");
+                    response.Append(")] Avaliable permanent flags.\r\n");
                 }
                 response.Append(cmdTag + " OK [READ-ONLY] EXAMINE completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds.\r\n");
 
@@ -3003,6 +2992,20 @@ namespace LumiSoft.Net.IMAP.Server
 
             #endregion
 
+            // UID FETCH must always return UID data-item, even if user didn't request it.
+            if(uid){
+                bool add = true;
+                foreach(IMAP_Fetch_DataItem item in dataItems){                    
+                    if(item is IMAP_Fetch_DataItem_Uid){
+                        add = false;
+                        break;
+                    }
+                }
+                if(add){
+                    dataItems.Add(new IMAP_Fetch_DataItem_Uid());
+                }
+            }
+
             UpdateSelectedFolderAndSendChanges();
 
             IMAP_e_Fetch fetchEArgs = new IMAP_e_Fetch(
@@ -3557,7 +3560,7 @@ namespace LumiSoft.Net.IMAP.Server
                 this.TcpStream.Write("* SEARCH");
                 logBuffer.Append("* SEARCH");
 
-                IMAP_e_Search searchArgs = new IMAP_e_Search(criteria);
+                IMAP_e_Search searchArgs = new IMAP_e_Search(criteria,new IMAP_r_ServerStatus(cmdTag,"OK","SEARCH completed in %exectime seconds.\r\n"));
                 searchArgs.Matched += new EventHandler<EventArgs<long>>(delegate(object s,EventArgs<long> e){
                     if(uid){
                         this.TcpStream.Write(" " + e.Value);
@@ -3578,7 +3581,7 @@ namespace LumiSoft.Net.IMAP.Server
                 logBuffer.Append("\r\n");
                 this.LogAddWrite(logBuffer.Length,logBuffer.ToString());
 
-                WriteLine(cmdTag + " OK SEARCH completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds.\r\n");
+                WriteLine(searchArgs.Response.ToString().Replace("%exectime",((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2")));
             }
             catch{
                 WriteLine(cmdTag + " BAD Error in arguments.");
@@ -5081,10 +5084,11 @@ namespace LumiSoft.Net.IMAP.Server
         /// </summary>
         /// <param name="cmdTag">Command tag.</param>
         /// <param name="folder">Folder name with optional path.</param>
+        /// <param name="response">Default IMAP server response.</param>
         /// <returns>Returns event args.</returns>
-        private IMAP_e_Folder OnCreate(string cmdTag,string folder)
+        private IMAP_e_Folder OnCreate(string cmdTag,string folder,IMAP_r_ServerStatus response)
         {
-            IMAP_e_Folder eArgs = new IMAP_e_Folder(cmdTag,folder);
+            IMAP_e_Folder eArgs = new IMAP_e_Folder(cmdTag,folder,response);
             if(this.Create != null){
                 this.Create(this,eArgs);
             }
@@ -5106,10 +5110,11 @@ namespace LumiSoft.Net.IMAP.Server
         /// </summary>
         /// <param name="cmdTag">Command tag.</param>
         /// <param name="folder">Folder name with optional path.</param>
+        /// <param name="response">Default IMAP server response.</param>
         /// <returns>Returns event args.</returns>
-        private IMAP_e_Folder OnDelete(string cmdTag,string folder)
+        private IMAP_e_Folder OnDelete(string cmdTag,string folder,IMAP_r_ServerStatus response)
         {
-            IMAP_e_Folder eArgs = new IMAP_e_Folder(cmdTag,folder);
+            IMAP_e_Folder eArgs = new IMAP_e_Folder(cmdTag,folder,response);
             if(this.Delete != null){
                 this.Delete(this,eArgs);
             }
@@ -5182,10 +5187,11 @@ namespace LumiSoft.Net.IMAP.Server
         /// </summary>
         /// <param name="cmdTag">Command tag.</param>
         /// <param name="folder">Folder name with optional path.</param>
+        /// <param name="response">Default IMAP server response.</param>
         /// <returns>Returns event args.</returns>
-        private IMAP_e_Folder OnSubscribe(string cmdTag,string folder)
+        private IMAP_e_Folder OnSubscribe(string cmdTag,string folder,IMAP_r_ServerStatus response)
         {
-            IMAP_e_Folder eArgs = new IMAP_e_Folder(cmdTag,folder);
+            IMAP_e_Folder eArgs = new IMAP_e_Folder(cmdTag,folder,response);
             if(this.Subscribe != null){
                 this.Subscribe(this,eArgs);
             }
@@ -5207,10 +5213,11 @@ namespace LumiSoft.Net.IMAP.Server
         /// </summary>
         /// <param name="cmdTag">Command tag.</param>
         /// <param name="folder">Folder name with optional path.</param>
+        /// <param name="response">Default IMAP server response.</param>
         /// <returns>Returns event args.</returns>
-        private IMAP_e_Folder OnUnsubscribe(string cmdTag,string folder)
+        private IMAP_e_Folder OnUnsubscribe(string cmdTag,string folder,IMAP_r_ServerStatus response)
         {
-            IMAP_e_Folder eArgs = new IMAP_e_Folder(cmdTag,folder);
+            IMAP_e_Folder eArgs = new IMAP_e_Folder(cmdTag,folder,response);
             if(this.Unsubscribe != null){
                 this.Unsubscribe(this,eArgs);
             }
