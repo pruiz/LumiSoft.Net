@@ -568,7 +568,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
@@ -631,7 +631,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
@@ -805,7 +805,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
@@ -890,7 +890,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
@@ -984,7 +984,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
@@ -1077,7 +1077,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
@@ -1158,7 +1158,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
@@ -1223,7 +1223,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
@@ -1277,7 +1277,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
@@ -1386,7 +1386,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
@@ -1496,7 +1496,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
@@ -1567,7 +1567,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
@@ -1628,7 +1628,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
@@ -1715,7 +1715,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
@@ -1786,7 +1786,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
@@ -1880,7 +1880,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
@@ -1944,7 +1944,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
@@ -2014,7 +2014,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
@@ -2080,7 +2080,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
 
@@ -2295,7 +2295,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
             if(m_pSelectedFolder == null){
@@ -2375,7 +2375,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
             if(m_pSelectedFolder == null){
@@ -2426,7 +2426,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
             if(m_pSelectedFolder == null){
@@ -2548,7 +2548,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
             if(m_pSelectedFolder == null){
@@ -2625,7 +2625,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
             if(m_pSelectedFolder == null){
@@ -2653,7 +2653,7 @@ namespace LumiSoft.Net.IMAP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
-            if(this.IsAuthenticated){
+            if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
             }
             if(m_pSelectedFolder == null){
