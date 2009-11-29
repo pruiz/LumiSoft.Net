@@ -1031,6 +1031,9 @@ namespace LumiSoft.Net.DNS.Client
                 else if((DNS_QType)type == DNS_QType.NAPTR){
                     answers.Add(DNS_rr_NAPTR.Parse(reply,ref offset,rdLength,ttl));
                 }
+                else if((DNS_QType)type == DNS_QType.SPF){
+                    answers.Add(DNS_rr_SPF.Parse(reply,ref offset,rdLength,ttl));
+                }
                 else{
                     // Unknown record, skip it.
                     offset += rdLength;
