@@ -254,6 +254,26 @@ namespace LumiSoft.Net.DNS.Client
 
 		#endregion
 
+        #region method GetSPFRecords
+
+		/// <summary>
+		/// Gets SPF resource records.
+		/// </summary>
+		/// <returns></returns>
+		public DNS_rr_SPF[] GetSPFRecords()
+		{
+            List<DNS_rr_SPF> retVal = new List<DNS_rr_SPF>();
+            foreach(DNS_rr record in m_pAnswers){
+                if(record.RecordType == DNS_QType.SPF){
+                    retVal.Add((DNS_rr_SPF)record);
+                }
+            }
+
+            return retVal.ToArray();
+		}
+
+		#endregion
+
 
 		#region method FilterRecords
 
