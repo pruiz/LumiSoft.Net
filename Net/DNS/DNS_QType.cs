@@ -83,6 +83,11 @@ namespace LumiSoft.Net.DNS
         NAPTR = 35,
 
         /// <summary>
+        /// SPF(Sender Policy Framework) record.
+        /// </summary>
+        SPF = 99,
+
+        /// <summary>
         /// All records what server returns.
         /// </summary>
         ANY = 255,
