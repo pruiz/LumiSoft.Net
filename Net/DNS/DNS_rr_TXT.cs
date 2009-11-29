@@ -1,23 +1,25 @@
 using System;
 
-namespace LumiSoft.Net.Dns.Client
+using LumiSoft.Net.DNS.Client;
+
+namespace LumiSoft.Net.DNS
 {
 	/// <summary>
-	/// PTR record class.
+	/// TXT record class.
 	/// </summary>
 	[Serializable]
-	public class DNS_rr_PTR : DNS_rr_base
+	public class DNS_rr_TXT : DNS_rr
 	{
-		private string m_DomainName = "";
+		private string m_Text = "";
 
 		/// <summary>
 		/// Default constructor.
 		/// </summary>
-		/// <param name="domainName">DomainName.</param>
+		/// <param name="text">Text.</param>
 		/// <param name="ttl">TTL value.</param>
-		public DNS_rr_PTR(string domainName,int ttl) : base(QTYPE.PTR,ttl)
+		public DNS_rr_TXT(string text,int ttl) : base(DNS_QType.TXT,ttl)
 		{
-			m_DomainName = domainName;
+			m_Text = text;
 		}
 
 
@@ -30,15 +32,13 @@ namespace LumiSoft.Net.Dns.Client
         /// <param name="offset">Current offset in reply data.</param>
         /// <param name="rdLength">Resource record data length.</param>
         /// <param name="ttl">Time to live in seconds.</param>
-        public static DNS_rr_PTR Parse(byte[] reply,ref int offset,int rdLength,int ttl)
+        public static DNS_rr_TXT Parse(byte[] reply,ref int offset,int rdLength,int ttl)
         {
-            string name = "";
-			if(Dns_Client.GetQName(reply,ref offset,ref name)){
-			    return new DNS_rr_PTR(name,ttl);
-            }
-            else{
-                throw new ArgumentException("Invalid PTR resource record data !");
-            }
+            // TXT RR
+
+            string text = Dns_Client.ReadCharacterString(reply,ref offset);
+
+			return new DNS_rr_TXT(text,ttl);
         }
 
         #endregion
@@ -47,14 +47,13 @@ namespace LumiSoft.Net.Dns.Client
         #region Properties Implementation
 
         /// <summary>
-		/// Gets domain name.
+		/// Gets text.
 		/// </summary>
-		public string DomainName
+		public string Text
 		{
-			get{ return m_DomainName; }
+			get{ return m_Text; }
 		}
 
 		#endregion
-
 	}
 }

@@ -8,7 +8,7 @@ using System.Threading;
 
 using LumiSoft.Net;
 using LumiSoft.Net.Log;
-using LumiSoft.Net.Dns.Client;
+using LumiSoft.Net.DNS.Client;
 using LumiSoft.Net.TCP;
 
 namespace LumiSoft.Net.SMTP.Relay

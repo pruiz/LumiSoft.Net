@@ -1,12 +1,14 @@
 using System;
 
-namespace LumiSoft.Net.Dns.Client
+using LumiSoft.Net.DNS.Client;
+
+namespace LumiSoft.Net.DNS
 {
 	/// <summary>
 	/// NS record class.
 	/// </summary>
 	[Serializable]
-	public class DNS_rr_NS : DNS_rr_base
+	public class DNS_rr_NS : DNS_rr
 	{
 		private string m_NameServer = "";
 
@@ -15,7 +17,7 @@ namespace LumiSoft.Net.Dns.Client
 		/// </summary>
 		/// <param name="nameServer">Name server name.</param>
 		/// <param name="ttl">TTL value.</param>
-		public DNS_rr_NS(string nameServer,int ttl) : base(QTYPE.NS,ttl)
+		public DNS_rr_NS(string nameServer,int ttl) : base(DNS_QType.NS,ttl)
 		{
 			m_NameServer = nameServer;
 		}

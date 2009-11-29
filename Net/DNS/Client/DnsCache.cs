@@ -4,7 +4,7 @@ using System.Collections;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 
-namespace LumiSoft.Net.Dns.Client
+namespace LumiSoft.Net.DNS.Client
 {
 	#region struct CacheEntry
 

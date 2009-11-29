@@ -8,7 +8,7 @@ using System.Text;
 using System.Net.NetworkInformation;
 using System.Threading;
 
-namespace LumiSoft.Net.Dns.Client
+namespace LumiSoft.Net.DNS.Client
 {
 	/// <summary>
 	/// Dns client.
@@ -339,7 +339,7 @@ namespace LumiSoft.Net.Dns.Client
 		/// <param name="queryText">Query text. It depends on queryType.</param>
 		/// <param name="queryType">Query type.</param>
 		/// <returns>Returns DSN server response.</returns>
-		public DnsServerResponse Query(string queryText,QTYPE queryType)
+		public DnsServerResponse Query(string queryText,DNS_QType queryType)
 		{
             return Query(queryText,queryType,2000);
         }
@@ -351,9 +351,9 @@ namespace LumiSoft.Net.Dns.Client
 		/// <param name="queryType">Query type.</param>
         /// <param name="timeout">Query timeout in milli seconds.</param>
 		/// <returns>Returns DSN server response.</returns>
-		public DnsServerResponse Query(string queryText,QTYPE queryType,int timeout)
+		public DnsServerResponse Query(string queryText,DNS_QType queryType,int timeout)
 		{
-			if(queryType == QTYPE.PTR){
+			if(queryType == DNS_QType.PTR){
 				string ip = queryText;
 
 				// See if IP is ok.
@@ -413,8 +413,8 @@ namespace LumiSoft.Net.Dns.Client
 				return System.Net.Dns.GetHostEntry(host).AddressList;
 			}
             else{
-                DnsServerResponse response = Query(host,QTYPE.A);
-                if(response.ResponseCode != RCODE.NO_ERROR){
+                DnsServerResponse response = Query(host,DNS_QType.A);
+                if(response.ResponseCode != DNS_RCode.NO_ERROR){
                     throw new DNS_ClientException(response.ResponseCode);
                 }
 
@@ -422,8 +422,8 @@ namespace LumiSoft.Net.Dns.Client
                     retVal.Add(record.IP);
                 }
 
-                response = Query(host,QTYPE.AAAA);
-                if(response.ResponseCode != RCODE.NO_ERROR){
+                response = Query(host,DNS_QType.AAAA);
+                if(response.ResponseCode != DNS_RCode.NO_ERROR){
                     throw new DNS_ClientException(response.ResponseCode);
                 }
 
@@ -491,8 +491,8 @@ namespace LumiSoft.Net.Dns.Client
 			else{
 				// hostName_IP must be host name, try to resolve it's IP
 				Dns_Client dns = new Dns_Client();
-				DnsServerResponse resp = dns.Query(host,QTYPE.A);
-				if(resp.ResponseCode == RCODE.NO_ERROR){
+				DnsServerResponse resp = dns.Query(host,DNS_QType.A);
+				if(resp.ResponseCode == DNS_RCode.NO_ERROR){
 					DNS_rr_A[] records = resp.GetARecords();
 					IPAddress[] retVal = new IPAddress[records.Length];
 					for(int i=0;i<records.Length;i++){
@@ -581,7 +581,7 @@ namespace LumiSoft.Net.Dns.Client
                 //}
 
                 // Cache query.
-                if(m_UseDnsCache && serverResponse.ResponseCode == RCODE.NO_ERROR){
+                if(m_UseDnsCache && serverResponse.ResponseCode == DNS_RCode.NO_ERROR){
 	                DnsCache.AddToCache(transaction.QName,transaction.QType,serverResponse);
 		        }
             }
@@ -625,7 +625,7 @@ namespace LumiSoft.Net.Dns.Client
                 //}
 
                 // Cache query.
-                if(m_UseDnsCache && serverResponse.ResponseCode == RCODE.NO_ERROR){
+                if(m_UseDnsCache && serverResponse.ResponseCode == DNS_RCode.NO_ERROR){
 	                DnsCache.AddToCache(transaction.QName,transaction.QType,serverResponse);
 		        }
             }
@@ -653,7 +653,7 @@ namespace LumiSoft.Net.Dns.Client
 		/// <param name="qtype">Query type.</param>
 		/// <param name="qclass">Query class.</param>
 		/// <returns>Returns DNS server response.</returns>
-		private DnsServerResponse QueryServer(int timeout,string qname,QTYPE qtype,int qclass)
+		private DnsServerResponse QueryServer(int timeout,string qname,DNS_QType qtype,int qclass)
 		{	
 			if(m_DnsServers == null || m_DnsServers.Length == 0){
 				throw new Exception("Dns server isn't specified !");
@@ -709,7 +709,7 @@ namespace LumiSoft.Net.Dns.Client
 		/// <param name="qtype">Query type.</param>
 		/// <param name="qclass">Query class.</param>
 		/// <returns></returns>
-		private byte[] CreateQuery(int ID,string qname,QTYPE qtype,int qclass)
+		private byte[] CreateQuery(int ID,string qname,DNS_QType qtype,int qclass)
 		{
 			byte[] query = new byte[512];
 
@@ -917,13 +917,13 @@ namespace LumiSoft.Net.Dns.Client
 			*/
 		
 			// Get reply code
-			int    id                     = (reply[0]  << 8 | reply[1]);
-			OPCODE opcode                 = (OPCODE)((reply[2] >> 3) & 15);
-			RCODE  replyCode              = (RCODE)(reply[3]  & 15);	
-			int    queryCount             = (reply[4]  << 8 | reply[5]);
-			int    answerCount            = (reply[6]  << 8 | reply[7]);
-			int    authoritiveAnswerCount = (reply[8]  << 8 | reply[9]);
-			int    additionalAnswerCount  = (reply[10] << 8 | reply[11]);
+			int       id                     = (reply[0]  << 8 | reply[1]);
+			OPCODE    opcode                 = (OPCODE)((reply[2] >> 3) & 15);
+			DNS_RCode replyCode              = (DNS_RCode)(reply[3]  & 15);	
+			int       queryCount             = (reply[4]  << 8 | reply[5]);
+			int       answerCount            = (reply[6]  << 8 | reply[7]);
+			int       authoritiveAnswerCount = (reply[8]  << 8 | reply[9]);
+			int       additionalAnswerCount  = (reply[10] << 8 | reply[11]);
 			//---- End of headers ---------------------------------//
 		
 			int pos = 12;
@@ -941,9 +941,9 @@ namespace LumiSoft.Net.Dns.Client
 			// 1) parse answers
 			// 2) parse authoritive answers
 			// 3) parse additional answers
-			List<DNS_rr_base> answers = ParseAnswers(reply,answerCount,ref pos);
-			List<DNS_rr_base> authoritiveAnswers = ParseAnswers(reply,authoritiveAnswerCount,ref pos);
-			List<DNS_rr_base> additionalAnswers = ParseAnswers(reply,additionalAnswerCount,ref pos);
+			List<DNS_rr> answers = ParseAnswers(reply,answerCount,ref pos);
+			List<DNS_rr> authoritiveAnswers = ParseAnswers(reply,authoritiveAnswerCount,ref pos);
+			List<DNS_rr> additionalAnswers = ParseAnswers(reply,additionalAnswerCount,ref pos);
 
 			return new DnsServerResponse(true,id,replyCode,answers,authoritiveAnswers,additionalAnswers);
 		}
@@ -959,7 +959,7 @@ namespace LumiSoft.Net.Dns.Client
 		/// <param name="answerCount">Number of answers to parse.</param>
 		/// <param name="offset">Position from where to start parsing answers.</param>
 		/// <returns></returns>
-		private List<DNS_rr_base> ParseAnswers(byte[] reply,int answerCount,ref int offset)
+		private List<DNS_rr> ParseAnswers(byte[] reply,int answerCount,ref int offset)
 		{
 			/* RFC 1035 4.1.3. Resource record format
 			 
@@ -985,7 +985,7 @@ namespace LumiSoft.Net.Dns.Client
 			+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 			*/
 
-			List<DNS_rr_base> answers = new List<DNS_rr_base>();
+			List<DNS_rr> answers = new List<DNS_rr>();
 			//---- Start parsing answers ------------------------------------------------------------------//
 			for(int i=0;i<answerCount;i++){	
 				string name = "";
@@ -998,37 +998,37 @@ namespace LumiSoft.Net.Dns.Client
 				int ttl      = reply[offset++] << 24 | reply[offset++] << 16 | reply[offset++] << 8  | reply[offset++];
 				int rdLength = reply[offset++] << 8  | reply[offset++];
                 				
-                if((QTYPE)type == QTYPE.A){
+                if((DNS_QType)type == DNS_QType.A){
                     answers.Add(DNS_rr_A.Parse(reply,ref offset,rdLength,ttl));
                 }
-                else if((QTYPE)type == QTYPE.NS){
+                else if((DNS_QType)type == DNS_QType.NS){
                     answers.Add(DNS_rr_NS.Parse(reply,ref offset,rdLength,ttl));
                 }
-                else if((QTYPE)type == QTYPE.CNAME){
+                else if((DNS_QType)type == DNS_QType.CNAME){
                     answers.Add(DNS_rr_CNAME.Parse(reply,ref offset,rdLength,ttl));
                 }
-                else if((QTYPE)type == QTYPE.SOA){
+                else if((DNS_QType)type == DNS_QType.SOA){
                     answers.Add(DNS_rr_SOA.Parse(reply,ref offset,rdLength,ttl));
                 }
-                else if((QTYPE)type == QTYPE.PTR){
+                else if((DNS_QType)type == DNS_QType.PTR){
                     answers.Add(DNS_rr_PTR.Parse(reply,ref offset,rdLength,ttl));
                 }
-                else if((QTYPE)type == QTYPE.HINFO){
+                else if((DNS_QType)type == DNS_QType.HINFO){
                     answers.Add(DNS_rr_HINFO.Parse(reply,ref offset,rdLength,ttl));
                 }
-                else if((QTYPE)type == QTYPE.MX){
+                else if((DNS_QType)type == DNS_QType.MX){
                     answers.Add(DNS_rr_MX.Parse(reply,ref offset,rdLength,ttl));
                 }
-                else if((QTYPE)type == QTYPE.TXT){
+                else if((DNS_QType)type == DNS_QType.TXT){
                     answers.Add(DNS_rr_TXT.Parse(reply,ref offset,rdLength,ttl));
                 }
-                else if((QTYPE)type == QTYPE.AAAA){
+                else if((DNS_QType)type == DNS_QType.AAAA){
                     answers.Add(DNS_rr_AAAA.Parse(reply,ref offset,rdLength,ttl));
                 }
-                else if((QTYPE)type == QTYPE.SRV){
+                else if((DNS_QType)type == DNS_QType.SRV){
                     answers.Add(DNS_rr_SRV.Parse(reply,ref offset,rdLength,ttl));
                 }
-                else if((QTYPE)type == QTYPE.NAPTR){
+                else if((DNS_QType)type == DNS_QType.NAPTR){
                     answers.Add(DNS_rr_NAPTR.Parse(reply,ref offset,rdLength,ttl));
                 }
                 else{

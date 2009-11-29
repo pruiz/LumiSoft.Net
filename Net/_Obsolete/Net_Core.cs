@@ -6,7 +6,8 @@ using System.Collections;
 using System.Text;
 using System.Text.RegularExpressions;
 
-using LumiSoft.Net.Dns.Client;
+using LumiSoft.Net.DNS;
+using LumiSoft.Net.DNS.Client;
 
 namespace LumiSoft.Net
 {
@@ -69,8 +70,8 @@ namespace LumiSoft.Net
             string retVal = ip.ToString();
 			try{
                 Dns_Client dns = new Dns_Client();
-                DnsServerResponse response = dns.Query(ip.ToString(),QTYPE.PTR);
-                if(response.ResponseCode == RCODE.NO_ERROR){
+                DnsServerResponse response = dns.Query(ip.ToString(),DNS_QType.PTR);
+                if(response.ResponseCode == DNS_RCode.NO_ERROR){
                     DNS_rr_PTR[] ptrs = response.GetPTRRecords();
                     if(ptrs.Length > 0){
                         retVal = ptrs[0].DomainName;

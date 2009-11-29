@@ -6,7 +6,8 @@ using System.Net.Sockets;
 
 using LumiSoft.Net.AUTH;
 using LumiSoft.Net.Log;
-using LumiSoft.Net.Dns.Client;
+using LumiSoft.Net.DNS;
+using LumiSoft.Net.DNS.Client;
 using LumiSoft.Net.SIP.Message;
 
 namespace LumiSoft.Net.SIP.Stack
@@ -746,17 +747,17 @@ namespace LumiSoft.Net.SIP.Stack
                     bool                            srvRecordsAvailable = false;
 
                     // Query SRV to see what protocols are supported.
-                    response = m_pDnsClient.Query("_sips._tcp." + uri.Host,QTYPE.SRV);
+                    response = m_pDnsClient.Query("_sips._tcp." + uri.Host,DNS_QType.SRV);
                     if(response.GetSRVRecords().Length > 0){
                         srvRecordsAvailable = true;
                         supportedTransports.Add(SIP_Transport.TLS,response.GetSRVRecords());
                     }
-                    response = m_pDnsClient.Query("_sip._tcp." + uri.Host,QTYPE.SRV);
+                    response = m_pDnsClient.Query("_sip._tcp." + uri.Host,DNS_QType.SRV);
                     if(response.GetSRVRecords().Length > 0){
                         srvRecordsAvailable = true;
                         supportedTransports.Add(SIP_Transport.TCP,response.GetSRVRecords());
                     }
-                    response = m_pDnsClient.Query("_sip._udp." + uri.Host,QTYPE.SRV);
+                    response = m_pDnsClient.Query("_sip._udp." + uri.Host,DNS_QType.SRV);
                     if(response.GetSRVRecords().Length > 0){
                         srvRecordsAvailable = true;
                         supportedTransports.Add(SIP_Transport.UDP,response.GetSRVRecords());
@@ -895,13 +896,13 @@ namespace LumiSoft.Net.SIP.Stack
                 if(transportSetExplicitly){
                     DnsServerResponse response = null;
                     if(transport == SIP_Transport.TLS){
-                        response = m_pDnsClient.Query("_sips._tcp." + uri.Host,QTYPE.SRV);
+                        response = m_pDnsClient.Query("_sips._tcp." + uri.Host,DNS_QType.SRV);
                     }
                     else if(transport == SIP_Transport.TCP){
-                        response = m_pDnsClient.Query("_sip._tcp." + uri.Host,QTYPE.SRV);
+                        response = m_pDnsClient.Query("_sip._tcp." + uri.Host,DNS_QType.SRV);
                     }
                     else{
-                        response = m_pDnsClient.Query("_sip._udp." + uri.Host,QTYPE.SRV);
+                        response = m_pDnsClient.Query("_sip._udp." + uri.Host,DNS_QType.SRV);
                     }
                     targetSRV.AddRange(response.GetSRVRecords());
                 }                         

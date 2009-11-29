@@ -1,12 +1,14 @@
 using System;
 
-namespace LumiSoft.Net.Dns.Client
+using LumiSoft.Net.DNS.Client;
+
+namespace LumiSoft.Net.DNS
 {
 	/// <summary>
 	/// SOA record class.
 	/// </summary>
 	[Serializable]
-	public class DNS_rr_SOA : DNS_rr_base
+	public class DNS_rr_SOA : DNS_rr
 	{
 		private string m_NameServer = "";
 		private string m_AdminEmail = "";
@@ -27,7 +29,7 @@ namespace LumiSoft.Net.Dns.Client
 		/// <param name="expire">Time value(in seconds) that specifies the upper limit on the time interval that can elapse before the zone is no longer authoritative.</param>
 		/// <param name="minimum">Minimum TTL(in seconds) field that should be exported with any RR from this zone.</param>
 		/// <param name="ttl">TTL value.</param>
-		public DNS_rr_SOA(string nameServer,string adminEmail,long serial,long refresh,long retry,long expire,long minimum,int ttl) : base(QTYPE.SOA,ttl)
+		public DNS_rr_SOA(string nameServer,string adminEmail,long serial,long refresh,long retry,long expire,long minimum,int ttl) : base(DNS_QType.SOA,ttl)
 		{
 			m_NameServer = nameServer;
 			m_AdminEmail = adminEmail;

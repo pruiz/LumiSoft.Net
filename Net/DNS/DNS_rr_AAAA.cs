@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Text;
 using System.Net;
 
-namespace LumiSoft.Net.Dns.Client
+namespace LumiSoft.Net.DNS
 {
     /// <summary>
     /// DNS AAAA resource record.
     /// </summary>
-    public class DNS_rr_AAAA : DNS_rr_base
+    public class DNS_rr_AAAA : DNS_rr
     {
         private IPAddress m_IP  = null;
 
@@ -17,7 +17,7 @@ namespace LumiSoft.Net.Dns.Client
         /// </summary>
         /// <param name="ip">IP address.</param>
         /// <param name="ttl">Time to live in seconds.</param>
-        public DNS_rr_AAAA(IPAddress ip,int ttl) : base(QTYPE.AAAA,ttl)
+        public DNS_rr_AAAA(IPAddress ip,int ttl) : base(DNS_QType.AAAA,ttl)
         {
             m_IP = ip;
         }

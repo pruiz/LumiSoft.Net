@@ -1,21 +1,21 @@
 using System;
 
-namespace LumiSoft.Net.Dns.Client
+namespace LumiSoft.Net.DNS
 {
 	/// <summary>
-	/// Base class for DNS records.
+	/// This is base class for DNS records.
 	/// </summary>
-	public abstract class DNS_rr_base
+	public abstract class DNS_rr
 	{
-		private QTYPE m_Type = QTYPE.A;
-		private int   m_TTL  = -1;
+		private DNS_QType m_Type = DNS_QType.A;
+		private int       m_TTL  = -1;
 
 		/// <summary>
 		/// Default constructor.
 		/// </summary>
 		/// <param name="recordType">Record type (A,MX, ...).</param>
 		/// <param name="ttl">TTL (time to live) value in seconds.</param>
-		public DNS_rr_base(QTYPE recordType,int ttl)
+		public DNS_rr(DNS_QType recordType,int ttl)
 		{
 			m_Type = recordType;
 			m_TTL  = ttl;
@@ -27,7 +27,7 @@ namespace LumiSoft.Net.Dns.Client
         /// <summary>
 		/// Gets record type (A,MX,...).
 		/// </summary>
-		public QTYPE RecordType
+		public DNS_QType RecordType
 		{
 			get{ return m_Type; }
 		}

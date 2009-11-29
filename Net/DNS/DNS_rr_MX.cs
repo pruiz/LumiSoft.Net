@@ -1,12 +1,14 @@
 using System;
 
-namespace LumiSoft.Net.Dns.Client
+using LumiSoft.Net.DNS.Client;
+
+namespace LumiSoft.Net.DNS
 {
 	/// <summary>
 	/// MX record class.
 	/// </summary>
 	[Serializable]
-	public class DNS_rr_MX : DNS_rr_base,IComparable
+	public class DNS_rr_MX : DNS_rr,IComparable
 	{
 		private int    m_Preference = 0;
 		private string m_Host       = "";
@@ -17,7 +19,7 @@ namespace LumiSoft.Net.Dns.Client
 		/// <param name="preference">MX record preference.</param>
 		/// <param name="host">Mail host dns name.</param>
 		/// <param name="ttl">TTL value.</param>
-		public DNS_rr_MX(int preference,string host,int ttl) : base(QTYPE.MX,ttl)
+		public DNS_rr_MX(int preference,string host,int ttl) : base(DNS_QType.MX,ttl)
 		{
 			m_Preference = preference;
 			m_Host       = host;

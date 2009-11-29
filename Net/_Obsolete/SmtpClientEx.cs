@@ -8,7 +8,8 @@ using System.Collections;
 using System.Collections.Generic;
 
 using LumiSoft.Net;
-using LumiSoft.Net.Dns.Client;
+using LumiSoft.Net.DNS;
+using LumiSoft.Net.DNS.Client;
 using LumiSoft.Net.Mime;
 
 namespace LumiSoft.Net.SMTP.Client
@@ -218,12 +219,12 @@ namespace LumiSoft.Net.SMTP.Client
 				//--- Get MX record -------------------------------------------//
 				Dns_Client dns = new Dns_Client();
 				Dns_Client.DnsServers = m_pDnsServers;
-				DnsServerResponse dnsResponse = dns.Query(domain,QTYPE.MX);
+				DnsServerResponse dnsResponse = dns.Query(domain,DNS_QType.MX);
 
                 bool connected = false;
 				switch(dnsResponse.ResponseCode)
 				{
-					case RCODE.NO_ERROR:
+					case DNS_RCode.NO_ERROR:
 						DNS_rr_MX[] mxRecords = dnsResponse.GetMXRecords();
 
 						// Try all available hosts by MX preference order, if can't connect specified host.
@@ -284,13 +285,13 @@ namespace LumiSoft.Net.SMTP.Client
 						}
 						break;
 
-					case RCODE.NAME_ERROR:
+					case DNS_RCode.NAME_ERROR:
 						if(m_pLogger != null){
 							m_pLogger.AddTextEntry("Invalid domain,no MX or A record: " + domain);
 						}
 						throw new Exception("Invalid domain,no MX or A record: " + domain);
 
-					case RCODE.SERVER_FAILURE:
+					case DNS_RCode.SERVER_FAILURE:
 						if(m_pLogger != null){
 							m_pLogger.AddTextEntry("Dns server unvailable.");
 						}
@@ -2008,7 +2009,7 @@ namespace LumiSoft.Net.SMTP.Client
             List<IPAddress> retVal = new List<IPAddress>();
             Dns_Client dns = new Dns_Client();
             Dns_Client.DnsServers = this.DnsServers;
-            DnsServerResponse response = dns.Query(domain,QTYPE.MX);
+            DnsServerResponse response = dns.Query(domain,DNS_QType.MX);
             // Add MX            
             foreach(DNS_rr_MX mx in response.GetMXRecords()){
                 try{
@@ -2025,7 +2026,7 @@ namespace LumiSoft.Net.SMTP.Client
             }
             // Add A records only if no MX records.
             if(retVal.Count == 0){                
-                response = dns.Query(domain,QTYPE.A);
+                response = dns.Query(domain,DNS_QType.A);
                 foreach(DNS_rr_A a in response.GetARecords()){
                     IPAddress ip = a.IP;
                     if(!retVal.Contains(ip)){

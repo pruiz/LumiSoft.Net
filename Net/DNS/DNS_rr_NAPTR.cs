@@ -2,13 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace LumiSoft.Net.Dns.Client
+using LumiSoft.Net.DNS.Client;
+
+namespace LumiSoft.Net.DNS
 {
     /// <summary>
     /// NAPRT(Naming Authority Pointer) resource record. Defined in RFC 3403.
     /// </summary>
     [Serializable]
-    public class DNS_rr_NAPTR : DNS_rr_base
+    public class DNS_rr_NAPTR : DNS_rr
     {
         private int    m_Order       = 0;
         private int    m_Preference  = 0;
@@ -27,7 +29,7 @@ namespace LumiSoft.Net.Dns.Client
         /// <param name="regexp">Regular expression that is applied to the original string.</param>
         /// <param name="replacement">Regular expressions replacement value.</param>
         /// <param name="ttl">Time to live value in seconds.</param>
-        public DNS_rr_NAPTR(int order,int preference,string flags,string services,string regexp,string replacement,int ttl) : base(QTYPE.NAPTR,ttl)
+        public DNS_rr_NAPTR(int order,int preference,string flags,string services,string regexp,string replacement,int ttl) : base(DNS_QType.NAPTR,ttl)
         {
             m_Order       = order;
             m_Preference  = preference;

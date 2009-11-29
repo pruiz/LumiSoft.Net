@@ -118,6 +118,7 @@
     <Compile Include="AUTH\AUTH_SASL_ServerMechanism_DigestMd5.cs" />
     <Compile Include="AUTH\AUTH_SASL_ServerMechanism_Login.cs" />
     <Compile Include="AUTH\AUTH_SASL_ServerMechanism_Plain.cs" />
+    <Compile Include="DNS\DNS_rr_SPF.cs" />
     <Compile Include="DNS\DNS_Query.cs" />
     <Compile Include="DNS\DNS_QClass.cs" />
     <Compile Include="DNS\DNS_QType.cs" />
@@ -283,6 +284,7 @@
     </Compile>
     <Compile Include="POP3\Server\POP3_ServerMessage.cs" />
     <Compile Include="POP3\Server\POP3_Session.cs" />
+    <Compile Include="Range_long.cs" />
     <Compile Include="RTP\RTP_StreamMode.cs" />
     <Compile Include="SDP\SDP_MediaTypes.cs" />
     <Compile Include="SDP\SDP_Origin.cs" />
@@ -327,9 +329,9 @@
     <Compile Include="Media\Codec\Audio\AudioCodec.cs" />
     <Compile Include="Media\Codec\Codec.cs" />
     <Compile Include="DNS\Client\DNS_ClientException.cs" />
-    <Compile Include="DNS\Client\DNS_rr_AAAA.cs" />
-    <Compile Include="DNS\Client\DNS_rr_NAPTR.cs" />
-    <Compile Include="DNS\Client\DNS_rr_SRV.cs" />
+    <Compile Include="DNS\DNS_rr_AAAA.cs" />
+    <Compile Include="DNS\DNS_rr_NAPTR.cs" />
+    <Compile Include="DNS\DNS_rr_SRV.cs" />
     <Compile Include="DNS\Client\_OPCODE.cs" />
     <Compile Include="FTP\Client\FTP_ClientException.cs" />
     <Compile Include="FTP\FTP_ListItem.cs" />
@@ -464,16 +466,16 @@
     <Compile Include="UDP\UDP_ProcessMode.cs" />
     <Compile Include="UDP\UDP_Server.cs" />
     <Compile Include="URI\AbsoluteUri.cs" />
-    <Compile Include="DNS\Client\DNS_rr_A.cs">
+    <Compile Include="DNS\DNS_rr_A.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="DNS\Client\DNS_rr_CNAME.cs">
+    <Compile Include="DNS\DNS_rr_CNAME.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="DNS\Client\DnsCache.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="DNS\Client\DNS_rr_base.cs">
+    <Compile Include="DNS\DNS_rr.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="DNS\Client\DnsServerResponse.cs">
@@ -482,28 +484,22 @@
     <Compile Include="DNS\Client\DNS_Client.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="DNS\Client\DNS_rr_HINFO.cs">
+    <Compile Include="DNS\DNS_rr_HINFO.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="DNS\Client\DNS_rr_MX.cs">
+    <Compile Include="DNS\DNS_rr_MX.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="DNS\Client\DNS_rr_NS.cs">
+    <Compile Include="DNS\DNS_rr_NS.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="DNS\Client\DNS_rr_PTR.cs">
+    <Compile Include="DNS\DNS_rr_PTR.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="DNS\Client\QTYPE.cs">
+    <Compile Include="DNS\DNS_rr_SOA.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="DNS\Client\RCODE.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="DNS\Client\DNS_rr_SOA.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="DNS\Client\DNS_rr_TXT.cs">
+    <Compile Include="DNS\DNS_rr_TXT.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="FTP\Client\FTP_Client.cs">

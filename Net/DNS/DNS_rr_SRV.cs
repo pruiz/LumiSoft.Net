@@ -2,13 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace LumiSoft.Net.Dns.Client
+using LumiSoft.Net.DNS.Client;
+
+namespace LumiSoft.Net.DNS
 {
     /// <summary>
     /// DNS SRV record. SRV record specifies the location of services. Defined in RFC 2782.
     /// </summary>
     [Serializable]
-    public class DNS_rr_SRV : DNS_rr_base
+    public class DNS_rr_SRV : DNS_rr
     {
         private int    m_Priority = 1;
         private int    m_Weight   = 1;
@@ -23,7 +25,7 @@ namespace LumiSoft.Net.Dns.Client
         /// <param name="port">Service port.</param>
         /// <param name="target">Service provider host name or IP address.</param>
         /// <param name="ttl">Time to live value in seconds.</param>
-        public DNS_rr_SRV(int priority,int weight,int port,string target,int ttl) : base(QTYPE.SRV,ttl)
+        public DNS_rr_SRV(int priority,int weight,int port,string target,int ttl) : base(DNS_QType.SRV,ttl)
         {
             m_Priority = priority;
             m_Weight   = weight;

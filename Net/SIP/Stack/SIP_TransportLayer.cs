@@ -7,7 +7,8 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Security.Cryptography.X509Certificates;
 
-using LumiSoft.Net.Dns.Client;
+using LumiSoft.Net.DNS;
+using LumiSoft.Net.DNS.Client;
 using LumiSoft.Net.SIP.Message;
 using LumiSoft.Net.UDP;
 using LumiSoft.Net.TCP;
@@ -1397,8 +1398,8 @@ namespace LumiSoft.Net.SIP.Stack
                     else if(via.ProtocolTransport == SIP_Transport.UDP){
                         srvQuery = "_sips._tcp." + via.SentBy.Host;
                     }
-                    DnsServerResponse dnsResponse = m_pStack.Dns.Query(srvQuery,QTYPE.SRV);
-                    if(dnsResponse.ResponseCode != RCODE.NO_ERROR){
+                    DnsServerResponse dnsResponse = m_pStack.Dns.Query(srvQuery,DNS_QType.SRV);
+                    if(dnsResponse.ResponseCode != DNS_RCode.NO_ERROR){
                         throw new SIP_TransportException("Dns error: " + dnsResponse.ResponseCode.ToString());
                     }
                     DNS_rr_SRV[] srvRecords = dnsResponse.GetSRVRecords();

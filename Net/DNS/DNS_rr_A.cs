@@ -1,13 +1,13 @@
 using System;
 using System.Net;
 
-namespace LumiSoft.Net.Dns.Client
+namespace LumiSoft.Net.DNS
 {
 	/// <summary>
 	/// A record class.
 	/// </summary>
 	[Serializable]
-	public class DNS_rr_A : DNS_rr_base
+	public class DNS_rr_A : DNS_rr
 	{
 		private IPAddress m_IP  = null;
 
@@ -16,7 +16,7 @@ namespace LumiSoft.Net.Dns.Client
 		/// </summary>
 		/// <param name="ip">IP address.</param>
 		/// <param name="ttl">TTL value.</param>
-		public DNS_rr_A(IPAddress ip,int ttl) : base(QTYPE.A,ttl)
+		public DNS_rr_A(IPAddress ip,int ttl) : base(DNS_QType.A,ttl)
 		{
 			m_IP = ip;
 		}

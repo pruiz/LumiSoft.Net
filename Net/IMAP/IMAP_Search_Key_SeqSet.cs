@@ -43,7 +43,8 @@ namespace LumiSoft.Net.IMAP
                 throw new ArgumentNullException("r");
             }
 
-            string value = r.ReadWord();
+            r.ReadToFirstChar();
+            string value = r.QuotedReadToDelimiter(' ');
             if(value == null){
                 throw new ParseException("Parse error: Invalid 'sequence-set' value.");
             }

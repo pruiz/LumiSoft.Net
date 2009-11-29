@@ -10,7 +10,8 @@ using LumiSoft.Net.IO;
 using LumiSoft.Net.TCP;
 using LumiSoft.Net.SMTP;
 using LumiSoft.Net.SMTP.Client;
-using LumiSoft.Net.Dns.Client;
+using LumiSoft.Net.DNS;
+using LumiSoft.Net.DNS.Client;
 using LumiSoft.Net.Log;
 
 namespace LumiSoft.Net.SMTP.Relay
@@ -692,8 +693,8 @@ namespace LumiSoft.Net.SMTP.Relay
             List<string> retVal = new List<string>();
 
             // Get MX records.
-            DnsServerResponse response = m_pServer.DnsClient.Query(domain,QTYPE.MX);
-            if(response.ResponseCode == RCODE.NO_ERROR){
+            DnsServerResponse response = m_pServer.DnsClient.Query(domain,DNS_QType.MX);
+            if(response.ResponseCode == DNS_RCode.NO_ERROR){
                 foreach(DNS_rr_MX mx in response.GetMXRecords()){
                     // Block invalid MX records.
                     if(!string.IsNullOrEmpty(mx.Host)){

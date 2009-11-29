@@ -47,7 +47,8 @@ namespace LumiSoft.Net.IMAP
             if(!string.Equals(word,"UID",StringComparison.InvariantCultureIgnoreCase)){
                 throw new ParseException("Parse error: Not a SEARCH 'UID' key.");
             }
-            string value = r.ReadWord();
+            r.ReadToFirstChar();
+            string value = r.QuotedReadToDelimiter(' ');
             if(value == null){
                 throw new ParseException("Parse error: Invalid 'UID' value.");
             }

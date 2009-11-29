@@ -8,7 +8,8 @@ using System.Security.Cryptography;
 
 using LumiSoft.Net.TCP;
 using LumiSoft.Net.AUTH;
-using LumiSoft.Net.Dns.Client;
+using LumiSoft.Net.DNS;
+using LumiSoft.Net.DNS.Client;
 using LumiSoft.Net.Mail;
 using LumiSoft.Net.MIME;
 using LumiSoft.Net.Mime;
@@ -1514,8 +1515,8 @@ namespace LumiSoft.Net.SMTP.Client
 
             // Get MX records.
             using(Dns_Client dns = new Dns_Client()){
-                DnsServerResponse response = dns.Query(domain,QTYPE.MX);
-                if(response.ResponseCode == RCODE.NO_ERROR){
+                DnsServerResponse response = dns.Query(domain,DNS_QType.MX);
+                if(response.ResponseCode == DNS_RCode.NO_ERROR){
                     foreach(DNS_rr_MX mx in response.GetMXRecords()){
                         // Block invalid MX records.
                         if(!string.IsNullOrEmpty(mx.Host)){

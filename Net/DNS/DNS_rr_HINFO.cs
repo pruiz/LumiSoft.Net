@@ -1,11 +1,13 @@
 using System;
 
-namespace LumiSoft.Net.Dns.Client
+using LumiSoft.Net.DNS.Client;
+
+namespace LumiSoft.Net.DNS
 {
 	/// <summary>
 	/// HINFO record.
 	/// </summary>
-	public class DNS_rr_HINFO : DNS_rr_base
+	public class DNS_rr_HINFO : DNS_rr
 	{
 		private string m_CPU = "";
 		private string m_OS  = "";
@@ -16,7 +18,7 @@ namespace LumiSoft.Net.Dns.Client
 		/// <param name="cpu">Host CPU.</param>
 		/// <param name="os">Host OS.</param>
 		/// <param name="ttl">TTL value.</param>
-		public DNS_rr_HINFO(string cpu,string os,int ttl) : base(QTYPE.HINFO,ttl)
+		public DNS_rr_HINFO(string cpu,string os,int ttl) : base(DNS_QType.HINFO,ttl)
 		{
 			m_CPU = cpu;
 			m_OS  = os;

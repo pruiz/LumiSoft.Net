@@ -2,7 +2,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace LumiSoft.Net.Dns.Client
+using LumiSoft.Net.DNS;
+
+namespace LumiSoft.Net.DNS.Client
 {
 	/// <summary>
 	/// This class represents dns server response.
@@ -10,14 +12,14 @@ namespace LumiSoft.Net.Dns.Client
 	[Serializable]
 	public class DnsServerResponse
 	{
-		private bool              m_Success             = true;
-        private int               m_ID                  = 0;
-		private RCODE             m_RCODE               = RCODE.NO_ERROR;
-		private List<DNS_rr_base> m_pAnswers            = null;
-		private List<DNS_rr_base> m_pAuthoritiveAnswers = null;
-		private List<DNS_rr_base> m_pAdditionalAnswers  = null;
+		private bool         m_Success             = true;
+        private int          m_ID                  = 0;
+		private DNS_RCode    m_RCODE               = DNS_RCode.NO_ERROR;
+		private List<DNS_rr> m_pAnswers            = null;
+		private List<DNS_rr> m_pAuthoritiveAnswers = null;
+		private List<DNS_rr> m_pAdditionalAnswers  = null;
 		
-		internal DnsServerResponse(bool connectionOk,int id,RCODE rcode,List<DNS_rr_base> answers,List<DNS_rr_base> authoritiveAnswers,List<DNS_rr_base> additionalAnswers)
+		internal DnsServerResponse(bool connectionOk,int id,DNS_RCode rcode,List<DNS_rr> answers,List<DNS_rr> authoritiveAnswers,List<DNS_rr> additionalAnswers)
 		{
 			m_Success             = connectionOk;
             m_ID                  = id;
@@ -37,8 +39,8 @@ namespace LumiSoft.Net.Dns.Client
 		public DNS_rr_A[] GetARecords()
 		{
             List<DNS_rr_A> retVal = new List<DNS_rr_A>();
-            foreach(DNS_rr_base record in m_pAnswers){
-                if(record.RecordType == QTYPE.A){
+            foreach(DNS_rr record in m_pAnswers){
+                if(record.RecordType == DNS_QType.A){
                     retVal.Add((DNS_rr_A)record);
                 }
             }
@@ -57,8 +59,8 @@ namespace LumiSoft.Net.Dns.Client
 		public DNS_rr_NS[] GetNSRecords()
 		{
             List<DNS_rr_NS> retVal = new List<DNS_rr_NS>();
-            foreach(DNS_rr_base record in m_pAnswers){
-                if(record.RecordType == QTYPE.NS){
+            foreach(DNS_rr record in m_pAnswers){
+                if(record.RecordType == DNS_QType.NS){
                     retVal.Add((DNS_rr_NS)record);
                 }
             }
@@ -77,8 +79,8 @@ namespace LumiSoft.Net.Dns.Client
 		public DNS_rr_CNAME[] GetCNAMERecords()
 		{
             List<DNS_rr_CNAME> retVal = new List<DNS_rr_CNAME>();
-            foreach(DNS_rr_base record in m_pAnswers){
-                if(record.RecordType == QTYPE.CNAME){
+            foreach(DNS_rr record in m_pAnswers){
+                if(record.RecordType == DNS_QType.CNAME){
                     retVal.Add((DNS_rr_CNAME)record);
                 }
             }
@@ -97,8 +99,8 @@ namespace LumiSoft.Net.Dns.Client
 		public DNS_rr_SOA[] GetSOARecords()
 		{
             List<DNS_rr_SOA> retVal = new List<DNS_rr_SOA>();
-            foreach(DNS_rr_base record in m_pAnswers){
-                if(record.RecordType == QTYPE.SOA){
+            foreach(DNS_rr record in m_pAnswers){
+                if(record.RecordType == DNS_QType.SOA){
                     retVal.Add((DNS_rr_SOA)record);
                 }
             }
@@ -117,8 +119,8 @@ namespace LumiSoft.Net.Dns.Client
 		public DNS_rr_PTR[] GetPTRRecords()
 		{	
             List<DNS_rr_PTR> retVal = new List<DNS_rr_PTR>();
-            foreach(DNS_rr_base record in m_pAnswers){
-                if(record.RecordType == QTYPE.PTR){
+            foreach(DNS_rr record in m_pAnswers){
+                if(record.RecordType == DNS_QType.PTR){
                     retVal.Add((DNS_rr_PTR)record);
                 }
             }
@@ -137,8 +139,8 @@ namespace LumiSoft.Net.Dns.Client
 		public DNS_rr_HINFO[] GetHINFORecords()
 		{	
             List<DNS_rr_HINFO> retVal = new List<DNS_rr_HINFO>();
-            foreach(DNS_rr_base record in m_pAnswers){
-                if(record.RecordType == QTYPE.HINFO){
+            foreach(DNS_rr record in m_pAnswers){
+                if(record.RecordType == DNS_QType.HINFO){
                     retVal.Add((DNS_rr_HINFO)record);
                 }
             }
@@ -157,8 +159,8 @@ namespace LumiSoft.Net.Dns.Client
 		public DNS_rr_MX[] GetMXRecords()
 		{
             List<DNS_rr_MX> mx = new List<DNS_rr_MX>();
-            foreach(DNS_rr_base record in m_pAnswers){
-                if(record.RecordType == QTYPE.MX){
+            foreach(DNS_rr record in m_pAnswers){
+                if(record.RecordType == DNS_QType.MX){
                     mx.Add((DNS_rr_MX)record);
                 }
             }
@@ -181,8 +183,8 @@ namespace LumiSoft.Net.Dns.Client
 		public DNS_rr_TXT[] GetTXTRecords()
 		{
             List<DNS_rr_TXT> retVal = new List<DNS_rr_TXT>();
-            foreach(DNS_rr_base record in m_pAnswers){
-                if(record.RecordType == QTYPE.TXT){
+            foreach(DNS_rr record in m_pAnswers){
+                if(record.RecordType == DNS_QType.TXT){
                     retVal.Add((DNS_rr_TXT)record);
                 }
             }
@@ -201,8 +203,8 @@ namespace LumiSoft.Net.Dns.Client
 		public DNS_rr_AAAA[] GetAAAARecords()
 		{
             List<DNS_rr_AAAA> retVal = new List<DNS_rr_AAAA>();
-            foreach(DNS_rr_base record in m_pAnswers){
-                if(record.RecordType == QTYPE.AAAA){
+            foreach(DNS_rr record in m_pAnswers){
+                if(record.RecordType == DNS_QType.AAAA){
                     retVal.Add((DNS_rr_AAAA)record);
                 }
             }
@@ -221,8 +223,8 @@ namespace LumiSoft.Net.Dns.Client
 		public DNS_rr_SRV[] GetSRVRecords()
 		{
             List<DNS_rr_SRV> retVal = new List<DNS_rr_SRV>();
-            foreach(DNS_rr_base record in m_pAnswers){
-                if(record.RecordType == QTYPE.SRV){
+            foreach(DNS_rr record in m_pAnswers){
+                if(record.RecordType == DNS_QType.SRV){
                     retVal.Add((DNS_rr_SRV)record);
                 }
             }
@@ -241,8 +243,8 @@ namespace LumiSoft.Net.Dns.Client
 		public DNS_rr_NAPTR[] GetNAPTRRecords()
 		{
             List<DNS_rr_NAPTR> retVal = new List<DNS_rr_NAPTR>();
-            foreach(DNS_rr_base record in m_pAnswers){
-                if(record.RecordType == QTYPE.NAPTR){
+            foreach(DNS_rr record in m_pAnswers){
+                if(record.RecordType == DNS_QType.NAPTR){
                     retVal.Add((DNS_rr_NAPTR)record);
                 }
             }
@@ -261,10 +263,10 @@ namespace LumiSoft.Net.Dns.Client
 		/// <param name="answers"></param>
 		/// <param name="type"></param>
 		/// <returns></returns>
-		private List<DNS_rr_base> FilterRecordsX(List<DNS_rr_base> answers,QTYPE type)
+		private List<DNS_rr> FilterRecordsX(List<DNS_rr> answers,DNS_QType type)
 		{
-            List<DNS_rr_base> retVal = new List<DNS_rr_base>();
-            foreach(DNS_rr_base record in answers){
+            List<DNS_rr> retVal = new List<DNS_rr>();
+            foreach(DNS_rr record in answers){
                 if(record.RecordType == type){
                     retVal.Add(record);
                 }
@@ -297,7 +299,7 @@ namespace LumiSoft.Net.Dns.Client
 		/// <summary>
 		/// Gets dns server response code.
 		/// </summary>
-		public RCODE ResponseCode
+		public DNS_RCode ResponseCode
 		{
 			get{ return m_RCODE; }
 		}
@@ -307,10 +309,10 @@ namespace LumiSoft.Net.Dns.Client
 		/// Gets all resource records returned by server (answer records section + authority records section + additional records section). 
 		/// NOTE: Before using this property ensure that ConnectionOk=true and ResponseCode=RCODE.NO_ERROR.
 		/// </summary>
-		public DNS_rr_base[] AllAnswers
+		public DNS_rr[] AllAnswers
 		{
 			get{
-                List<DNS_rr_base> retVal = new List<DNS_rr_base>();
+                List<DNS_rr> retVal = new List<DNS_rr>();
                 retVal.AddRange(m_pAnswers.ToArray());
                 retVal.AddRange(m_pAuthoritiveAnswers.ToArray());
                 retVal.AddRange(m_pAdditionalAnswers.ToArray());
@@ -338,7 +340,7 @@ namespace LumiSoft.Net.Dns.Client
 		///		}
 		/// }
 		/// </code>
-		public DNS_rr_base[] Answers
+		public DNS_rr[] Answers
 		{
 			get{ return m_pAnswers.ToArray(); }
 		}
@@ -346,7 +348,7 @@ namespace LumiSoft.Net.Dns.Client
 		/// <summary>
 		/// Gets name server resource records in the authority records section. NOTE: Before using this property ensure that ConnectionOk=true and ResponseCode=RCODE.NO_ERROR.
 		/// </summary>
-		public DNS_rr_base[] AuthoritiveAnswers
+		public DNS_rr[] AuthoritiveAnswers
 		{
 			get{ return m_pAuthoritiveAnswers.ToArray(); }
 		}
@@ -354,7 +356,7 @@ namespace LumiSoft.Net.Dns.Client
 		/// <summary>
 		/// Gets resource records in the additional records section. NOTE: Before using this property ensure that ConnectionOk=true and ResponseCode=RCODE.NO_ERROR.
 		/// </summary>
-		public DNS_rr_base[] AdditionalAnswers
+		public DNS_rr[] AdditionalAnswers
 		{
 			get{ return m_pAdditionalAnswers.ToArray(); }
 		}

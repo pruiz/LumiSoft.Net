@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace LumiSoft.Net.Dns.Client
+namespace LumiSoft.Net.DNS.Client
 {
 	/// <summary>
 	/// 

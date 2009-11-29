@@ -20,70 +20,15 @@ namespace LumiSoft.Net.IMAP
 	/// </summary>
 	public class IMAP_SequenceSet
     {
-        #region class Range
-
-        /// <summary>
-        /// Implements range.
-        /// </summary>
-        private class Range
-        {
-            private long m_Start = 0;
-            private long m_End   = 0;
-
-            /// <summary>
-            /// Default constructor.
-            /// </summary>
-            /// <param name="value">Range value.</param>
-            public Range(long value)
-            {
-                m_Start = value;
-                m_End   = value;
-            }
-
-            /// <summary>
-            /// Default constructor.
-            /// </summary>
-            /// <param name="start">Range start.</param>
-            /// <param name="end">Range end.</param>
-            public Range(long start,long end)
-            {
-                m_Start = start;
-                m_End   = end;
-            }
-
-
-            #region Properties Implementation
-
-            /// <summary>
-            /// Gets range start.
-            /// </summary>
-            public long Start
-            {
-                get{ return m_Start; }
-            }
-
-            /// <summary>
-            /// Gets range end.
-            /// </summary>
-            public long End
-            {
-                get{ return m_End; }
-            }
-
-            #endregion
-        }
-
-        #endregion
-
-        private List<Range> m_pSequenceParts = null;
-        private string      m_SequenceString = "";
+        private List<Range_long> m_pSequenceParts = null;
+        private string           m_SequenceString = "";
 
 		/// <summary>
 		/// Default constructor.
 		/// </summary>
 		public IMAP_SequenceSet()
 		{
-            m_pSequenceParts = new List<Range>();
+            m_pSequenceParts = new List<Range_long>();
 		}
 
 
@@ -155,10 +100,10 @@ namespace LumiSoft.Net.IMAP
                         long start = Parse_Seq_Number(rangeParts[0],seqMaxValue);
                         long end   = Parse_Seq_Number(rangeParts[1],seqMaxValue);
                         if(start <= end){
-                            m_pSequenceParts.Add(new Range(start,end));
+                            m_pSequenceParts.Add(new Range_long(start,end));
                         }
                         else{
-                            m_pSequenceParts.Add(new Range(end,start));
+                            m_pSequenceParts.Add(new Range_long(end,start));
                         }                        			
 					}
 					else{
@@ -167,7 +112,7 @@ namespace LumiSoft.Net.IMAP
 				}
 				// seq-number
 				else{
-					m_pSequenceParts.Add(new Range(Parse_Seq_Number(sequenceSet,seqMaxValue)));
+					m_pSequenceParts.Add(new Range_long(Parse_Seq_Number(sequenceSet,seqMaxValue)));
 				}
 			}
 			//-----------------------------------------------------------------------------------//
@@ -186,8 +131,8 @@ namespace LumiSoft.Net.IMAP
 		/// <param name="seqNumber">Number to check.</param>
 		public bool Contains(long seqNumber)
 		{
-			foreach(Range range in m_pSequenceParts){
-                if(seqNumber >= range.Start && seqNumber <= range.End){
+			foreach(Range_long range in m_pSequenceParts){
+                if(range.Contains(seqNumber)){
                     return true;
                 }
             }
@@ -240,5 +185,18 @@ namespace LumiSoft.Net.IMAP
 
 		#endregion
 
-	}
+
+        #region Properties implementation
+
+        /// <summary>
+        /// Gets sequence set ranges.
+        /// </summary>
+        public Range_long[] Items
+        {
+            get{ return m_pSequenceParts.ToArray(); }
+        }
+
+        #endregion
+
+    }
 }

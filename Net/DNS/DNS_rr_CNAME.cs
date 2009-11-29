@@ -1,12 +1,14 @@
 using System;
 
-namespace LumiSoft.Net.Dns.Client
+using LumiSoft.Net.DNS.Client;
+
+namespace LumiSoft.Net.DNS
 {
 	/// <summary>
 	/// CNAME record class.
 	/// </summary>
 	[Serializable]
-	public class DNS_rr_CNAME : DNS_rr_base
+	public class DNS_rr_CNAME : DNS_rr
 	{
 		private string m_Alias = "";
 
@@ -15,7 +17,7 @@ namespace LumiSoft.Net.Dns.Client
 		/// </summary>
 		/// <param name="alias">Alias.</param>
 		/// <param name="ttl">TTL value.</param>
-		public DNS_rr_CNAME(string alias,int ttl) : base(QTYPE.CNAME,ttl)
+		public DNS_rr_CNAME(string alias,int ttl) : base(DNS_QType.CNAME,ttl)
 		{
 			m_Alias = alias;
         }
