@@ -9,13 +9,15 @@ namespace LumiSoft.Net.IMAP.Server
     /// </summary>
     public class IMAP_e_MessagesInfo : EventArgs
     {
-        private string                 m_Folder    = null;
-        private List<IMAP_MessageInfo> m_pMessages = null;
+        private IMAP_r_ServerStatus    m_pErrorResponse = null;
+        private string                 m_Folder         = null;
+        private List<IMAP_MessageInfo> m_pMessages      = null;
 
         /// <summary>
         /// Default constructor.
         /// </summary>
         /// <param name="folder">Folder name with optional path.</param>
+        /// <param name="response">Default IMAP server response.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> is null reference.</exception>
         internal IMAP_e_MessagesInfo(string folder)
         {
@@ -30,6 +32,16 @@ namespace LumiSoft.Net.IMAP.Server
 
 
         #region Properties implementation
+
+        /// <summary>
+        /// Gets or sets IMAP server error response to this operation.
+        /// </summary>
+        public IMAP_r_ServerStatus ErrorResponse
+        {
+            get{ return m_pErrorResponse; }
+
+            set{ m_pErrorResponse = value; }
+        }
 
         /// <summary>
         /// Gets folder name with optional path.
