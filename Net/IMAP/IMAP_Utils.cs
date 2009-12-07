@@ -98,7 +98,7 @@ namespace LumiSoft.Net.IMAP
             foreach(string flagToAdd in flagsToAdd){
                 bool contains = false;
                 foreach(string flag in flags){
-                    if(string.Equals(flag,flag,StringComparison.InvariantCultureIgnoreCase)){
+                    if(string.Equals(flag,flagToAdd,StringComparison.InvariantCultureIgnoreCase)){
                         contains = true;
                         break;
                     }

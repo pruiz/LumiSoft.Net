@@ -34,8 +34,9 @@ namespace LumiSoft.Net.Mail
         /// </summary>
         /// <param name="wordEncoder">8-bit words ecnoder. Value null means that words are not encoded.</param>
         /// <param name="parmetersCharset">Charset to use to encode 8-bit characters. Value null means parameters not encoded.</param>
+        /// <param name="reEncode">If true always specified encoding is used. If false and header field value not modified, original encoding is kept.</param>
         /// <returns>Returns header field as string.</returns>
-        public override string ToString(MIME_Encoding_EncodedWord wordEncoder,Encoding parmetersCharset)
+        public override string ToString(MIME_Encoding_EncodedWord wordEncoder,Encoding parmetersCharset,bool reEncode)
         {
             return "TODO:";
         }

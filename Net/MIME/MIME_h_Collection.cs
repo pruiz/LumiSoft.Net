@@ -316,11 +316,25 @@ namespace LumiSoft.Net.MIME
         /// <exception cref="ArgumentNullException">Is raised when <b>stream</b> is null reference.</exception>
         public void ToStream(Stream stream,MIME_Encoding_EncodedWord wordEncoder,Encoding parmetersCharset)
         {
+            ToStream(stream,wordEncoder,parmetersCharset,false);
+        }
+
+        /// <summary>
+        /// Stores header to the specified stream.
+        /// </summary>
+        /// <param name="stream">Stream where to store header.</param>
+        /// <param name="wordEncoder">8-bit words ecnoder. Value null means that words are not encoded.</param>
+        /// <param name="parmetersCharset">Charset to use to encode 8-bit header parameters. Value null means parameters not encoded.</param>
+        /// <param name="reEncod">If true always specified encoding is used for header. If false and header field value not modified, 
+        /// original encoding is kept.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>stream</b> is null reference.</exception>
+        public void ToStream(Stream stream,MIME_Encoding_EncodedWord wordEncoder,Encoding parmetersCharset,bool reEncod)
+        {
             if(stream == null){
                 throw new ArgumentNullException("stream");
             }
 
-            byte[] header = Encoding.UTF8.GetBytes(ToString(wordEncoder,parmetersCharset));
+            byte[] header = Encoding.UTF8.GetBytes(ToString(wordEncoder,parmetersCharset,reEncod));
             stream.Write(header,0,header.Length);
         }
 
@@ -334,7 +348,7 @@ namespace LumiSoft.Net.MIME
         /// <returns>Returns MIME header as string.</returns>
         public override string ToString()
         {
-            return ToString(null,null);
+            return ToString(null,null,false);
         }
 
         /// <summary>
@@ -345,9 +359,21 @@ namespace LumiSoft.Net.MIME
         /// <returns>Returns MIME header as string.</returns>
         public string ToString(MIME_Encoding_EncodedWord wordEncoder,Encoding parmetersCharset)
         {
+            return ToString(wordEncoder,parmetersCharset,false);
+        }
+
+        /// <summary>
+        /// Returns MIME header as string.
+        /// </summary>
+        /// <param name="wordEncoder">8-bit words ecnoder. Value null means that words are not encoded.</param>
+        /// <param name="parmetersCharset">Charset to use to encode 8-bit header parameters. Value null means parameters not encoded.</param>
+        /// <param name="reEncode">If true always specified encoding is used. If false and header fields which value not modified, original encoding is kept.</param>
+        /// <returns>Returns MIME header as string.</returns>
+        public string ToString(MIME_Encoding_EncodedWord wordEncoder,Encoding parmetersCharset,bool reEncode)
+        {
             StringBuilder retVal = new StringBuilder();
             foreach(MIME_h field in m_pFields){
-                retVal.Append(field.ToString(wordEncoder,parmetersCharset));
+                retVal.Append(field.ToString(wordEncoder,parmetersCharset,reEncode));
             }
 
             return retVal.ToString();

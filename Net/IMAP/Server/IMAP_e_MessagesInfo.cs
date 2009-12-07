@@ -16,7 +16,6 @@ namespace LumiSoft.Net.IMAP.Server
         /// Default constructor.
         /// </summary>
         /// <param name="folder">Folder name with optional path.</param>
-        /// <param name="response">Default IMAP server response.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> is null reference.</exception>
         internal IMAP_e_MessagesInfo(string folder)
         {

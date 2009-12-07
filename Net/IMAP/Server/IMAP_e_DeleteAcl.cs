@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace LumiSoft.Net.IMAP
+namespace LumiSoft.Net.IMAP.Server
 {
     /// <summary>
     /// This class provides data for <b cref="IMAP_Session.DeleteAcl">IMAP_Session.DeleteAcl</b> event.

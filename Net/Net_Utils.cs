@@ -101,6 +101,34 @@ namespace LumiSoft.Net
 
         #endregion
 
+        #region static method ArrayToString
+
+        /// <summary>
+        /// Convert array elements to string.
+        /// </summary>
+        /// <param name="values">String values.</param>
+        /// <param name="delimiter">Values delimiter.</param>
+        /// <returns>Returns array elements as string.</returns>
+        public static string ArrayToString(string[] values,string delimiter)
+        {
+            if(values == null){
+                return "";
+            }
+
+            StringBuilder retVal = new StringBuilder();
+            for(int i=0;i<values.Length;i++){
+                if(i > 0){
+                    retVal.Append(delimiter);
+                }
+
+                retVal.Append(values[i]);
+            }
+
+            return retVal.ToString();
+        }
+
+        #endregion
+
         #region static method StreamCopy
 
         /// <summary>

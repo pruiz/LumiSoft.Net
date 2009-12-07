@@ -20,6 +20,7 @@ namespace LumiSoft.Net.IMAP.Server
         /// </summary>
         /// <param name="cmdTag">Command tag.</param>
         /// <param name="folder">Folder name with optional path.</param>
+        /// <param name="response">Default IMAP server response.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>cmdTag</b>,<b>folder</b> or <b>response</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         internal IMAP_e_Folder(string cmdTag,string folder,IMAP_r_ServerStatus response)

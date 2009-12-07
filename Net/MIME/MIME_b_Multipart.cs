@@ -659,8 +659,10 @@ namespace LumiSoft.Net.MIME
         /// <param name="stream">Stream where to store body data.</param>
         /// <param name="headerWordEncoder">Header 8-bit words ecnoder. Value null means that words are not encoded.</param>
         /// <param name="headerParmetersCharset">Charset to use to encode 8-bit header parameters. Value null means parameters not encoded.</param>
+        /// <param name="headerReencode">If true always specified encoding is used for header. If false and header field value not modified, 
+        /// original encoding is kept.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>stream</b> is null reference.</exception>
-        internal protected override void ToStream(Stream stream,MIME_Encoding_EncodedWord headerWordEncoder,Encoding headerParmetersCharset)
+        internal protected override void ToStream(Stream stream,MIME_Encoding_EncodedWord headerWordEncoder,Encoding headerParmetersCharset,bool headerReencode)
         {
             if(stream == null){
                 throw new ArgumentNullException("stream");
@@ -684,7 +686,7 @@ namespace LumiSoft.Net.MIME
                 byte[] bStart = Encoding.UTF8.GetBytes("\r\n--" + this.Entity.ContentType.Param_Boundary + "\r\n");
                 stream.Write(bStart,0,bStart.Length);
                 
-                bodyPart.ToStream(stream,headerWordEncoder,headerParmetersCharset);
+                bodyPart.ToStream(stream,headerWordEncoder,headerParmetersCharset,headerReencode);
 
                 // Last body part, close boundary.
                 if(i == (m_pBodyParts.Count - 1)){

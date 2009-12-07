@@ -225,34 +225,13 @@ namespace LumiSoft.Net.MIME
         /// Gets all MIME entities as list.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Is raised when this class is disposed and this property is accessed.</exception>
+        /// <remarks>The nestetd entities of embbed messages with <b>Content-Type: Message/Rfc822</b> are also included.</remarks>
         public MIME_Entity[] AllEntities
         {
             get{
                 if(m_IsDisposed){
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
-
-                /* REMOVE ME: 30.10.2009
-                List<MIME_Entity>  retVal        = new List<MIME_Entity>();
-                Queue<MIME_Entity> entitiesQueue = new Queue<MIME_Entity>();
-                entitiesQueue.Enqueue(this);
-            
-                while(entitiesQueue.Count > 0){
-                    MIME_Entity currentEntity = entitiesQueue.Dequeue();
-        
-                    // Current entity is multipart entity, add it's body-parts for processing.
-                    if(this.Body != null && currentEntity.Body.GetType().IsSubclassOf(typeof(MIME_b_Multipart))){
-                        foreach(MIME_Entity bodypart in ((MIME_b_Multipart)currentEntity.Body).BodyParts){
-                            
-                            entitiesQueue.Enqueue(bodypart);
-                        }
-                    }
-
-                    retVal.Add(currentEntity);
-                }
-
-                return retVal.ToArray(); 
-                */
 
                 List<MIME_Entity>  retVal       = new List<MIME_Entity>();
                 List<MIME_Entity> entitiesQueue = new List<MIME_Entity>();
@@ -270,7 +249,11 @@ namespace LumiSoft.Net.MIME
                         for(int i=0;i<bodyParts.Count;i++){
                             entitiesQueue.Insert(i,bodyParts[i]);
                         }
-                    }                    
+                    }
+                    // Add embbed message for processing (Embbed message entities will be included).
+                    else if(this.Body != null && currentEntity.Body is MIME_b_MessageRfc822){
+                        entitiesQueue.Add(((MIME_b_MessageRfc822)currentEntity.Body).Message);
+                    }
                 }
 
                 return retVal.ToArray();

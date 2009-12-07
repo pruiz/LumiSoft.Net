@@ -3026,8 +3026,10 @@ namespace LumiSoft.Net.IMAP.Client
                         */
                         
                         if(search != null){
-                            foreach(string value in responseLine.Split(new char[]{' '},3)[2].Split(' ')){
-                                search.Add(Convert.ToInt32(value));
+                            if(responseLine.Split(' ').Length > 2){
+                                foreach(string value in responseLine.Split(new char[]{' '},3)[2].Split(' ')){
+                                    search.Add(Convert.ToInt32(value));
+                                }
                             }
                         }
                     }

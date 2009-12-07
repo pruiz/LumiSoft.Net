@@ -12,7 +12,7 @@ namespace LumiSoft.Net.IMAP.Server
     /// </summary>
     /// <remarks>
     /// IMAP FETCH handler application should provide requested data for each message in <see cref="IMAP_e_Fetch.MessagesInfo"/>
-    /// by calling <see cref="IMAP_e_Fetch.AddData(IMAP_MessageInfo,Stream)"/> method.
+    /// by calling <see cref="IMAP_e_Fetch.AddData(IMAP_MessageInfo,Mail_Message)"/> method.
     /// </remarks>
     public class IMAP_e_Fetch : EventArgs
     {

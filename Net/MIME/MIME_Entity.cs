@@ -61,6 +61,21 @@ namespace LumiSoft.Net.MIME
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         public void ToFile(string file,MIME_Encoding_EncodedWord headerWordEncoder,Encoding headerParmetersCharset)
         {
+            ToFile(file,headerWordEncoder,headerParmetersCharset,false);
+        }
+
+        /// <summary>
+        /// Stores MIME entity to the specified file.
+        /// </summary>
+        /// <param name="file">File name with path where to store MIME entity.</param>
+        /// <param name="headerWordEncoder">Header 8-bit words ecnoder. Value null means that words are not encoded.</param>
+        /// <param name="headerParmetersCharset">Charset to use to encode 8-bit header parameters. Value null means parameters not encoded.</param>
+        /// <param name="headerReencode">If true always specified encoding is used for header. If false and header field value not modified, 
+        /// original encoding is kept.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>file</b> is null.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        public void ToFile(string file,MIME_Encoding_EncodedWord headerWordEncoder,Encoding headerParmetersCharset,bool headerReencode)
+        {
             if(file == null){
                 throw new ArgumentNullException("file");
             }
@@ -69,7 +84,7 @@ namespace LumiSoft.Net.MIME
             }
 
             using(FileStream fs = File.Create(file)){
-                ToStream(fs,headerWordEncoder,headerParmetersCharset);
+                ToStream(fs,headerWordEncoder,headerParmetersCharset,headerReencode);
             }
         }
 
@@ -86,13 +101,27 @@ namespace LumiSoft.Net.MIME
         /// <exception cref="ArgumentNullException">Is raised when <b>stream</b> is null.</exception>
         public void ToStream(Stream stream,MIME_Encoding_EncodedWord headerWordEncoder,Encoding headerParmetersCharset)
         {
+            ToStream(stream,headerWordEncoder,headerParmetersCharset,false);
+        }
+
+        /// <summary>
+        /// Store MIME enity to the specified stream.
+        /// </summary>
+        /// <param name="stream">Stream where to store MIME entity. Storing starts form stream current position.</param>
+        /// <param name="headerWordEncoder">Header 8-bit words ecnoder. Value null means that words are not encoded.</param>
+        /// <param name="headerParmetersCharset">Charset to use to encode 8-bit header parameters. Value null means parameters not encoded.</param>
+        /// <param name="headerReencode">If true always specified encoding is used for header. If false and header field value not modified, 
+        /// original encoding is kept.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>stream</b> is null.</exception>
+        public void ToStream(Stream stream,MIME_Encoding_EncodedWord headerWordEncoder,Encoding headerParmetersCharset,bool headerReencode)
+        {
             if(stream == null){
                 throw new ArgumentNullException("stream");
             }
 
-            m_pHeader.ToStream(stream,headerWordEncoder,headerParmetersCharset);
+            m_pHeader.ToStream(stream,headerWordEncoder,headerParmetersCharset,headerReencode);
             stream.Write(new byte[]{(int)'\r',(int)'\n'},0,2);
-            m_pBody.ToStream(stream,headerWordEncoder,headerParmetersCharset);
+            m_pBody.ToStream(stream,headerWordEncoder,headerParmetersCharset,headerReencode);
         }
 
         #endregion
@@ -116,8 +145,21 @@ namespace LumiSoft.Net.MIME
         /// <returns>Returns MIME entity as string.</returns>
         public string ToString(MIME_Encoding_EncodedWord headerWordEncoder,Encoding headerParmetersCharset)
         {
+            return ToString(headerWordEncoder,headerParmetersCharset,false);
+        }
+
+        /// <summary>
+        /// Returns MIME entity as string.
+        /// </summary>
+        /// <param name="headerWordEncoder">Header 8-bit words ecnoder. Value null means that words are not encoded.</param>
+        /// <param name="headerParmetersCharset">Charset to use to encode 8-bit header parameters. Value null means parameters not encoded.</param>
+        /// <param name="headerReencode">If true always specified encoding is used for header. If false and header field value not modified, 
+        /// original encoding is kept.</param>
+        /// <returns>Returns MIME entity as string.</returns>
+        public string ToString(MIME_Encoding_EncodedWord headerWordEncoder,Encoding headerParmetersCharset,bool headerReencode)
+        {
             using(MemoryStream ms = new MemoryStream()){
-                ToStream(ms,headerWordEncoder,headerParmetersCharset);
+                ToStream(ms,headerWordEncoder,headerParmetersCharset,headerReencode);
 
                 return Encoding.UTF8.GetString(ms.ToArray());
             }
@@ -135,8 +177,21 @@ namespace LumiSoft.Net.MIME
         /// <returns>Returns MIME entity as byte[].</returns>
         public byte[] ToByte(MIME_Encoding_EncodedWord headerWordEncoder,Encoding headerParmetersCharset)
         {
+            return ToByte(headerWordEncoder,headerParmetersCharset,false);
+        }
+
+        /// <summary>
+        /// Returns MIME entity as byte[].
+        /// </summary>
+        /// <param name="headerWordEncoder">Header 8-bit words ecnoder. Value null means that words are not encoded.</param>
+        /// <param name="headerParmetersCharset">Charset to use to encode 8-bit header parameters. Value null means parameters not encoded.</param>
+        /// <param name="headerReencode">If true always specified encoding is used for header. If false and header field value not modified, 
+        /// original encoding is kept.</param>
+        /// <returns>Returns MIME entity as byte[].</returns>
+        public byte[] ToByte(MIME_Encoding_EncodedWord headerWordEncoder,Encoding headerParmetersCharset,bool headerReencode)
+        {
             using(MemoryStream ms = new MemoryStream()){
-                ToStream(ms,headerWordEncoder,headerParmetersCharset);
+                ToStream(ms,headerWordEncoder,headerParmetersCharset,headerReencode);
 
                 return ms.ToArray();
             }

@@ -5,7 +5,7 @@ using System.Text;
 namespace LumiSoft.Net.IMAP
 {
     /// <summary>
-    /// This class represents IMAP SEARCH <b>UNKEYWORD <flag></b> key. Defined in RFC 3501 6.4.4.
+    /// This class represents IMAP SEARCH <b>UNKEYWORD (flag)</b> key. Defined in RFC 3501 6.4.4.
     /// </summary>
     /// <remarks>Messages that do not have the specified keyword flag set.</remarks>
     public class IMAP_Search_Key_Unkeyword : IMAP_Search_Key

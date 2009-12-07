@@ -48,6 +48,8 @@ namespace LumiSoft.Net.IMAP.Server
                 m_Folder        = folder;
                 m_IsReadOnly    = isReadOnly;
                 m_pMessagesInfo = messagesInfo;
+
+                Reindex();
             }
                         
 
@@ -378,7 +380,7 @@ namespace LumiSoft.Net.IMAP.Server
                                 
                 string[] cmd_args = Encoding.UTF8.GetString(op.Buffer,0,op.LineBytesInBuffer).Split(new char[]{' '},3);
                 if(cmd_args.Length < 2){                    
-                    WriteLine("* BAD Error: command '" + op.LineUtf8 + "' not recognized.");
+                    WriteLine("* BAD Error: Command '" + op.LineUtf8 + "' not recognized.");
 
                     return true;
                 }
@@ -507,7 +509,7 @@ namespace LumiSoft.Net.IMAP.Server
                          return false;
                      }
                    
-                     WriteLine(cmdTag + " BAD Error: command '" + cmd + "' not recognized.");
+                     WriteLine(cmdTag + " BAD Error: Command '" + cmd + "' not recognized.");
                  }
              }
              catch(Exception x){
@@ -3146,7 +3148,7 @@ namespace LumiSoft.Net.IMAP.Server
                                     #region TEXT
 
                                     else if(string.Equals(partSpecifier,"TEXT",StringComparison.InvariantCultureIgnoreCase)){
-                                        entity.Body.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8);
+                                        entity.Body.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8,false);
                                         tmpFs.Position = 0;
                                     }
 
@@ -3283,7 +3285,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                     else if(dataItem is IMAP_Fetch_DataItem_Rfc822Text){
                         using(FileStream tmpFs = File.Create(Path.GetTempFileName())){
-                            message.Body.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8);
+                            message.Body.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8,false);
                             tmpFs.Position = 0;
 
                             reponseBuffer.Append("RFC822.TEXT {" + tmpFs.Length + "}\r\n");
@@ -3560,7 +3562,7 @@ namespace LumiSoft.Net.IMAP.Server
                 this.TcpStream.Write("* SEARCH");
                 logBuffer.Append("* SEARCH");
 
-                IMAP_e_Search searchArgs = new IMAP_e_Search(criteria,new IMAP_r_ServerStatus(cmdTag,"OK","SEARCH completed in %exectime seconds.\r\n"));
+                IMAP_e_Search searchArgs = new IMAP_e_Search(criteria,new IMAP_r_ServerStatus(cmdTag,"OK","SEARCH completed in %exectime seconds."));
                 searchArgs.Matched += new EventHandler<EventArgs<long>>(delegate(object s,EventArgs<long> e){
                     if(uid){
                         this.TcpStream.Write(" " + e.Value);
@@ -3987,6 +3989,7 @@ namespace LumiSoft.Net.IMAP.Server
                     WriteLine("* " + (i + 1) + " EXPUNGE\r\n");
                 }
             }
+            m_pSelectedFolder.Reindex();
             
             WriteLine(response.ToString());
         }
@@ -4085,29 +4088,70 @@ namespace LumiSoft.Net.IMAP.Server
 
             TimerEx timer = new TimerEx(30000,true);
             timer.Elapsed += new System.Timers.ElapsedEventHandler(delegate(object sender,System.Timers.ElapsedEventArgs e){
-                UpdateSelectedFolderAndSendChanges();
+                try{
+                    UpdateSelectedFolderAndSendChanges();
+                }
+                catch{
+                }
             });
             timer.Enabled = true;
-
 
             // Read client response. 
             SmartStream.ReadLineAsyncOP readLineOP = new SmartStream.ReadLineAsyncOP(new byte[32000],SizeExceededAction.JunkAndThrowException);
             readLineOP.Completed += new EventHandler<EventArgs<SmartStream.ReadLineAsyncOP>>(delegate(object sender,EventArgs<SmartStream.ReadLineAsyncOP> e){
+                if(readLineOP.Error != null){
+                    LogAddText("Error: " + readLineOP.Error.Message);
+                    timer.Dispose();
+
+                    return;
+                }
+
+                LogAddRead(readLineOP.BytesInBuffer,readLineOP.LineUtf8);
+
                 if(string.Equals(readLineOP.LineUtf8,"DONE",StringComparison.InvariantCultureIgnoreCase)){
                     timer.Dispose();
 
                     WriteLine(cmdTag + " OK IDLE terminated.\r\n");
                     BeginReadCmd();
                 }
+                else{
+                    while(this.TcpStream.ReadLine(readLineOP,true)){
+                        if(readLineOP.Error != null){
+                            LogAddText("Error: " + readLineOP.Error.Message);
+                            timer.Dispose();
+
+                            return;
+                        }
+                        LogAddRead(readLineOP.BytesInBuffer,readLineOP.LineUtf8);
+
+                        if(string.Equals(readLineOP.LineUtf8,"DONE",StringComparison.InvariantCultureIgnoreCase)){
+                            timer.Dispose();
+
+                            WriteLine(cmdTag + " OK IDLE terminated.\r\n");
+                            BeginReadCmd();
+
+                            break;
+                        }
+                    }
+                }
             });
-            if(this.TcpStream.ReadLine(readLineOP,true)){
+            while(this.TcpStream.ReadLine(readLineOP,true)){
+                if(readLineOP.Error != null){
+                    LogAddText("Error: " + readLineOP.Error.Message);
+                    timer.Dispose();
+
+                    break;
+                }
+
+                LogAddRead(readLineOP.BytesInBuffer,readLineOP.LineUtf8);
+
                 if(string.Equals(readLineOP.LineUtf8,"DONE",StringComparison.InvariantCultureIgnoreCase)){
                     timer.Dispose();
 
                     WriteLine(cmdTag + " OK IDLE terminated.\r\n");
                     BeginReadCmd();
 
-                    return true;
+                    break;
                 }                
             }
             
@@ -4406,11 +4450,11 @@ namespace LumiSoft.Net.IMAP.Server
 
             // Send STATUS change responses.
             if(retVal.Length > 0){
-                WriteLine(retVal.ToString());
-
-                // Create new selected folder based on new messages info.
-                m_pSelectedFolder = new _SelectedFolder(m_pSelectedFolder.Folder,m_pSelectedFolder.IsReadOnly,e.MessagesInfo);
+                WriteLine(retVal.ToString());                
             }
+
+            // Create new selected folder based on new messages info.
+            m_pSelectedFolder = new _SelectedFolder(m_pSelectedFolder.Folder,m_pSelectedFolder.IsReadOnly,e.MessagesInfo);
         }
 
         #endregion
@@ -5440,7 +5484,7 @@ namespace LumiSoft.Net.IMAP.Server
 
         #region method OnListRights
 
-        // <summary>
+        /// <summary>
         /// Raises <b>ListRights</b> event.
         /// </summary>
         /// <param name="folder">Folder name with optional path.</param>
