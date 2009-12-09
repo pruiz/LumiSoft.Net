@@ -2587,7 +2587,12 @@ namespace LumiSoft.Net.IMAP.Client
                             S: A003 OK COPY completed
             */
 
-            SendCommand((m_CommandIndex++).ToString("d5") + " COPY " + seqSet.ToSequenceSetString() + " " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(targetFolder)) + "\r\n");
+            if(uid){
+                SendCommand((m_CommandIndex++).ToString("d5") + " UID COPY " + seqSet.ToSequenceSetString() + " " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(targetFolder)) + "\r\n");
+            }
+            else{
+                SendCommand((m_CommandIndex++).ToString("d5") + " COPY " + seqSet.ToSequenceSetString() + " " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(targetFolder)) + "\r\n");
+            }
 
             IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
