@@ -139,7 +139,7 @@ namespace LumiSoft.Net.IMAP
             }
 
             // Read "subject".
-            string subject = r.ReadWord();
+            string subject = MIME_Encoding_EncodedWord.DecodeS(r.ReadWord());
 
             // Read "from"
             Mail_t_Address[] from = ReadAddresses(r);
@@ -257,7 +257,7 @@ namespace LumiSoft.Net.IMAP
             }
 
             // Read "subject".
-            string subject = fetchReader.ReadString();
+            string subject =  MIME_Encoding_EncodedWord.DecodeS(fetchReader.ReadString());
 
             // Read "from"
             Mail_t_Address[] from = ReadAddresses(fetchReader);
@@ -518,7 +518,7 @@ namespace LumiSoft.Net.IMAP
                     // Eat address starting "(".
                     r.ReadSpecifiedLength(1);
 
-                    string personalName = r.ReadWord();
+                    string personalName = MIME_Encoding_EncodedWord.DecodeS(r.ReadWord());
                     string atDomainList = r.ReadWord();
                     string mailboxName  = r.ReadWord();
                     string hostName     = r.ReadWord();
@@ -580,7 +580,7 @@ namespace LumiSoft.Net.IMAP
                     // Eat address starting "(".
                     fetchReader.GetReader().ReadSpecifiedLength(1);
 
-                    string personalName = fetchReader.ReadString();
+                    string personalName = MIME_Encoding_EncodedWord.DecodeS(fetchReader.ReadString());
                     string atDomainList = fetchReader.ReadString();
                     string mailboxName  = fetchReader.ReadString();
                     string hostName     = fetchReader.ReadString();

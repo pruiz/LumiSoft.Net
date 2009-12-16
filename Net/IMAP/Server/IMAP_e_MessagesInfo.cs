@@ -9,8 +9,8 @@ namespace LumiSoft.Net.IMAP.Server
     /// </summary>
     public class IMAP_e_MessagesInfo : EventArgs
     {
-        private string                 m_Folder         = null;
-        private List<IMAP_MessageInfo> m_pMessages      = null;
+        private string                 m_Folder    = null;
+        private List<IMAP_MessageInfo> m_pMessages = null;
 
         /// <summary>
         /// Default constructor.
@@ -83,10 +83,8 @@ namespace LumiSoft.Net.IMAP.Server
         {
             get{
                 for(int i=0;i<m_pMessages.Count;i++){
-                    foreach(string flag in m_pMessages[i].Flags){
-                        if(string.Equals(flag,"Seen",StringComparison.InvariantCultureIgnoreCase)){
-                            return i + 1;
-                        }
+                    if(!m_pMessages[i].ConatinsFlag("Seen")){
+                        return i + 1;
                     }
                 }
 

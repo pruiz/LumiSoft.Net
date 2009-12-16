@@ -465,6 +465,9 @@ namespace LumiSoft.Net.IMAP.Server
                 else if(cmd == "MYRIGHTS"){
                     MYRIGHTS(cmdTag,args);
                 }
+                else if(cmd == "CHECK"){
+                    CHECK(cmdTag,args);
+                }
                 else if(cmd == "CLOSE"){
                     CLOSE(cmdTag,args);
                 }
@@ -1755,51 +1758,56 @@ namespace LumiSoft.Net.IMAP.Server
                 m_pSelectedFolder = null;
             }
 
-            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+            try{
+                string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
 
-            IMAP_e_Select e = OnSelect(cmdTag,folder);
-            if(e.ErrorResponse == null){
-                StringBuilder response = new StringBuilder();
+                IMAP_e_Select e = OnSelect(cmdTag,folder);
+                if(e.ErrorResponse == null){
+                    StringBuilder response = new StringBuilder();
 
-                IMAP_e_MessagesInfo eMessagesInfo = OnGetMessagesInfo(folder);
-                response.Append("* " + eMessagesInfo.Exists + " EXISTS\r\n");
-                response.Append("* " + eMessagesInfo.Recent + " RECENT\r\n");
-                if(eMessagesInfo.FirstUnseen > -1){
-                    response.Append("* OK [UNSEEN " + eMessagesInfo.FirstUnseen + "] Message " + eMessagesInfo.FirstUnseen + " is the first unseen.\r\n");
-                }
-                response.Append("* OK [UIDNEXT " + eMessagesInfo.UidNext + "] Predicted next message UID.\r\n");
-                if(e.FolderUID > 0){
-                    response.Append("* OK [UIDVALIDITY " + e.FolderUID + "] Folder UID value.\r\n");
-                }
-                if(e.Flags.Count > 0){
-                    response.Append("* FLAGS (");
-                    for(int i=0;i<e.Flags.Count;i++){
-                        if(i > 0){
-                            response.Append(" ");
-                        }
-                        response.Append(e.Flags[i]);
+                    IMAP_e_MessagesInfo eMessagesInfo = OnGetMessagesInfo(folder);
+                    response.Append("* " + eMessagesInfo.Exists + " EXISTS\r\n");
+                    response.Append("* " + eMessagesInfo.Recent + " RECENT\r\n");
+                    if(eMessagesInfo.FirstUnseen > -1){
+                        response.Append("* OK [UNSEEN " + eMessagesInfo.FirstUnseen + "] Message " + eMessagesInfo.FirstUnseen + " is the first unseen.\r\n");
                     }
-                    response.Append(")\r\n");
-                }
-                if(e.PermanentFlags.Count > 0){
-                    response.Append("* OK [PERMANENTFLAGS (");
-                    for(int i=0;i<e.PermanentFlags.Count;i++){
-                        if(i > 0){
-                            response.Append(" ");
-                        }
-                        response.Append(e.PermanentFlags[i]);
+                    response.Append("* OK [UIDNEXT " + eMessagesInfo.UidNext + "] Predicted next message UID.\r\n");
+                    if(e.FolderUID > 0){
+                        response.Append("* OK [UIDVALIDITY " + e.FolderUID + "] Folder UID value.\r\n");
                     }
-                    response.Append(")] Avaliable permanent flags.\r\n");
+                    if(e.Flags.Count > 0){
+                        response.Append("* FLAGS (");
+                        for(int i=0;i<e.Flags.Count;i++){
+                            if(i > 0){
+                                response.Append(" ");
+                            }
+                            response.Append(e.Flags[i]);
+                        }
+                        response.Append(")\r\n");
+                    }
+                    if(e.PermanentFlags.Count > 0){
+                        response.Append("* OK [PERMANENTFLAGS (");
+                        for(int i=0;i<e.PermanentFlags.Count;i++){
+                            if(i > 0){
+                                response.Append(" ");
+                            }
+                            response.Append(e.PermanentFlags[i]);
+                        }
+                        response.Append(")] Avaliable permanent flags.\r\n");
+                    }
+                    response.Append(cmdTag + " OK [" + (e.IsReadOnly ? "READ-ONLY" : "READ-WRITE") + "] SELECT completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds.\r\n");
+
+                    WriteLine(response.ToString());
+
+                    m_pSelectedFolder = new _SelectedFolder(folder,e.IsReadOnly,eMessagesInfo.MessagesInfo);
+                    m_pSelectedFolder.Reindex();
                 }
-                response.Append(cmdTag + " OK [" + (e.IsReadOnly ? "READ-ONLY" : "READ-WRITE") + "] SELECT completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds.\r\n");
-
-                WriteLine(response.ToString());
-
-                m_pSelectedFolder = new _SelectedFolder(folder,e.IsReadOnly,eMessagesInfo.MessagesInfo);
-                m_pSelectedFolder.Reindex();
+                else{
+                    WriteLine(e.ErrorResponse.ToString());
+                }
             }
-            else{
-                WriteLine(e.ErrorResponse.ToString());
+            catch(Exception x){
+                WriteLine("NO Error: " + x.Message);
             }
         }
 
@@ -2469,6 +2477,57 @@ namespace LumiSoft.Net.IMAP.Server
         #endregion
 
 
+        #region method CHECK
+
+        private void CHECK(string cmdTag,string cmdText)
+        {
+            /* 6.4.1.  CHECK Command
+                Arguments:  none
+
+                Responses:  no specific responses for this command
+
+                Result:     OK - check completed
+                            BAD - command unknown or arguments invalid
+
+                The CHECK command requests a checkpoint of the currently selected
+                mailbox.  A checkpoint refers to any implementation-dependent
+                housekeeping associated with the mailbox (e.g., resolving the
+                server's in-memory state of the mailbox with the state on its
+                disk) that is not normally executed as part of each command.  A
+                checkpoint MAY take a non-instantaneous amount of real time to
+                complete.  If a server implementation has no such housekeeping
+                considerations, CHECK is equivalent to NOOP.
+
+                There is no guarantee that an EXISTS untagged response will happen
+                as a result of CHECK.  NOOP, not CHECK, SHOULD be used for new
+                message polling.
+
+                Example:    C: FXXZ CHECK
+                            S: FXXZ OK CHECK Completed
+            */
+
+            if(!this.IsAuthenticated){
+                WriteLine(cmdTag + " NO Authentication required.");
+
+                return;
+            }
+            if(m_pSelectedFolder == null){
+                WriteLine(cmdTag + " NO Error: This command is valid only in selected state.");
+
+                return;
+            }
+
+            // Store start time
+			long startTime = DateTime.Now.Ticks;
+
+           
+            UpdateSelectedFolderAndSendChanges();
+            
+            WriteLine(cmdTag + " OK CHECK Completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds.\r\n");
+        }
+
+        #endregion
+
         #region method CLOSE
 
         private void CLOSE(string cmdTag,string cmdText)
@@ -2851,8 +2910,8 @@ namespace LumiSoft.Net.IMAP.Server
 
                     #region Parse <partial>
 
-                    int offset   = 0;
-                    int maxCount = 0;
+                    int offset   = -1;
+                    int maxCount = -1;
                     // Partial data wanted.
                     if(r.StartsWith("<")){
                         string[] origin = r.ReadParenthesized().Split('.');
@@ -3045,10 +3104,14 @@ namespace LumiSoft.Net.IMAP.Server
                         int    offset   = -1;
                         int    maxCount = -1;
                         if(dataItem is IMAP_Fetch_DataItem_Body){
-                            section = ((IMAP_Fetch_DataItem_Body)dataItem).Section;
+                            section  = ((IMAP_Fetch_DataItem_Body)dataItem).Section;
+                            offset   = ((IMAP_Fetch_DataItem_Body)dataItem).Offset;
+                            maxCount = ((IMAP_Fetch_DataItem_Body)dataItem).MaxCount;
                         }
                         else{
-                            section = ((IMAP_Fetch_DataItem_BodyPeek)dataItem).Section;
+                            section  = ((IMAP_Fetch_DataItem_BodyPeek)dataItem).Section;
+                            offset   = ((IMAP_Fetch_DataItem_BodyPeek)dataItem).Offset;
+                            maxCount = ((IMAP_Fetch_DataItem_BodyPeek)dataItem).MaxCount;
                         }
 
                         using(FileStream tmpFs = File.Create(Path.GetTempFileName())){
@@ -3080,7 +3143,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                                     #region HEADER.FIELDS
 
-                                    else if(string.Equals(partSpecifier,"HEADER.FIELDS",StringComparison.InvariantCultureIgnoreCase)){
+                                    else if(string.Equals(partSpecifier,"HEADER.FIELDS",StringComparison.InvariantCultureIgnoreCase)){                            
                                         string   fieldsString = section.Split(new char[]{' '},2)[1];
                                         string[] fieldNames   = fieldsString.Substring(1,fieldsString.Length - 2).Split(' ');
                                         foreach(string filedName in fieldNames){
@@ -3093,7 +3156,7 @@ namespace LumiSoft.Net.IMAP.Server
                                             }
                                         }
                                         // All header fetches must include header terminator(CRLF).
-                                        if(tmpFs.Length >0 ){
+                                        if(tmpFs.Length > 0){
                                             tmpFs.WriteByte((byte)'\r');
                                             tmpFs.WriteByte((byte)'\n');
                                         }
@@ -3168,7 +3231,7 @@ namespace LumiSoft.Net.IMAP.Server
                             #region Send data
 
                             // All data wanted.
-                            if(offset < 1){
+                            if(offset < 0){
                                 reponseBuffer.Append("BODY[" + section + "] {" + tmpFs.Length + "}\r\n");
                                 WriteLine(reponseBuffer.ToString());
                                 reponseBuffer = new StringBuilder();
@@ -3199,8 +3262,12 @@ namespace LumiSoft.Net.IMAP.Server
                         }
 
                         // Set Seen flag.
-                        if(!m_pSelectedFolder.IsReadOnly){
-                            // TODO:
+                        if(!m_pSelectedFolder.IsReadOnly && dataItem is IMAP_Fetch_DataItem_Body){
+                            try{
+                                OnStore(e.MessageInfo,IMAP_Flags_SetType.Add,new string[]{"Seen"},new IMAP_r_ServerStatus("dummy","OK","This is FETCH set Seen flag, this response not used."));
+                            }
+                            catch{
+                            }
                         }
                     }
 
@@ -3737,7 +3804,13 @@ namespace LumiSoft.Net.IMAP.Server
                 msgInfo.UpdateFlags(setType,flags.ToArray());
 
                 if(!silent){
-                    WriteLine("* " + m_pSelectedFolder.GetSeqNo(msgInfo) + " FETCH (FLAGS " + msgInfo.FlagsToImapString() + ")");
+                    // UID STORE must include UID. For more info see RFC 3501 6.4.8. UID Command.
+                    if(uid){
+                        WriteLine("* " + m_pSelectedFolder.GetSeqNo(msgInfo) + " FETCH (FLAGS " + msgInfo.FlagsToImapString() + " UID " + msgInfo.UID + ")");
+                    }
+                    else{
+                        WriteLine("* " + m_pSelectedFolder.GetSeqNo(msgInfo) + " FETCH (FLAGS " + msgInfo.FlagsToImapString() + ")");
+                    }
                 }
             }
 
@@ -4405,9 +4478,13 @@ namespace LumiSoft.Net.IMAP.Server
                 throw new ArgumentNullException("text");
             }
             
-            // Log
-            if(this.Server.Logger != null){
-                this.Server.Logger.AddText(this.ID,text);
+            try{
+                // Log
+                if(this.Server.Logger != null){
+                    this.Server.Logger.AddText(this.ID,text);
+                }
+            }
+            catch{
             }
         }
 
