@@ -139,7 +139,7 @@ namespace LumiSoft.Net.IMAP
             }
 
             // Read "subject".
-            string subject = MIME_Encoding_EncodedWord.DecodeS(r.ReadWord());
+            string subject = ReadAndDecodeWord(r.ReadWord());
 
             // Read "from"
             Mail_t_Address[] from = ReadAddresses(r);
@@ -257,7 +257,7 @@ namespace LumiSoft.Net.IMAP
             }
 
             // Read "subject".
-            string subject =  MIME_Encoding_EncodedWord.DecodeS(fetchReader.ReadString());
+            string subject =  ReadAndDecodeWord(fetchReader.ReadString());
 
             // Read "from"
             Mail_t_Address[] from = ReadAddresses(fetchReader);
@@ -518,7 +518,7 @@ namespace LumiSoft.Net.IMAP
                     // Eat address starting "(".
                     r.ReadSpecifiedLength(1);
 
-                    string personalName = MIME_Encoding_EncodedWord.DecodeS(r.ReadWord());
+                    string personalName = ReadAndDecodeWord(r.ReadWord());
                     string atDomainList = r.ReadWord();
                     string mailboxName  = r.ReadWord();
                     string hostName     = r.ReadWord();
@@ -580,7 +580,7 @@ namespace LumiSoft.Net.IMAP
                     // Eat address starting "(".
                     fetchReader.GetReader().ReadSpecifiedLength(1);
 
-                    string personalName = MIME_Encoding_EncodedWord.DecodeS(fetchReader.ReadString());
+                    string personalName = ReadAndDecodeWord(fetchReader.ReadString());
                     string atDomainList = fetchReader.ReadString();
                     string mailboxName  = fetchReader.ReadString();
                     string hostName     = fetchReader.ReadString();
@@ -685,6 +685,28 @@ namespace LumiSoft.Net.IMAP
             }
 
             return value.Replace("\r","").Replace("\n","");
+        }
+
+        #endregion
+
+        #region static method DecodeWord
+
+        /// <summary>
+        /// Decodes word from reader.
+        /// </summary>
+        /// <param name="r">String reader.</param>
+        /// <returns>Returns decoded word.</returns>
+        private static string ReadAndDecodeWord(string word)
+        {            
+            if(word == null){
+                return null;
+            }
+            else if(string.Equals(word,"NIL",StringComparison.InvariantCultureIgnoreCase)){
+                return "";
+            }
+            else{
+                return MIME_Encoding_EncodedWord.DecodeS(word);
+            }
         }
 
         #endregion
