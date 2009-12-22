@@ -496,7 +496,7 @@ namespace LumiSoft.Net.TCP
             // FIX ME: if ssl switching fails, it closes source stream or otherwise if ssl successful, source stream leaks.
 
             SslStream sslStream = new SslStream(m_pTcpStream.SourceStream,true,this.RemoteCertificateValidationCallback);
-            sslStream.AuthenticateAsClient("");
+            sslStream.AuthenticateAsClient("dummy");
 
             // Close old stream, but leave source stream open.
             m_pTcpStream.IsOwner = false;
@@ -515,7 +515,7 @@ namespace LumiSoft.Net.TCP
                 return m_pCertificateCallback(sender,certificate,chain,sslPolicyErrors);
             }
             else{
-                if(sslPolicyErrors == SslPolicyErrors.None || sslPolicyErrors == SslPolicyErrors.RemoteCertificateNameMismatch){
+                if(sslPolicyErrors == SslPolicyErrors.None || ((sslPolicyErrors & SslPolicyErrors.RemoteCertificateNameMismatch) > 0)){
                     return true;
                 }
 
