@@ -611,6 +611,9 @@ namespace LumiSoft.Net.SMTP.Relay
                 else if(e.LogEntry.EntryType == LogEntryType.Write){
                     m_pServer.Logger.AddWrite(m_SessionID,e.LogEntry.UserIdentity,e.LogEntry.Size,e.LogEntry.Text,e.LogEntry.LocalEndPoint,e.LogEntry.RemoteEndPoint);
                 }
+                else if(e.LogEntry.EntryType == LogEntryType.Exception){
+                    m_pServer.Logger.AddException(m_SessionID,e.LogEntry.UserIdentity,e.LogEntry.Text,e.LogEntry.LocalEndPoint,e.LogEntry.RemoteEndPoint,e.LogEntry.Exception);
+                }
             }
             catch{
             }
