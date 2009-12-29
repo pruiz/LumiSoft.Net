@@ -49,14 +49,14 @@ namespace LumiSoft.Net.IMAP.Server
         }
 
 
-        #region method ConatinsFlag
+        #region method ContainsFlag
 
         /// <summary>
         /// Gets if this message info contains specified message flag.
         /// </summary>
         /// <param name="flag">Message flag.</param>
         /// <returns>Returns true if message info contains specified message flag.</returns>
-        public bool ConatinsFlag(string flag)
+        public bool ContainsFlag(string flag)
         {
             if(flag == null){
                 throw new ArgumentNullException("flag");

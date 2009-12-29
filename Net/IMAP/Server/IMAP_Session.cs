@@ -2009,9 +2009,13 @@ namespace LumiSoft.Net.IMAP.Server
                 folder = IMAP_Utils.Decode_IMAP_UTF7_String(r.QuotedReadToDelimiter(' '));
             }
             r.ReadToFirstChar();
-            string[] flags = new string[0];
-            if(r.StartsWith("(")){
-                flags = r.ReadParenthesized().Split(' ');
+            List<string> flags = new List<string>();
+            if(r.StartsWith("(")){                
+                foreach(string f in r.ReadParenthesized().Split(' ')){
+                    if(f.Length > 0 && !flags.Contains(f.Substring(1))){
+                        flags.Add(f.Substring(1));
+                    }
+                }
             }
             r.ReadToFirstChar();
             DateTime date = DateTime.MinValue;
@@ -2025,7 +2029,7 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }
 
-            IMAP_e_Append e = OnAppend(folder,flags,date,size,new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"APPEND command completed in %exectime seconds."));
+            IMAP_e_Append e = OnAppend(folder,flags.ToArray(),date,size,new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"APPEND command completed in %exectime seconds."));
             
             if(!string.Equals(e.Response.ResponseCode,"OK",StringComparison.InvariantCultureIgnoreCase)){
                 WriteLine(e.Response.ToString());
@@ -2574,7 +2578,7 @@ namespace LumiSoft.Net.IMAP.Server
 
             if(m_pSelectedFolder != null && !m_pSelectedFolder.IsReadOnly){
                 foreach(IMAP_MessageInfo msgInfo in m_pSelectedFolder.MessagesInfo){
-                    if(msgInfo.ConatinsFlag("Deleted")){
+                    if(msgInfo.ContainsFlag("Deleted")){
                         OnExpunge(msgInfo,new IMAP_r_ServerStatus("dummy","OK","This is CLOSE command expunge, so this response is not used."));
                     }
                 }
@@ -4048,7 +4052,7 @@ namespace LumiSoft.Net.IMAP.Server
             IMAP_r_ServerStatus response = new IMAP_r_ServerStatus(cmdTag,"OK","EXPUNGE completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds.");
             for(int i=0;i<m_pSelectedFolder.MessagesInfo.Length;i++){
                 IMAP_MessageInfo msgInfo = m_pSelectedFolder.MessagesInfo[i];
-                if(msgInfo.ConatinsFlag("Deleted")){
+                if(msgInfo.ContainsFlag("Deleted")){
                     IMAP_e_Expunge e = OnExpunge(msgInfo,response);
                     // Expunge failed.
                     if(!string.Equals(e.Response.ResponseCode,"OK",StringComparison.InvariantCultureIgnoreCase)){

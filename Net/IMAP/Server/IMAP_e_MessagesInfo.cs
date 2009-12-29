@@ -83,7 +83,7 @@ namespace LumiSoft.Net.IMAP.Server
         {
             get{
                 for(int i=0;i<m_pMessages.Count;i++){
-                    if(!m_pMessages[i].ConatinsFlag("Seen")){
+                    if(!m_pMessages[i].ContainsFlag("Seen")){
                         return i + 1;
                     }
                 }
