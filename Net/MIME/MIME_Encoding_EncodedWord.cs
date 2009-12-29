@@ -241,6 +241,53 @@ namespace LumiSoft.Net.MIME
 
         #endregion
 
+        #region static method DecodeTextS
+
+        /// <summary>
+        /// Decodes non-ascii text with MIME <b>encoded-word</b> method. Defined in RFC 2047 2.
+        /// </summary>
+        /// <param name="text">Text.</param>
+        /// <returns>Returns decoded text.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>text</b> is null reference.</exception>
+        public static string DecodeTextS(string text)
+        {
+            if(text == null){
+                throw new ArgumentNullException("word");
+            }
+
+            // There may be multiple encoded-words and they can be mixed with atom/quoted-string ... .
+            try{
+                StringBuilder v = new StringBuilder();
+                MIME_Reader r = new MIME_Reader(text);                
+                while(true){
+                    string whiteSpaces = r.ToFirstChar();
+                    if(!string.IsNullOrEmpty(whiteSpaces)){
+                        v.Append(whiteSpaces);
+                    }
+
+                    string phrase = r.Phrase();
+                    if(phrase == null){
+                        if(r.Available == 0){
+                            return v.ToString().TrimStart();
+                        }
+                        // Some special char(like :,{ ...) just read it.
+                        else{
+                            v.Append((char)r.Char(false));
+                        }
+                    }
+                    else{
+                        v.Append(phrase);
+                    }
+                }                
+            }
+            catch{
+                // Parsing failed, leave raw unparsed value.
+                return text;
+            }
+        }
+
+        #endregion
+
 
         #region Properties implementation
 
