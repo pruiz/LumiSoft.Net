@@ -4172,40 +4172,47 @@ namespace LumiSoft.Net.IMAP.Server
             // Read client response. 
             SmartStream.ReadLineAsyncOP readLineOP = new SmartStream.ReadLineAsyncOP(new byte[32000],SizeExceededAction.JunkAndThrowException);
             readLineOP.Completed += new EventHandler<EventArgs<SmartStream.ReadLineAsyncOP>>(delegate(object sender,EventArgs<SmartStream.ReadLineAsyncOP> e){
-                if(readLineOP.Error != null){
-                    LogAddText("Error: " + readLineOP.Error.Message);
-                    timer.Dispose();
+                try{
+                    if(readLineOP.Error != null){
+                        LogAddText("Error: " + readLineOP.Error.Message);
+                        timer.Dispose();
 
-                    return;
-                }
+                        return;
+                    }
 
-                LogAddRead(readLineOP.BytesInBuffer,readLineOP.LineUtf8);
+                    LogAddRead(readLineOP.BytesInBuffer,readLineOP.LineUtf8);
 
-                if(string.Equals(readLineOP.LineUtf8,"DONE",StringComparison.InvariantCultureIgnoreCase)){
-                    timer.Dispose();
+                    if(string.Equals(readLineOP.LineUtf8,"DONE",StringComparison.InvariantCultureIgnoreCase)){
+                        timer.Dispose();
 
-                    WriteLine(cmdTag + " OK IDLE terminated.\r\n");
-                    BeginReadCmd();
-                }
-                else{
-                    while(this.TcpStream.ReadLine(readLineOP,true)){
-                        if(readLineOP.Error != null){
-                            LogAddText("Error: " + readLineOP.Error.Message);
-                            timer.Dispose();
+                        WriteLine(cmdTag + " OK IDLE terminated.\r\n");
+                        BeginReadCmd();
+                    }
+                    else{
+                        while(this.TcpStream.ReadLine(readLineOP,true)){
+                            if(readLineOP.Error != null){
+                                LogAddText("Error: " + readLineOP.Error.Message);
+                                timer.Dispose();
 
-                            return;
-                        }
-                        LogAddRead(readLineOP.BytesInBuffer,readLineOP.LineUtf8);
+                                return;
+                            }
+                            LogAddRead(readLineOP.BytesInBuffer,readLineOP.LineUtf8);
 
-                        if(string.Equals(readLineOP.LineUtf8,"DONE",StringComparison.InvariantCultureIgnoreCase)){
-                            timer.Dispose();
+                            if(string.Equals(readLineOP.LineUtf8,"DONE",StringComparison.InvariantCultureIgnoreCase)){
+                                timer.Dispose();
 
-                            WriteLine(cmdTag + " OK IDLE terminated.\r\n");
-                            BeginReadCmd();
+                                WriteLine(cmdTag + " OK IDLE terminated.\r\n");
+                                BeginReadCmd();
 
-                            break;
+                                break;
+                            }
                         }
                     }
+                }
+                catch(Exception x){
+                    timer.Dispose();
+
+                    OnError(x);
                 }
             });
             while(this.TcpStream.ReadLine(readLineOP,true)){
