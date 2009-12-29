@@ -694,18 +694,18 @@ namespace LumiSoft.Net.IMAP
         /// <summary>
         /// Decodes word from reader.
         /// </summary>
-        /// <param name="r">String reader.</param>
+        /// <param name="text">Text.</param>
         /// <returns>Returns decoded word.</returns>
-        private static string ReadAndDecodeWord(string word)
+        private static string ReadAndDecodeWord(string text)
         {            
-            if(word == null){
+            if(text == null){
                 return null;
             }
-            else if(string.Equals(word,"NIL",StringComparison.InvariantCultureIgnoreCase)){
+            else if(string.Equals(text,"NIL",StringComparison.InvariantCultureIgnoreCase)){
                 return "";
             }
             else{
-                return MIME_Encoding_EncodedWord.DecodeS(word);
+                return MIME_Encoding_EncodedWord.DecodeTextS(text);
             }
         }
 
