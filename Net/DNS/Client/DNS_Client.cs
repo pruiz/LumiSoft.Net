@@ -490,20 +490,21 @@ namespace LumiSoft.Net.DNS.Client
 			}
 			else{
 				// hostName_IP must be host name, try to resolve it's IP
-				Dns_Client dns = new Dns_Client();
-				DnsServerResponse resp = dns.Query(host,DNS_QType.A);
-				if(resp.ResponseCode == DNS_RCode.NO_ERROR){
-					DNS_rr_A[] records = resp.GetARecords();
-					IPAddress[] retVal = new IPAddress[records.Length];
-					for(int i=0;i<records.Length;i++){
-						retVal[i] = records[i].IP;
-					}
+				using(Dns_Client dns = new Dns_Client()){
+				    DnsServerResponse resp = dns.Query(host,DNS_QType.A);
+				    if(resp.ResponseCode == DNS_RCode.NO_ERROR){
+					    DNS_rr_A[] records = resp.GetARecords();
+					    IPAddress[] retVal = new IPAddress[records.Length];
+					    for(int i=0;i<records.Length;i++){
+						    retVal[i] = records[i].IP;
+					    }
 
-					return retVal;
-				}
-				else{
-					throw new Exception(resp.ResponseCode.ToString());
-				}
+					    return retVal;
+				    }
+				    else{
+					    throw new Exception(resp.ResponseCode.ToString());
+				    }
+                }
 			}
 		}
 
