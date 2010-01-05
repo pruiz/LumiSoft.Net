@@ -326,8 +326,8 @@ namespace LumiSoft.Net.TCP
             }
         
             try{                
-                socket.SendTimeout = 30000;
-                socket.ReceiveTimeout = 30000;
+                socket.SendTimeout = 61000;
+                socket.ReceiveTimeout = 61000;
 
                 if(localEP != null){
                     socket.Bind(localEP);
