@@ -168,6 +168,49 @@ namespace LumiSoft.Net
         #endregion
 
 
+        #region static method CompareIP
+
+        /// <summary>
+        /// Compares 2 IP addresses. Returns 0 if IPs are equal, 
+        /// returns positive value if destination IP is bigger than source IP,
+        /// returns negative value if destination IP is smaller than source IP.
+        /// </summary>
+        /// <param name="source">Source IP address.</param>
+        /// <param name="destination">Destination IP address.</param>
+        /// <returns>Returns 0 if IPs are equal, 
+        /// returns positive value if destination IP is bigger than source IP,
+        /// returns negative value if destination IP is smaller than source IP.
+        /// </returns>
+        public static int CompareIP(IPAddress source,IPAddress destination)
+        {
+            byte[] sourceIpBytes      = source.GetAddressBytes();
+            byte[] destinationIpBytes = destination.GetAddressBytes();
+
+            // IPv4 and IPv6
+            if(sourceIpBytes.Length < destinationIpBytes.Length){
+                return 1;
+            }
+            // IPv6 and IPv4
+            else if(sourceIpBytes.Length > destinationIpBytes.Length){
+                return -1;
+            }
+            // IPv4 and IPv4 OR IPv6 and IPv6
+            else{                
+                for(int i=0;i<sourceIpBytes.Length;i++){
+                    if(sourceIpBytes[i] < destinationIpBytes[i]){
+                        return 1;
+                    }
+                    else if(sourceIpBytes[i] > destinationIpBytes[i]){
+                        return -1;
+                    }
+                }
+
+                return 0;
+            }
+        }
+
+        #endregion
+
         #region static method IsIPAddress
 
         /// <summary>
