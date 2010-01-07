@@ -120,6 +120,16 @@ namespace LumiSoft.Net.IMAP
         /// <returns>Returns this as string.</returns>
         public override string ToString()
         {
+            return ToString(false);
+        }
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <param name="encode">If true, folder name is encoded with IMAP UTF-7 encoding.</param>
+        /// <returns>Returns this as string.</returns>
+        public string ToString(bool encode)
+        {
             // Example:    S: * LIST (\Noselect) "/" ~/Mail/foo
 
             StringBuilder retVal = new StringBuilder();
@@ -134,7 +144,12 @@ namespace LumiSoft.Net.IMAP
             }
             retVal.Append(") ");
             retVal.Append("\"" + m_Delimiter + "\" ");
-            retVal.Append("\"" + m_FolderName + "\"\r\n");
+            if(encode){
+                retVal.Append("\"" + IMAP_Utils.Encode_IMAP_UTF7_String(m_FolderName) + "\"\r\n");
+            }
+            else{
+                retVal.Append("\"" + m_FolderName + "\"\r\n");
+            }
 
             return retVal.ToString();
         }

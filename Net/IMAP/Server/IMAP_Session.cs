@@ -1113,7 +1113,7 @@ namespace LumiSoft.Net.IMAP.Server
             else{
                 IMAP_e_List e = OnList(refName,folder);
                 foreach(IMAP_r_u_List r in e.Folders){
-                    response.Append(r.ToString());
+                    response.Append(r.ToString(true));
                 }
             }
                         
@@ -1415,7 +1415,7 @@ namespace LumiSoft.Net.IMAP.Server
             
             IMAP_e_LSub e = OnLSub(refName,folder);
             foreach(IMAP_r_u_LSub r in e.Folders){
-                response.Append(r.ToString());
+                response.Append(r.ToString(true));
             }
                                     
             response.Append(cmdTag + " OK LSUB Completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds.\r\n");
