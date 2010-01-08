@@ -3118,7 +3118,7 @@ namespace LumiSoft.Net.IMAP.Server
                             maxCount = ((IMAP_Fetch_DataItem_BodyPeek)dataItem).MaxCount;
                         }
 
-                        using(FileStream tmpFs = File.Create(Path.GetTempFileName())){
+                        using(FileStream tmpFs = File.Create(Path.GetTempFileName(),8000,FileOptions.DeleteOnClose)){
                             // Empty section, full message wanted.
                             if(string.IsNullOrEmpty(section)){
                                 message.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8);
@@ -3312,7 +3312,7 @@ namespace LumiSoft.Net.IMAP.Server
                     #region RFC822
 
                     else if(dataItem is IMAP_Fetch_DataItem_Rfc822){
-                        using(FileStream tmpFs = File.Create(Path.GetTempFileName())){
+                        using(FileStream tmpFs = File.Create(Path.GetTempFileName(),8000,FileOptions.DeleteOnClose)){
                             message.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8);
                             tmpFs.Position = 0;
 
@@ -3355,7 +3355,7 @@ namespace LumiSoft.Net.IMAP.Server
                     #region RFC822.TEXT
 
                     else if(dataItem is IMAP_Fetch_DataItem_Rfc822Text){
-                        using(FileStream tmpFs = File.Create(Path.GetTempFileName())){
+                        using(FileStream tmpFs = File.Create(Path.GetTempFileName(),8000,FileOptions.DeleteOnClose)){
                             message.Body.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8,false);
                             tmpFs.Position = 0;
 
