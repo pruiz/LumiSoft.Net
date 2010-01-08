@@ -28,6 +28,16 @@ namespace LumiSoft.Net.MIME
 
             m_pEncodedDataStream = new FileStream(Path.GetTempFileName(),FileMode.Create,FileAccess.ReadWrite,FileShare.None,32000,FileOptions.DeleteOnClose);
         }
+
+        /// <summary>
+        /// Destructor - Just incase user won't call dispose.
+        /// </summary>
+        ~MIME_b_SinglepartBase()
+        {
+            if(m_pEncodedDataStream != null){
+                m_pEncodedDataStream.Close();
+            }
+        }
         
   
         #region override SetParent
