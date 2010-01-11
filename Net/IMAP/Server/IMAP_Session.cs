@@ -2092,6 +2092,11 @@ namespace LumiSoft.Net.IMAP.Server
 
                 return;
             }
+            if(string.IsNullOrEmpty(cmdText)){
+                WriteLine(cmdTag + " BAD Error in arguments.");
+
+                return;
+            }
             
             string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
 
