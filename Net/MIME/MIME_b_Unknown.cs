@@ -44,14 +44,15 @@ namespace LumiSoft.Net.MIME
                 throw new ArgumentNullException("stream");
             }
 
-            MIME_b_Unknown retVal = null;
-            if(owner.ContentType != null){
-                retVal = new MIME_b_Unknown(owner.ContentType.TypeWithSubype);
+            string mediaType = null;
+            try{
+                mediaType = owner.ContentType.TypeWithSubype;
             }
-            else{
-                retVal = new MIME_b_Unknown(defaultContentType.TypeWithSubype);
+            catch{
+                mediaType = "unparsable/unparsable";
             }
 
+            MIME_b_Unknown retVal = new MIME_b_Unknown(mediaType);
             Net_Utils.StreamCopy(stream,retVal.EncodedStream,32000);
 
             return retVal;

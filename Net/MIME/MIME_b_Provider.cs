@@ -57,8 +57,14 @@ namespace LumiSoft.Net.MIME
             }
 
             string mediaType = defaultContentType.TypeWithSubype;
-            if(owner.ContentType != null){
-                mediaType = owner.ContentType.TypeWithSubype;
+            try{
+                if(owner.ContentType != null){
+                    mediaType = owner.ContentType.TypeWithSubype;
+                }
+            }
+            catch{
+                // Do nothing, content will be MIME_b_Unknown.
+                mediaType = "unknown/unknown";
             }
 
             Type bodyType = null;
