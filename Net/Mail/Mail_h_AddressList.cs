@@ -66,90 +66,20 @@ namespace LumiSoft.Net.Mail
             if(name_value.Length != 2){
                 throw new ParseException("Invalid header field value '" + value + "'.");
             }
-
-            MIME_Reader r = new MIME_Reader(name_value[1].Trim());
-
+                        
             /* RFC 5322 3.4.
                 address         =   mailbox / group
-
                 mailbox         =   name-addr / addr-spec
-
                 name-addr       =   [display-name] angle-addr
-
                 angle-addr      =   [CFWS] "<" addr-spec ">" [CFWS] / obs-angle-addr
-
                 group           =   display-name ":" [group-list] ";" [CFWS]
-
                 display-name    =   phrase
-
                 mailbox-list    =   (mailbox *("," mailbox)) / obs-mbox-list
-
                 address-list    =   (address *("," address)) / obs-addr-list
-
                 group-list      =   mailbox-list / CFWS / obs-group-list
             */
 
-            Mail_h_AddressList retVal = new Mail_h_AddressList(name_value[0],new Mail_t_AddressList());
-
-            while(true){
-                string word = r.QuotedReadToDelimiter(new char[]{',','<',':'});
-                // We processed all data.
-                if(word == null && r.Available == 0){
-                    break;
-                }
-                // group
-                else if(r.Peek(true) == ':'){
-                    Mail_t_Group group = new Mail_t_Group(word != null ? MIME_Encoding_EncodedWord.DecodeS(TextUtils.UnQuoteString(word)) : null);
-                    // Consume ':'
-                    r.Char(true);
-           
-                    while(true){
-                        word = r.QuotedReadToDelimiter(new char[]{',','<',':',';'});
-                        // We processed all data.
-                        if((word == null && r.Available == 0) || r.Peek(false) == ';'){
-                            break;
-                        }
-                        // In valid address list value.
-                        else if(word == string.Empty){
-                            throw new ParseException("Invalid address-list value '" + value + "'.");
-                        }
-                        // name-addr
-                        else if(r.Peek(true) == '<'){  
-                            group.Members.Add(new Mail_t_Mailbox(word != null ? MIME_Encoding_EncodedWord.DecodeS(TextUtils.UnQuoteString(word)) : null,r.ReadParenthesized()));                    
-                        }
-                        // addr-spec
-                        else{
-                            group.Members.Add(new Mail_t_Mailbox(null,word));
-                        }
-                       
-                        // We reached at the end of group.
-                        if(r.Peek(true) == ';'){
-                            r.Char(true);
-                            break;
-                        }
-                        // We have more addresses.
-                        if(r.Peek(true) == ','){
-                            r.Char(false);
-                        }
-                    }
-
-                    retVal.m_pAddresses.Add(group);
-                }
-                // name-addr
-                else if(r.Peek(true) == '<'){
-                    retVal.m_pAddresses.Add(new Mail_t_Mailbox(word != null ? MIME_Encoding_EncodedWord.DecodeS(TextUtils.UnQuoteString(word.Trim())) : null,r.ReadParenthesized()));                    
-                }
-                // addr-spec
-                else{
-                    retVal.m_pAddresses.Add(new Mail_t_Mailbox(null,word));
-                }
-
-                // We have more addresses.
-                if(r.Peek(true) == ','){
-                    r.Char(false);
-                }
-            }
-
+            Mail_h_AddressList retVal = new Mail_h_AddressList(name_value[0],Mail_t_AddressList.Parse(name_value[1].Trim()));
             retVal.m_ParseValue = value;
             retVal.m_pAddresses.AcceptChanges();
 
