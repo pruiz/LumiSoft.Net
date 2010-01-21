@@ -3,11 +3,19 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 
+using LumiSoft.Net.MIME;
+
 namespace LumiSoft.Net.Mail
 {
     /// <summary>
     /// This class represents <b>mailbox-list</b>. Defined in RFC 5322 3.4.
     /// </summary>
+    /// <example>
+    /// <code>
+    /// RFC 5322.
+    ///     mailbox-list =  (mailbox *("," mailbox)) / obs-mbox-list
+    /// </code>
+    /// </example>
     public class Mail_t_MailboxList : IEnumerable
     {
         private bool                 m_IsModified = false;
@@ -20,6 +28,50 @@ namespace LumiSoft.Net.Mail
         {
             m_pList = new List<Mail_t_Mailbox>();
         }
+
+
+        #region static method Parse
+
+        /// <summary>
+        /// Parses <b>mailbox-list</b> from specified string value.
+        /// </summary>
+        /// <param name="value">The <b>mailbox-list</b> string value.</param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>value</b> is null reference.</exception>
+        /// <exception cref="ParseException">Is raised when <b>value</b> is not valid <b>mailbox-list</b> value.</exception>
+        public static Mail_t_MailboxList Parse(string value)
+        {
+            if(value == null){
+                throw new ArgumentNullException("value");
+            }
+
+            MIME_Reader        r      = new MIME_Reader(value);
+            Mail_t_MailboxList retVal = new Mail_t_MailboxList();
+            while(true){
+                string word = r.QuotedReadToDelimiter(new char[]{',','<'});
+                // We processed all data.
+                if(string.IsNullOrEmpty(word) && r.Available == 0){
+                    break;
+                }
+                // name-addr
+                else if(r.Peek(true) == '<'){
+                    retVal.Add(new Mail_t_Mailbox(word != null ? MIME_Encoding_EncodedWord.DecodeS(TextUtils.UnQuoteString(word.Trim())) : null,r.ReadParenthesized()));                    
+                }
+                // addr-spec
+                else{
+                    retVal.Add(new Mail_t_Mailbox(null,word));
+                }
+
+                // We have more addresses.
+                if(r.Peek(true) == ','){
+                    r.Char(false);
+                }
+            }
+
+            return retVal;
+        }
+
+        #endregion
 
 
         #region method Insert

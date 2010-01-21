@@ -3,11 +3,20 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 
+using LumiSoft.Net.MIME;
+
 namespace LumiSoft.Net.Mail
 {
     /// <summary>
     /// This class represents <b>address-list</b>. Defined in RFC 5322 3.4.
     /// </summary>
+    /// <example>
+    /// <code>
+    /// RFC 5322.
+    ///     address-list = (address *("," address))
+    ///     address      = mailbox / group
+    /// </code>
+    /// </example>
     public class Mail_t_AddressList : IEnumerable
     {
         private bool                 m_IsModified = false;
@@ -21,7 +30,101 @@ namespace LumiSoft.Net.Mail
             m_pList = new List<Mail_t_Address>();
         }
 
-        
+
+        #region static method Parse
+
+        /// <summary>
+        /// Parses <b>address-list</b> from specified string value.
+        /// </summary>
+        /// <param name="value">The <b>address-list</b> string value.</param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>value</b> is null reference.</exception>
+        /// <exception cref="ParseException">Is raised when <b>value</b> is not valid <b>address-list</b> value.</exception>
+        public static Mail_t_AddressList Parse(string value)
+        {
+            if(value == null){
+                throw new ArgumentNullException("value");
+            }
+
+            /* RFC 5322 3.4.
+                address         =   mailbox / group
+                mailbox         =   name-addr / addr-spec
+                name-addr       =   [display-name] angle-addr
+                angle-addr      =   [CFWS] "<" addr-spec ">" [CFWS] / obs-angle-addr
+                group           =   display-name ":" [group-list] ";" [CFWS]
+                display-name    =   phrase
+                mailbox-list    =   (mailbox *("," mailbox)) / obs-mbox-list
+                address-list    =   (address *("," address)) / obs-addr-list
+                group-list      =   mailbox-list / CFWS / obs-group-list
+            */
+
+            MIME_Reader        r      = new MIME_Reader(value);
+            Mail_t_AddressList retVal = new Mail_t_AddressList();
+            while(true){
+                string word = r.QuotedReadToDelimiter(new char[]{',','<',':'});
+                // We processed all data.
+                if(word == null && r.Available == 0){
+                    break;
+                }
+                // group
+                else if(r.Peek(true) == ':'){
+                    Mail_t_Group group = new Mail_t_Group(word != null ? MIME_Encoding_EncodedWord.DecodeS(TextUtils.UnQuoteString(word)) : null);
+                    // Consume ':'
+                    r.Char(true);
+           
+                    while(true){
+                        word = r.QuotedReadToDelimiter(new char[]{',','<',':',';'});
+                        // We processed all data.
+                        if((word == null && r.Available == 0) || r.Peek(false) == ';'){
+                            break;
+                        }
+                        // In valid address list value.
+                        else if(word == string.Empty){
+                            throw new ParseException("Invalid address-list value '" + value + "'.");
+                        }
+                        // name-addr
+                        else if(r.Peek(true) == '<'){  
+                            group.Members.Add(new Mail_t_Mailbox(word != null ? MIME_Encoding_EncodedWord.DecodeS(TextUtils.UnQuoteString(word)) : null,r.ReadParenthesized()));                    
+                        }
+                        // addr-spec
+                        else{
+                            group.Members.Add(new Mail_t_Mailbox(null,word));
+                        }
+                       
+                        // We reached at the end of group.
+                        if(r.Peek(true) == ';'){
+                            r.Char(true);
+                            break;
+                        }
+                        // We have more addresses.
+                        if(r.Peek(true) == ','){
+                            r.Char(false);
+                        }
+                    }
+
+                    retVal.Add(group);
+                }
+                // name-addr
+                else if(r.Peek(true) == '<'){
+                    retVal.Add(new Mail_t_Mailbox(word != null ? MIME_Encoding_EncodedWord.DecodeS(TextUtils.UnQuoteString(word.Trim())) : null,r.ReadParenthesized()));                    
+                }
+                // addr-spec
+                else{
+                    retVal.Add(new Mail_t_Mailbox(null,word));
+                }
+
+                // We have more addresses.
+                if(r.Peek(true) == ','){
+                    r.Char(false);
+                }
+            }
+
+            return retVal;
+        }
+
+        #endregion
+
+
         #region method Insert
 
         /// <summary>
