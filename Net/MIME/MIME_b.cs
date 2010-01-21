@@ -72,7 +72,7 @@ namespace LumiSoft.Net.MIME
             m_pEntity = entity;
 
             // Owner entity has no content-type or has different content-type, just add/overwrite it.
-            if(setContentType &&(entity.ContentType == null || !string.Equals(entity.ContentType.TypeWithSubype,this.MediaType,StringComparison.InvariantCultureIgnoreCase))){
+            if(setContentType &&(entity.ContentType == null || !string.Equals(entity.ContentType.TypeWithSubtype,this.MediaType,StringComparison.InvariantCultureIgnoreCase))){
                 entity.ContentType = m_pContentType;
             }
         }
@@ -118,7 +118,7 @@ namespace LumiSoft.Net.MIME
         /// </summary>
         public string MediaType
         {
-            get{ return m_pContentType.TypeWithSubype; }
+            get{ return m_pContentType.TypeWithSubtype; }
         }
 
         #endregion

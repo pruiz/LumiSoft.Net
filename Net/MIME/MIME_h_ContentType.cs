@@ -217,7 +217,16 @@ namespace LumiSoft.Net.MIME
         /// <summary>
         /// Gets media type with subtype as Type/SubType. Well known value are in <see cref="MIME_MediaTypes">MIME_MediaTypes</see>. For example: text/plain.
         /// </summary>
+        [Obsolete("Mispelled 'TypeWithSubype', use TypeWithSubtype instead !")]
         public string TypeWithSubype
+        {
+            get{ return m_Type + "/" + m_SubType; }
+        }
+
+        /// <summary>
+        /// Gets media type with subtype as Type/SubType. Well known value are in <see cref="MIME_MediaTypes">MIME_MediaTypes</see>. For example: text/plain.
+        /// </summary>
+        public string TypeWithSubtype
         {
             get{ return m_Type + "/" + m_SubType; }
         }

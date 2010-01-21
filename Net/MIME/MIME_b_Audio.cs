@@ -46,10 +46,10 @@ namespace LumiSoft.Net.MIME
 
             MIME_b_Audio retVal = null;
             if(owner.ContentType != null){
-                retVal = new MIME_b_Audio(owner.ContentType.TypeWithSubype);
+                retVal = new MIME_b_Audio(owner.ContentType.TypeWithSubtype);
             }
             else{
-                retVal = new MIME_b_Audio(defaultContentType.TypeWithSubype);
+                retVal = new MIME_b_Audio(defaultContentType.TypeWithSubtype);
             }
 
             Net_Utils.StreamCopy(stream,retVal.EncodedStream,32000);

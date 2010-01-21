@@ -46,7 +46,7 @@ namespace LumiSoft.Net.MIME
 
             string mediaType = null;
             try{
-                mediaType = owner.ContentType.TypeWithSubype;
+                mediaType = owner.ContentType.TypeWithSubtype;
             }
             catch{
                 mediaType = "unparsable/unparsable";

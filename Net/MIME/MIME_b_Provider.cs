@@ -56,10 +56,10 @@ namespace LumiSoft.Net.MIME
                 throw new ArgumentNullException("defaultContentType");
             }
 
-            string mediaType = defaultContentType.TypeWithSubype;
+            string mediaType = defaultContentType.TypeWithSubtype;
             try{
                 if(owner.ContentType != null){
-                    mediaType = owner.ContentType.TypeWithSubype;
+                    mediaType = owner.ContentType.TypeWithSubtype;
                 }
             }
             catch{

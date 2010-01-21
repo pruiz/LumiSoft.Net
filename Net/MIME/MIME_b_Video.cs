@@ -50,10 +50,10 @@ namespace LumiSoft.Net.MIME
 
             MIME_b_Video retVal = null;
             if(owner.ContentType != null){
-                retVal = new MIME_b_Video(owner.ContentType.TypeWithSubype);
+                retVal = new MIME_b_Video(owner.ContentType.TypeWithSubtype);
             }
             else{
-                retVal = new MIME_b_Video(defaultContentType.TypeWithSubype);
+                retVal = new MIME_b_Video(defaultContentType.TypeWithSubtype);
             }
 
             Net_Utils.StreamCopy(stream,retVal.EncodedStream,32000);

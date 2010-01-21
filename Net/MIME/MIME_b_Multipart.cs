@@ -579,7 +579,7 @@ namespace LumiSoft.Net.MIME
             }
             
             MIME_b_Multipart retVal = new MIME_b_Multipart(owner.ContentType);
-            ParseInternal(owner,owner.ContentType.TypeWithSubype,stream,retVal);
+            ParseInternal(owner,owner.ContentType.TypeWithSubtype,stream,retVal);
 
             return retVal;
         }
@@ -644,7 +644,7 @@ namespace LumiSoft.Net.MIME
             base.SetParent(entity,setContentType);
 
             // Owner entity has no content-type or has different content-type, just add/overwrite it.
-            if(setContentType && (this.Entity.ContentType == null || !string.Equals(this.Entity.ContentType.TypeWithSubype,this.MediaType,StringComparison.InvariantCultureIgnoreCase))){
+            if(setContentType && (this.Entity.ContentType == null || !string.Equals(this.Entity.ContentType.TypeWithSubtype,this.MediaType,StringComparison.InvariantCultureIgnoreCase))){
                 this.Entity.ContentType = m_pContentType;
             }
         }

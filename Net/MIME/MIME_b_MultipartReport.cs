@@ -23,7 +23,7 @@ namespace LumiSoft.Net.MIME
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         public MIME_b_MultipartReport(MIME_h_ContentType contentType) : base(contentType)
         {
-            if(!string.Equals(contentType.TypeWithSubype,"multipart/report",StringComparison.CurrentCultureIgnoreCase)){
+            if(!string.Equals(contentType.TypeWithSubtype,"multipart/report",StringComparison.CurrentCultureIgnoreCase)){
                 throw new ArgumentException("Argument 'contentType.TypeWithSubype' value must be 'multipart/report'.");
             }
             //if(contentType.Parameters["report-type"] == null){
@@ -58,7 +58,7 @@ namespace LumiSoft.Net.MIME
             }
             
             MIME_b_MultipartReport retVal = new MIME_b_MultipartReport(owner.ContentType);
-            ParseInternal(owner,owner.ContentType.TypeWithSubype,stream,retVal);
+            ParseInternal(owner,owner.ContentType.TypeWithSubtype,stream,retVal);
 
             return retVal;
         }

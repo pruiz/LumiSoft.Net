@@ -19,7 +19,7 @@ namespace LumiSoft.Net.MIME
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         public MIME_b_MultipartEncrypted(MIME_h_ContentType contentType) : base(contentType)
         {
-            if(!string.Equals(contentType.TypeWithSubype,"multipart/encrypted",StringComparison.CurrentCultureIgnoreCase)){
+            if(!string.Equals(contentType.TypeWithSubtype,"multipart/encrypted",StringComparison.CurrentCultureIgnoreCase)){
                 throw new ArgumentException("Argument 'contentType.TypeWithSubype' value must be 'multipart/encrypted'.");
             }
         }
@@ -51,7 +51,7 @@ namespace LumiSoft.Net.MIME
             }
             
             MIME_b_MultipartEncrypted retVal = new MIME_b_MultipartEncrypted(owner.ContentType);
-            ParseInternal(owner,owner.ContentType.TypeWithSubype,stream,retVal);
+            ParseInternal(owner,owner.ContentType.TypeWithSubtype,stream,retVal);
 
             return retVal;
         }

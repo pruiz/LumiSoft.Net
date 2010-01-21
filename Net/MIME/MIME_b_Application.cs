@@ -51,10 +51,10 @@ namespace LumiSoft.Net.MIME
 
             MIME_b_Application retVal = null;
             if(owner.ContentType != null){
-                retVal = new MIME_b_Application(owner.ContentType.TypeWithSubype);
+                retVal = new MIME_b_Application(owner.ContentType.TypeWithSubtype);
             }
             else{
-                retVal = new MIME_b_Application(defaultContentType.TypeWithSubype);
+                retVal = new MIME_b_Application(defaultContentType.TypeWithSubtype);
             }
 
             Net_Utils.StreamCopy(stream,retVal.EncodedStream,32000);

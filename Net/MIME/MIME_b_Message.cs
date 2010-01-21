@@ -46,10 +46,10 @@ namespace LumiSoft.Net.MIME
 
             MIME_b_Message retVal = null;
             if(owner.ContentType != null){
-                retVal = new MIME_b_Message(owner.ContentType.TypeWithSubype);
+                retVal = new MIME_b_Message(owner.ContentType.TypeWithSubtype);
             }
             else{
-                retVal = new MIME_b_Message(defaultContentType.TypeWithSubype);
+                retVal = new MIME_b_Message(defaultContentType.TypeWithSubtype);
             }
 
             Net_Utils.StreamCopy(stream,retVal.EncodedStream,32000);

@@ -52,7 +52,7 @@ namespace LumiSoft.Net.MIME
             base.SetParent(entity,setContentType);
 
             // Owner entity has no content-type or has different content-type, just add/overwrite it.
-            if(setContentType && (this.Entity.ContentType == null || !string.Equals(this.Entity.ContentType.TypeWithSubype,this.MediaType,StringComparison.InvariantCultureIgnoreCase))){
+            if(setContentType && (this.Entity.ContentType == null || !string.Equals(this.Entity.ContentType.TypeWithSubtype,this.MediaType,StringComparison.InvariantCultureIgnoreCase))){
                 this.Entity.ContentType = new MIME_h_ContentType(MediaType);
             }
         }
@@ -141,7 +141,7 @@ namespace LumiSoft.Net.MIME
             }
 
             // Owner entity has no content-type or has different content-type, just add/overwrite it.
-            if(this.Entity.ContentType == null || !string.Equals(this.Entity.ContentType.TypeWithSubype,this.MediaType,StringComparison.InvariantCultureIgnoreCase)){
+            if(this.Entity.ContentType == null || !string.Equals(this.Entity.ContentType.TypeWithSubtype,this.MediaType,StringComparison.InvariantCultureIgnoreCase)){
                 this.Entity.ContentType = new MIME_h_ContentType(this.MediaType);
             }
             this.Entity.ContentTransferEncoding = contentTransferEncoding;

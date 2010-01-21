@@ -22,7 +22,7 @@ namespace LumiSoft.Net.MIME
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         public MIME_b_MultipartDigest(MIME_h_ContentType contentType) : base(contentType)
         {
-            if(!string.Equals(contentType.TypeWithSubype,"multipart/digest",StringComparison.CurrentCultureIgnoreCase)){
+            if(!string.Equals(contentType.TypeWithSubtype,"multipart/digest",StringComparison.CurrentCultureIgnoreCase)){
                 throw new ArgumentException("Argument 'contentType.TypeWithSubype' value must be 'multipart/digest'.");
             }
         }
@@ -54,7 +54,7 @@ namespace LumiSoft.Net.MIME
             }
             
             MIME_b_MultipartDigest retVal = new MIME_b_MultipartDigest(owner.ContentType);
-            ParseInternal(owner,owner.ContentType.TypeWithSubype,stream,retVal);
+            ParseInternal(owner,owner.ContentType.TypeWithSubtype,stream,retVal);
 
             return retVal;
         }
