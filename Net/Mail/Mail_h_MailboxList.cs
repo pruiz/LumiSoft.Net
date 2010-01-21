@@ -68,41 +68,13 @@ namespace LumiSoft.Net.Mail
 
             /* RFC 5322 3.4.
                 mailbox       =   name-addr / addr-spec
-
                 name-addr     =   [display-name] angle-addr
-
                 angle-addr    =   [CFWS] "<" addr-spec ">" [CFWS] / obs-angle-addr
-
                 display-name  =   phrase
-
                 mailbox-list  =   (mailbox *("," mailbox)) / obs-mbox-list
             */
 
-            MIME_Reader r = new MIME_Reader(name_value[1].Trim());
-
-            Mail_h_MailboxList retVal = new Mail_h_MailboxList(name_value[0],new Mail_t_MailboxList());
-
-            while(true){
-                string word = r.QuotedReadToDelimiter(new char[]{',','<'});
-                // We processed all data.
-                if(string.IsNullOrEmpty(word) && r.Available == 0){
-                    break;
-                }
-                // name-addr
-                else if(r.Peek(true) == '<'){
-                    retVal.m_pAddresses.Add(new Mail_t_Mailbox(word != null ? MIME_Encoding_EncodedWord.DecodeS(TextUtils.UnQuoteString(word.Trim())) : null,r.ReadParenthesized()));                    
-                }
-                // addr-spec
-                else{
-                    retVal.m_pAddresses.Add(new Mail_t_Mailbox(null,word));
-                }
-
-                // We have more addresses.
-                if(r.Peek(true) == ','){
-                    r.Char(false);
-                }
-            }
-
+            Mail_h_MailboxList retVal = new Mail_h_MailboxList(name_value[0],Mail_t_MailboxList.Parse(name_value[1].Trim()));
             retVal.m_ParseValue = value;
             retVal.m_pAddresses.AcceptChanges();
 
