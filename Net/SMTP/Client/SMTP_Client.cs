@@ -1693,10 +1693,62 @@ namespace LumiSoft.Net.SMTP.Client
         /// </summary>
         /// <param name="host">Host name or IP address.</param>
         /// <param name="port">Host port.</param>
+        /// <param name="ssl">Specifies if connected via SSL.</param>
+        /// <param name="message">Mail message to send.</param>
+        /// <exception cref="ArgumentNullException">Is raised when argument <b>host</b> or <b>message</b> is null.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the method arguments has invalid value.</exception>
+        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
+        public static void QuickSendSmartHost(string host,int port,bool ssl,Mail_Message message)
+        {
+            if(message == null){
+                throw new ArgumentNullException("message");
+            }
+
+            string from = "";
+            if(message.From != null && message.From.Count > 0){
+                from = ((Mail_t_Mailbox)message.From[0]).Address;
+            }
+
+            List<string> recipients = new List<string>();
+            if(message.To != null){
+				Mail_t_Mailbox[] addresses = message.To.Mailboxes;	
+				foreach(Mail_t_Mailbox address in addresses){
+					recipients.Add(address.Address);
+				}
+			}
+			if(message.Cc != null){
+				Mail_t_Mailbox[] addresses = message.Cc.Mailboxes;				
+				foreach(Mail_t_Mailbox address in addresses){
+					recipients.Add(address.Address);
+				}
+			}
+			if(message.Bcc != null){
+				Mail_t_Mailbox[] addresses = message.Bcc.Mailboxes;				
+				foreach(Mail_t_Mailbox address in addresses){
+					recipients.Add(address.Address);
+				}
+
+                // We must hide BCC
+                message.Bcc.Clear();
+			}
+
+            foreach(string recipient in recipients){
+                MemoryStream ms = new MemoryStream();
+                message.ToStream(ms,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.Q,Encoding.UTF8),Encoding.UTF8);
+                ms.Position = 0;
+                QuickSendSmartHost(null,host,port,ssl,null,null,from,new string[]{recipient},ms);
+            }            
+        }
+
+        /// <summary>
+        /// Sends message by using specified smart host.
+        /// </summary>
+        /// <param name="host">Host name or IP address.</param>
+        /// <param name="port">Host port.</param>
         /// <param name="from">Sender email what is reported to SMTP server.</param>
         /// <param name="to">Recipients email addresses.</param>
         /// <param name="message">Raw message to send.</param>
-        /// <exception cref="ArgumentNullException">Is raised when argument <b>host</b>,<b>from</b>,<b>to</b> or <b>stream</b> is null.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when argument <b>host</b>,<b>from</b>,<b>to</b> or <b>message</b> is null.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the method arguments has invalid value.</exception>
         /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
         public static void QuickSendSmartHost(string host,int port,string from,string[] to,Stream message)
