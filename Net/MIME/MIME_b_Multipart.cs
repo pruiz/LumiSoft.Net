@@ -160,13 +160,16 @@ namespace LumiSoft.Net.MIME
                     attached to the boundary so that it is possible to have a part that
                     does not end with a CRLF (line  break).  
                 */
-
-                m_pPreviousLine = null;
-
+                
+                if(m_State == State.InBoundary){
+                    throw new InvalidOperationException("You must read all boundary data, before calling this method.");
+                }
                 if(m_State == State.Done){
                     return false;
                 }
                 else if(m_State == State.SeekFirst){
+                    m_pPreviousLine = null;
+
                     while(true){
                         m_pStream.ReadLine(m_pReadLineOP,false);                                                
                         if(m_pReadLineOP.Error != null){
@@ -211,11 +214,12 @@ namespace LumiSoft.Net.MIME
                     }                   
                 }
                 else if(m_State == State.ReadNext){
+                    m_pPreviousLine = null;
                     m_State = State.InBoundary;
 
                     return true;
                 }
-                
+           
                 return false;
             }
 
@@ -615,8 +619,8 @@ namespace LumiSoft.Net.MIME
                 throw new ArgumentNullException("body");
             }
 
-            _MultipartReader multipartReader = new _MultipartReader(stream,owner.ContentType.Param_Boundary);
-            while(multipartReader.Next()){                
+            _MultipartReader multipartReader = new _MultipartReader(stream,owner.ContentType.Param_Boundary);       
+            while(multipartReader.Next()){
                 MIME_Entity entity = new MIME_Entity();
                 entity.Parse(new SmartStream(multipartReader,false),Encoding.UTF8,body.DefaultBodyPartContentType);
                 body.m_pBodyParts.Add(entity);
