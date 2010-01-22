@@ -74,19 +74,20 @@ namespace LumiSoft.Net.MIME
                 throw new ArgumentNullException("stream");
             }
 
+            // We need to buffer all body data, otherwise we don't know if we have readed all data 
+            // from stream.
+            MemoryStream msBuffer = new MemoryStream();
+            Net_Utils.StreamCopy(stream,msBuffer,32000);
+            msBuffer.Position = 0;            
+
             MIME_b_MessageDeliveryStatus retVal = new MIME_b_MessageDeliveryStatus();
             //Pare per-message fields.
             retVal.m_pMessageFields.Parse(stream);
             // Parse per-recipient fields.
-            while(true){
+            while(msBuffer.Position < msBuffer.Length){
                 MIME_h_Collection recipientFields = new MIME_h_Collection(new MIME_h_Provider());
-                recipientFields.Parse(stream);
-                if(recipientFields.Count == 0){
-                    break;
-                }
-                else{
-                    retVal.m_pRecipientBlocks.Add(recipientFields);
-                }
+                recipientFields.Parse(new SmartStream(msBuffer,true));
+                retVal.m_pRecipientBlocks.Add(recipientFields);                
             }                     
 
             return retVal;
