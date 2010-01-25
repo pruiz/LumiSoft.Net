@@ -1928,7 +1928,7 @@ namespace LumiSoft.Net.Mail
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                foreach(MIME_Entity e in this.AllEntities){
+                foreach(MIME_Entity e in GetAllEntities(false)){
                     if(e.Body.MediaType.ToLower() == MIME_MediaTypes.Text.plain){
                         return ((MIME_b_Text)e.Body).Text;
                     }
@@ -1949,7 +1949,7 @@ namespace LumiSoft.Net.Mail
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                foreach(MIME_Entity e in this.AllEntities){
+                foreach(MIME_Entity e in GetAllEntities(false)){
                     if(e.Body.MediaType.ToLower() == MIME_MediaTypes.Text.html){
                         return ((MIME_b_Text)e.Body).Text;
                     }
