@@ -181,6 +181,48 @@ namespace LumiSoft.Net.MIME
         #endregion
 
 
+        #region method GetAllEntities
+
+        /// <summary>
+        /// Gets all MIME entities as list.
+        /// </summary>
+        /// <param name="includeEmbbedMessage">If true, then embbed RFC822 message child entities as included.</param>
+        /// <returns>Returns all MIME entities as list.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this class is disposed and this method is accessed.</exception>
+        public MIME_Entity[] GetAllEntities(bool includeEmbbedMessage)
+        {
+            if(m_IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+
+            List<MIME_Entity>  retVal       = new List<MIME_Entity>();
+            List<MIME_Entity> entitiesQueue = new List<MIME_Entity>();
+            entitiesQueue.Add(this);
+            
+            while(entitiesQueue.Count > 0){
+                MIME_Entity currentEntity = entitiesQueue[0];
+                entitiesQueue.RemoveAt(0);
+        
+                retVal.Add(currentEntity);
+
+                // Current entity is multipart entity, add it's body-parts for processing.
+                if(this.Body != null && currentEntity.Body.GetType().IsSubclassOf(typeof(MIME_b_Multipart))){
+                    MIME_EntityCollection bodyParts = ((MIME_b_Multipart)currentEntity.Body).BodyParts;
+                    for(int i=0;i<bodyParts.Count;i++){
+                        entitiesQueue.Insert(i,bodyParts[i]);
+                    }
+                }
+                // Add embbed message for processing (Embbed message entities will be included).
+                else if(includeEmbbedMessage && this.Body != null && currentEntity.Body is MIME_b_MessageRfc822){
+                    entitiesQueue.Add(((MIME_b_MessageRfc822)currentEntity.Body).Message);
+                }
+            }
+
+            return retVal.ToArray();
+        }
+
+        #endregion
+
         #region method GetEntityByCID
 
         /// <summary>
