@@ -194,6 +194,32 @@ namespace LumiSoft.Net.MIME
             }
 
             /* RFC 2231.
+                Character set and language information may be combined with the
+                parameter continuation mechanism. For example:
+
+                Content-Type: application/x-stuff
+                    title*0*=us-ascii'en'This%20is%20even%20more%20
+                    title*1*=%2A%2A%2Afun%2A%2A%2A%20
+                    title*2="isn't it!"
+
+                Note that:
+
+                (1) Language and character set information only appear at
+                    the beginning of a given parameter value.
+
+                (2) Continuations do not provide a facility for using more
+                    than one character set or language in the same
+                    parameter value.
+
+                (3) A value presented using multiple continuations may
+                    contain a mixture of encoded and unencoded segments.
+
+                (4) The first segment of a continuation MUST be encoded if
+                    language and character set information are given.
+
+                (5) If the first segment of a continued parameter value is
+                    encoded the language and character set field delimiters
+                    MUST be present even when the fields are left blank.
             */
 
             while(true){
@@ -225,7 +251,7 @@ namespace LumiSoft.Net.MIME
                         string[] name_x_no_x = name.Split('*');
                         name = name_x_no_x[0];
                         
-                        Encoding      charset     = Encoding.ASCII;
+                        Encoding      charset     = Encoding.UTF8;
                         StringBuilder valueBuffer = new StringBuilder();
                         // We must have charset'language'value.
                         // Examples:
@@ -234,9 +260,9 @@ namespace LumiSoft.Net.MIME
                         if((name_x_no_x.Length == 2 && name_x_no_x[1] == "") || name_x_no_x.Length == 3){                            
                             string[] charset_language_value = value.Split('\'');
                             charset = Encoding.GetEncoding(charset_language_value[0]);
-                            valueBuffer.Append(DecodeExtOctet(charset_language_value[2],charset));
+                            valueBuffer.Append(charset_language_value[2]);
                         }
-                        // No encoding, probably just splitted ASCII value.
+                        // No encoding, probably just splitted ASCII/UTF-8 value.
                         // Example:
                         //     URL*0="value1";
                         //     URL*1="value2";
@@ -267,13 +293,13 @@ namespace LumiSoft.Net.MIME
                                     string v = reader.Word();
                                     // Normally value may not be null, but following case: paramName=EOS.
                                     if(v != null){
-                                        valueBuffer.Append(DecodeExtOctet(v,charset));
+                                        valueBuffer.Append(v);
                                     }
                                 }
                             }
                         }
-                                                 
-                        this[name] = valueBuffer.ToString();
+                          
+                        this[name] = DecodeExtOctet(valueBuffer.ToString(),charset);
                     }
                     // Regular parameter.
                     else{
