@@ -194,6 +194,12 @@ namespace LumiSoft.Net.MIME
             }
 
             /* RFC 2231.
+                Asterisks ("*") are reused to provide the indicator that language and
+                character set information is present and encoding is being used. A
+                single quote ("'") is used to delimit the character set and language
+                information at the beginning of the parameter value. Percent signs
+                ("%") are used as the encoding flag, which agrees with RFC 2047.
+                         
                 Character set and language information may be combined with the
                 parameter continuation mechanism. For example:
 
@@ -248,11 +254,90 @@ namespace LumiSoft.Net.MIME
                
                     // RFC 2231 encoded/splitted parameter.
                     if(name.IndexOf('*') > -1){
-                        string[] name_x_no_x = name.Split('*');
-                        name = name_x_no_x[0];
-                        
-                        Encoding      charset     = Encoding.UTF8;
+                        /* Read all parameter parts, sort and decode.
+                         
+                           NOTE: Some email client/servers won't honour order of parameter parts, they use random order.
+                                 For example:
+                                    title*1*=%2A%2A%2Afun%2A%2A%2A%20
+                                    title*2="isn't it!"
+                                    title*0*=us-ascii'en'This%20is%20even%20more%20
+                        */
+                        try{
+                        SortedList<int,string> parmeterParts = new SortedList<int,string>();
+                        Encoding               charset       = Encoding.UTF8;
+                        while(true){
+                            string[] name_partNo = name.Split('*');
+                            int      partNo      = 0;  
+                            bool     encoded     = false;
+                            // We have: title*=
+                            if(name_partNo.Length == 2 && name.EndsWith("*")){
+                                partNo  = 0;
+                                encoded = true;
+                            }
+                            // We have: title*0=
+                            else if(name_partNo.Length == 2){
+                                partNo = Convert.ToInt32(name_partNo[1]);
+                            }
+                            // We have: title*0*=
+                            else{
+                                partNo  = Convert.ToInt32(name_partNo[1]);
+                                encoded = true;
+                            }
+
+                            string v = "";
+                            // First part has encoding and language parts, if encoded '*' was specified.
+                            if(partNo == 0 && encoded){
+                                string[] charset_language_value = value.Split('\'');
+                                charset = Encoding.GetEncoding(charset_language_value[0]);
+                                v = charset_language_value[2];
+                            }
+                            else{
+                                v = value;
+                            }
+
+                            if(!parmeterParts.ContainsKey(partNo)){
+                                parmeterParts.Add(partNo,v);
+                            }
+
+
+                            reader.ToFirstChar();
+                            // End of stream reached.
+                            if(reader.Peek(true) == -1){
+                                break;
+                            }
+                            // Next parameter start, just eat that char.
+                            else if(reader.Peek(true) == ';'){
+                                reader.Char(false);
+                            }
+                            else{
+                                if(!reader.StartsWith(name.Split('*')[0] + "*")){
+                                    break;
+                                }
+                                name = reader.Token();
+
+                                // Parameter value specified.
+                                if(reader.Peek(true) == '='){
+                                    reader.Char(false);
+                                    value = reader.Word();
+                                    // Normally value may not be null, but following case: paramName=EOS.
+                                    if(value == null){
+                                        value = "";
+                                    }
+                                }
+                            }
+                        }
+
                         StringBuilder valueBuffer = new StringBuilder();
+                        foreach(string part in parmeterParts.Values){
+                            valueBuffer.Append(part);
+                        }
+                    
+                        this[name.Split('*')[0]] = DecodeExtOctet(valueBuffer.ToString(),charset);
+                        }
+                        catch(Exception x){
+                            System.Windows.Forms.MessageBox.Show(x.ToString());
+                        }
+                        /* REMOVE ME:
                         // We must have charset'language'value.
                         // Examples:
                         //      URL*=utf-8''test;
@@ -264,8 +349,8 @@ namespace LumiSoft.Net.MIME
                         }
                         // No encoding, probably just splitted ASCII/UTF-8 value.
                         // Example:
-                        //     URL*0="value1";
-                        //     URL*1="value2";
+                        //     URL*0=value1;
+                        //     URL*1=value2;
                         else{
                             valueBuffer.Append(value);
                         }
@@ -299,7 +384,7 @@ namespace LumiSoft.Net.MIME
                             }
                         }
                           
-                        this[name] = DecodeExtOctet(valueBuffer.ToString(),charset);
+                        this[name] = DecodeExtOctet(valueBuffer.ToString(),charset);*/
                     }
                     // Regular parameter.
                     else{
