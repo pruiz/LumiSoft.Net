@@ -1893,22 +1893,37 @@ namespace LumiSoft.Net.Mail
 
                 List<MIME_Entity> retVal = new List<MIME_Entity>();
                 foreach(MIME_Entity entity in this.AllEntities){
-                    if(entity.ContentDisposition != null && string.Equals(entity.ContentDisposition.DispositionType,"attachment",StringComparison.InvariantCultureIgnoreCase)){
+                    MIME_h_ContentType contentType= null;
+                    try{
+                        contentType = entity.ContentType;
+                    }
+                    catch{
+                        // ContentType parsing failed.
+                    }
+                    MIME_h_ContentDisposition disposition = null;
+                    try{
+                        disposition = entity.ContentDisposition;
+                    }
+                    catch{
+                        // ContentDisposition parsing failed.
+                    }
+
+                    if(disposition != null && string.Equals(disposition.DispositionType,"attachment",StringComparison.InvariantCultureIgnoreCase)){
                         retVal.Add(entity);
                     }
-                    else if(entity.ContentType != null && entity.ContentType.Type.ToLower() == "application"){
+                    else if(contentType != null && contentType.Type.ToLower() == "application"){
                         retVal.Add(entity);
                     }
-                    else if(entity.ContentType != null && entity.ContentType.Type.ToLower() == "image"){
+                    else if(contentType != null && contentType.Type.ToLower() == "image"){
                         retVal.Add(entity);
                     }
-                    else if(entity.ContentType != null && entity.ContentType.Type.ToLower() == "video"){
+                    else if(contentType != null && contentType.Type.ToLower() == "video"){
                         retVal.Add(entity);
                     }
-                    else if(entity.ContentType != null && entity.ContentType.Type.ToLower() == "audio"){
+                    else if(contentType != null && contentType.Type.ToLower() == "audio"){
                         retVal.Add(entity);
                     }
-                    else if(entity.ContentType != null && entity.ContentType.Type.ToLower() == "message"){
+                    else if(contentType != null && contentType.Type.ToLower() == "message"){
                         retVal.Add(entity);
                     }
                 }
