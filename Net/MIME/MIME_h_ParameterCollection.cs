@@ -227,7 +227,7 @@ namespace LumiSoft.Net.MIME
                     encoded the language and character set field delimiters
                     MUST be present even when the fields are left blank.
             */
-
+            
             while(true){
                 // End os stream reached.
                 if(reader.Peek(true) == -1){
@@ -239,7 +239,7 @@ namespace LumiSoft.Net.MIME
                 }
                 else{
                     string name = reader.Token();
-
+                    
                     string value = "";
                     // Parameter value specified.
                     if(reader.Peek(true) == '='){
@@ -253,7 +253,7 @@ namespace LumiSoft.Net.MIME
                     }
                
                     // RFC 2231 encoded/splitted parameter.
-                    if(name.IndexOf('*') > -1){
+                    if(name != null && name.IndexOf('*') > -1){
                         /* Read all parameter parts, sort and decode.
                          
                            NOTE: Some email client/servers won't honour order of parameter parts, they use random order.
@@ -262,7 +262,7 @@ namespace LumiSoft.Net.MIME
                                     title*2="isn't it!"
                                     title*0*=us-ascii'en'This%20is%20even%20more%20
                         */
-                        try{
+                       
                         SortedList<int,string> parmeterParts = new SortedList<int,string>();
                         Encoding               charset       = Encoding.UTF8;
                         while(true){
@@ -333,66 +333,17 @@ namespace LumiSoft.Net.MIME
                         }
                     
                         this[name.Split('*')[0]] = DecodeExtOctet(valueBuffer.ToString(),charset);
-                        }
-                        catch(Exception x){
-                            System.Windows.Forms.MessageBox.Show(x.ToString());
-                        }
-                        /* REMOVE ME:
-                        // We must have charset'language'value.
-                        // Examples:
-                        //      URL*=utf-8''test;
-                        //      URL*0*=utf-8''"test";
-                        if((name_x_no_x.Length == 2 && name_x_no_x[1] == "") || name_x_no_x.Length == 3){                            
-                            string[] charset_language_value = value.Split('\'');
-                            charset = Encoding.GetEncoding(charset_language_value[0]);
-                            valueBuffer.Append(charset_language_value[2]);
-                        }
-                        // No encoding, probably just splitted ASCII/UTF-8 value.
-                        // Example:
-                        //     URL*0=value1;
-                        //     URL*1=value2;
-                        else{
-                            valueBuffer.Append(value);
-                        }
-
-                        // Read while value continues.
-                        while(true){
-                            // End os stream reached.
-                            if(reader.Peek(true) == -1){
-                                break;
-                            }
-                            // Next parameter start, just eat that char.
-                            else if(reader.Peek(true) == ';'){
-                                reader.Char(false);
-                            }
-                            else{
-                                if(!reader.StartsWith(name + "*")){
-                                    break;
-                                }
-                                reader.Token();
-
-                                // Parameter value specified.
-                                if(reader.Peek(true) == '='){
-                                    reader.Char(false);
-
-                                    string v = reader.Word();
-                                    // Normally value may not be null, but following case: paramName=EOS.
-                                    if(v != null){
-                                        valueBuffer.Append(v);
-                                    }
-                                }
-                            }
-                        }
-                          
-                        this[name] = DecodeExtOctet(valueBuffer.ToString(),charset);*/
                     }
                     // Regular parameter.
                     else{
-                        this[name] = MIME_Encoding_EncodedWord.DecodeS(value);
+                        // Skip parameters without name.
+                        if(!string.IsNullOrEmpty(name)){
+                            this[name] = MIME_Encoding_EncodedWord.DecodeS(value);
+                        }
                     }
                 }
             }
-
+                
             m_IsModified = false;
         }
 
