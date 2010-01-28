@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace LumiSoft.Net.MIME
 {
@@ -20,6 +21,8 @@ namespace LumiSoft.Net.MIME
         private static readonly char[] specials = new char[]{'(',')','<','>','[',']',':',';','@','\\',',','.','"'};
 
         private static readonly char[] tspecials = new char[]{'(',')','<','>','@',',',';',':','\\','"','/','[',']','?','='};
+
+        private static readonly Regex encodedword_regex = new Regex(@"=\?(?<charset>.*?)\?(?<encoding>[qQbB])\?(?<value>.*?)\?=",RegexOptions.IgnoreCase);
 
         #endregion
 
@@ -278,24 +281,18 @@ namespace LumiSoft.Net.MIME
 
             StringBuilder retVal = new StringBuilder();
             while(true){
-                int index = m_Source.IndexOf("?=",m_Offset);
-                // Invalid or not encoded-word.
-                if(index == -1){
-                    retVal.Append(ToEnd());
-                }
-                else{
-                    string encodedWord = m_Source.Substring(m_Offset,index - m_Offset + 2);
-  
+                Match match = encodedword_regex.Match(m_Source,m_Offset);
+                if(match.Success && match.Index == m_Offset){
+                    string encodedWord = m_Source.Substring(m_Offset,match.Length);
                     // Move index over encoded-word.
-                    m_Offset += encodedWord.Length;
+                    m_Offset += match.Length;
 
                     try{
-                        string[] encodedWordParts = encodedWord.Split('?');
-                        if(encodedWordParts[2].ToUpper() == "Q"){ 
-                            retVal.Append(MIME_Utils.QDecode(Encoding.GetEncoding(encodedWordParts[1]),encodedWordParts[3]));
+                        if(string.Equals(match.Groups["encoding"].Value,"Q",StringComparison.InvariantCultureIgnoreCase)){
+                            retVal.Append(MIME_Utils.QDecode(Encoding.GetEncoding(match.Groups["charset"].Value),match.Groups["value"].Value));
                         }
-                        else if(encodedWordParts[2].ToUpper() == "B"){
-                            retVal.Append(Encoding.GetEncoding(encodedWordParts[1]).GetString(Net_Utils.FromBase64(Encoding.Default.GetBytes(encodedWordParts[3]))));
+                        else if(string.Equals(match.Groups["encoding"].Value,"B",StringComparison.InvariantCultureIgnoreCase)){
+                            retVal.Append(Encoding.GetEncoding(match.Groups["charset"].Value).GetString(Net_Utils.FromBase64(Encoding.Default.GetBytes(match.Groups["value"].Value))));
                         }
                         // Failed to parse encoded-word, leave it as is. RFC 2047 6.3.
                         else{
@@ -307,9 +304,13 @@ namespace LumiSoft.Net.MIME
                         retVal.Append(encodedWord);
                     }
                 }
+                else{
+                    retVal.Append(Token());
+                }
 
                 // We have continuos encoded-word.
-                if(m_Source.Substring(m_Offset).TrimStart().StartsWith("=?")){
+                match = encodedword_regex.Match(m_Source,m_Offset);
+                if(match.Success && match.Index == m_Offset){
                     ToFirstChar();
                 }
                 // encoded-word does not continue.
@@ -421,14 +422,43 @@ namespace LumiSoft.Net.MIME
             */
                         
             int peek = Peek(true);
-            if(peek == '"'){
+            if(peek == -1){
+                return null;
+            }
+            else if(peek == '"'){
                 return "\"" + QuotedString() + "\"";
             }
             else if(peek == '='){
                 return EncodedWord();
             }
             else{
-                return Atom();
+                string word = Atom();
+                if(word == null){
+                    return null;
+                }
+                
+                // Try to encode invalid encoded-words if any mixed in text.
+                word = encodedword_regex.Replace(word,delegate(Match m){
+                    string encodedWord = m.Value;
+                    try{
+                        if(string.Equals(m.Groups["encoding"].Value,"Q",StringComparison.InvariantCultureIgnoreCase)){
+                            return MIME_Utils.QDecode(Encoding.GetEncoding(m.Groups["charset"].Value),m.Groups["value"].Value);
+                        }
+                        else if(string.Equals(m.Groups["encoding"].Value,"B",StringComparison.InvariantCultureIgnoreCase)){
+                            return Encoding.GetEncoding(m.Groups["charset"].Value).GetString(Net_Utils.FromBase64(Encoding.Default.GetBytes(m.Groups["value"].Value)));
+                        }
+                        // Failed to parse encoded-word, leave it as is. RFC 2047 6.3.
+                        else{
+                            return encodedWord;
+                        }
+                    }
+                    catch{
+                        // Failed to parse encoded-word, leave it as is. RFC 2047 6.3.
+                        return encodedWord;
+                    }
+                });        
+
+                return word;
             }
         }
 
