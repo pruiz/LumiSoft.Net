@@ -305,7 +305,7 @@ namespace LumiSoft.Net.MIME
                     }
                 }
                 else{
-                    retVal.Append(Token());
+                    retVal.Append(Atom());
                 }
 
                 // We have continuos encoded-word.
@@ -923,6 +923,14 @@ namespace LumiSoft.Net.MIME
         public int Available
         {
             get{ return m_Source.Length - m_Offset; }
+        }
+
+        /// <summary>
+        /// Gets position in string.
+        /// </summary>
+        public int Position
+        {
+            get{ return m_Offset; }
         }
 
         #endregion
