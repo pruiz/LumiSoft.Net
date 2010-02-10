@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace LumiSoft.Net.MIME
 {
@@ -12,6 +13,8 @@ namespace LumiSoft.Net.MIME
         private MIME_EncodedWordEncoding m_Encoding;
         private Encoding                 m_pCharset = null;
         private bool                     m_Split    = true;
+
+        private static readonly Regex encodedword_regex = new Regex(@"=\?(((?<charset>.*?)\*.*?)|(?<charset>.*?))\?(?<encoding>[qQbB])\?(?<value>.*?)\?=(?<whitespaces>\s*)",RegexOptions.IgnoreCase);
 
         /// <summary>
         /// Default constructor.
@@ -209,34 +212,7 @@ namespace LumiSoft.Net.MIME
                 throw new ArgumentNullException("word");
             }
 
-            /* RFC 2047 2.
-                encoded-word = "=?" charset "?" encoding "?" encoded-text "?="
-             
-               RFC 2231.
-                encoded-word := "=?" charset ["*" language] "?" encoded-text "?="
-            */
-
-            try{
-                string[] parts = word.Split('?');
-                // Not encoded-word.
-                if(parts.Length != 5){
-                    return word;
-                }
-                else if(parts[2].ToUpper() == "Q"){
-                    return MIME_Utils.QDecode(Encoding.GetEncoding(parts[1].Split('*')[0]),parts[3]);
-                }
-                else if(parts[2].ToUpper() == "B"){                        
-                    return Encoding.GetEncoding(parts[1].Split('*')[0]).GetString(Net_Utils.FromBase64(Encoding.Default.GetBytes(parts[3])));
-                }
-                // Unknown encoding.
-                else{
-                    return word;
-                }
-            }
-            catch{
-                // Failed to parse encoded-word, leave it as is. RFC 2047 6.3.
-                return word;
-            }
+            return DecodeTextS(word);
         }
 
         #endregion
@@ -255,35 +231,57 @@ namespace LumiSoft.Net.MIME
                 throw new ArgumentNullException("word");
             }
 
-            // There may be multiple encoded-words and they can be mixed with atom/quoted-string ... .
-            try{
-                StringBuilder v = new StringBuilder();
-                MIME_Reader r = new MIME_Reader(text);                
-                while(true){
-                    string whiteSpaces = r.ToFirstChar();
-                    if(!string.IsNullOrEmpty(whiteSpaces)){
-                        v.Append(whiteSpaces);
-                    }
+            /* RFC 2047 2.
+                encoded-word = "=?" charset "?" encoding "?" encoded-text "?="
+             
+                encoded-text = 1*<Any printable ASCII character other than "?" or SPACE>
+                               ; (but see "Use of encoded-words in message
+                               ; headers", section 5)
+            
+                An 'encoded-word' may not be more than 75 characters long, including
+                'charset', 'encoding', 'encoded-text', and delimiters.  If it is
+                desirable to encode more text than will fit in an 'encoded-word' of
+                75 characters, multiple 'encoded-word's (separated by CRLF SPACE) may
+                be used.
+             
+                RFC 2231 updates.
+                    encoded-word := "=?" charset ["*" language] "?" encoded-text "?="
+            */
 
-                    string phrase = r.Phrase();
-                    if(phrase == null){
-                        if(r.Available == 0){
-                            return v.ToString().TrimStart();
-                        }
-                        // Some special char(like :,{ ...) just read it.
-                        else{
-                            v.Append((char)r.Char(false));
-                        }
+            string retVal = text;
+
+            retVal = encodedword_regex.Replace(retVal,delegate(Match m){
+                // We have encoded word, try to decode it.
+                // Also if we have continuing encoded word, we need to skip all whitespaces between words.
+              
+                string encodedWord = m.Value;
+                try{
+                    if(string.Equals(m.Groups["encoding"].Value,"Q",StringComparison.InvariantCultureIgnoreCase)){
+                        encodedWord =  MIME_Utils.QDecode(Encoding.GetEncoding(m.Groups["charset"].Value),m.Groups["value"].Value);
                     }
-                    else{
-                        v.Append(phrase);
+                    else if(string.Equals(m.Groups["encoding"].Value,"B",StringComparison.InvariantCultureIgnoreCase)){
+                        encodedWord = Encoding.GetEncoding(m.Groups["charset"].Value).GetString(Net_Utils.FromBase64(Encoding.Default.GetBytes(m.Groups["value"].Value)));
                     }
-                }                
-            }
-            catch{
-                // Parsing failed, leave raw unparsed value.
-                return text;
-            }
+                    // Failed to parse encoded-word, leave it as is. RFC 2047 6.3.
+                    // else{
+
+                    // No continuing encoded-word, append whitespaces to retval.
+                    Match mNext = encodedword_regex.Match(retVal,m.Index + m.Length);
+                    if(!(mNext.Success && mNext.Index == (m.Index + m.Length))){
+                        encodedWord += m.Groups["whitespaces"].Value;
+                    }
+                    // We have continuing encoded-word, so skip all whitespaces.
+                    //else{
+
+                    return encodedWord;
+                }
+                catch{
+                    // Failed to parse encoded-word, leave it as is. RFC 2047 6.3.
+                    return encodedWord;
+                }
+            });   
+
+            return retVal;
         }
 
         #endregion
