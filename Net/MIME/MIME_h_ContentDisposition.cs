@@ -92,6 +92,9 @@ namespace LumiSoft.Net.MIME
                 throw new ArgumentNullException("value");
             }
 
+            // We should not have encoded words here, but some email clients do this, so encoded them if any.
+            value = MIME_Encoding_EncodedWord.DecodeS(value);
+
             MIME_h_ContentDisposition retVal = new MIME_h_ContentDisposition();
             
             string[] name_value = value.Split(new char[]{':'},2);
