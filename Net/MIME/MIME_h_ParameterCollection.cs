@@ -10,6 +10,98 @@ namespace LumiSoft.Net.MIME
     /// </summary>
     public class MIME_h_ParameterCollection : IEnumerable
     {
+        #region class _ParameterBuilder
+
+        /// <summary>
+        /// This class represents header field parameter builder.
+        /// </summary>
+        public class _ParameterBuilder
+        {
+            private string                 m_Name      = null;
+            private SortedList<int,string> m_pParts    = null;
+            private Encoding               m_pEncoding = null;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="name">Parameter name.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>name</b> is null reference.</exception>
+            public _ParameterBuilder(string name)
+            {
+                if(name == null){
+                    throw new ArgumentNullException("name");
+                }
+
+                m_Name = name;
+
+                m_pParts = new SortedList<int,string>();
+            }
+
+
+            #region method AddPart
+
+            /// <summary>
+            /// Adds header field parameter part to paramter buffer.
+            /// </summary>
+            /// <param name="index">Parameter part index.</param>
+            /// <param name="encoded">If true parameter part is encoded.</param>
+            /// <param name="value">Parameter part value.</param>
+            public void AddPart(int index,bool encoded,string value)
+            {
+                // We should have charset and language information available.
+                if(encoded && index == 0){
+                    // Syntax: <charset>'<language>'<value>
+                    string[] charset_language_value = value.Split('\'');
+                    m_pEncoding = Encoding.GetEncoding(charset_language_value[0]);
+                    value = charset_language_value[2];
+                }
+
+                // Add parameter to list.
+                m_pParts.Add(index,value);
+            }
+
+            #endregion
+
+            #region method GetParamter
+
+            /// <summary>
+            /// Gets header field parameter(splitted paramter values concated).
+            /// </summary>
+            /// <returns>Returns header field parameter.</returns>
+            public MIME_h_Parameter GetParamter()
+            {
+                // Concate parts values and decode value. (SortedList takes care for sorting part indexes)
+                StringBuilder value = new StringBuilder();
+                foreach(KeyValuePair<int,string> v in m_pParts){
+                    value.Append(v.Value);
+                }
+
+                if(m_pEncoding != null){
+                    return new MIME_h_Parameter(m_Name,DecodeExtOctet(value.ToString(),m_pEncoding));
+                }
+                else{
+                    return new MIME_h_Parameter(m_Name,value.ToString());
+                }
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets parameter name.
+            /// </summary>
+            public string Name
+            {
+                get{ return m_Name ; }
+            }
+
+            #endregion
+        }
+
+        #endregion
+
         private bool                                m_IsModified  = false;
         private MIME_h                              m_pOwner      = null;
         private Dictionary<string,MIME_h_Parameter> m_pParameters = null;
@@ -227,123 +319,49 @@ namespace LumiSoft.Net.MIME
                     encoded the language and character set field delimiters
                     MUST be present even when the fields are left blank.
             */
-            
-            while(true){
-                // End os stream reached.
-                if(reader.Peek(true) == -1){
-                    break;
+
+            KeyValueCollection<string,_ParameterBuilder> parameters = new KeyValueCollection<string,_ParameterBuilder>();
+
+            // Parse all parameter parts.
+            string[] parameterParts = TextUtils.SplitQuotedString(reader.ToEnd(),';');
+            foreach(string part in parameterParts){
+                if(string.IsNullOrEmpty(part)){
+                    continue;
                 }
-                // Next parameter start, just eat that char.
-                else if(reader.Peek(true) == ';'){
-                    reader.Char(false);
+
+                string[] name_value = part.Trim().Split(new char[]{'='},2);
+                string   paramName  = name_value[0].Trim();
+                string   paramValue = null;
+                if(name_value.Length == 2){
+                    paramValue = TextUtils.UnQuoteString(name_value[1].Trim());
                 }
-                else{
-                    string name = reader.Token();
-                    
-                    string value = "";
-                    // Parameter value specified.
-                    if(reader.Peek(true) == '='){
-                        reader.Char(false);
-
-                        string v = reader.Word();
-                        // Normally value may not be null, but following case: paramName=EOS.
-                        if(v != null){
-                            value = v;
-                        }
+                // Valueless parameter.
+                //else{
+                                
+                string[] nameParts = paramName.Split('*');
+                int      index     = 0;
+                bool     encoded   = nameParts.Length == 3;
+                if(name_value.Length >= 2){
+                    try{
+                        index = Convert.ToInt32(nameParts[1]);
                     }
-               
-                    // RFC 2231 encoded/splitted parameter.
-                    if(name != null && name.IndexOf('*') > -1){
-                        /* Read all parameter parts, sort and decode.
-                         
-                           NOTE: Some email client/servers won't honour order of parameter parts, they use random order.
-                                 For example:
-                                    title*1*=%2A%2A%2Afun%2A%2A%2A%20
-                                    title*2="isn't it!"
-                                    title*0*=us-ascii'en'This%20is%20even%20more%20
-                        */
-                       
-                        SortedList<int,string> parmeterParts = new SortedList<int,string>();
-                        Encoding               charset       = Encoding.UTF8;
-                        while(true){
-                            string[] name_partNo = name.Split('*');
-                            int      partNo      = 0;  
-                            bool     encoded     = false;
-                            // We have: title*=
-                            if(name_partNo.Length == 2 && name.EndsWith("*")){
-                                partNo  = 0;
-                                encoded = true;
-                            }
-                            // We have: title*0=
-                            else if(name_partNo.Length == 2){
-                                partNo = Convert.ToInt32(name_partNo[1]);
-                            }
-                            // We have: title*0*=
-                            else{
-                                partNo  = Convert.ToInt32(name_partNo[1]);
-                                encoded = true;
-                            }
-
-                            string v = "";
-                            // First part has encoding and language parts, if encoded '*' was specified.
-                            if(partNo == 0 && encoded){
-                                string[] charset_language_value = value.Split('\'');
-                                charset = Encoding.GetEncoding(charset_language_value[0]);
-                                v = charset_language_value[2];
-                            }
-                            else{
-                                v = value;
-                            }
-
-                            if(!parmeterParts.ContainsKey(partNo)){
-                                parmeterParts.Add(partNo,v);
-                            }
-
-
-                            reader.ToFirstChar();
-                            // End of stream reached.
-                            if(reader.Peek(true) == -1){
-                                break;
-                            }
-                            // Next parameter start, just eat that char.
-                            else if(reader.Peek(true) == ';'){
-                                reader.Char(false);
-                            }
-                            else{
-                                if(!reader.StartsWith(name.Split('*')[0] + "*")){
-                                    break;
-                                }
-                                name = reader.Token();
-
-                                // Parameter value specified.
-                                if(reader.Peek(true) == '='){
-                                    reader.Char(false);
-                                    value = reader.Word();
-                                    // Normally value may not be null, but following case: paramName=EOS.
-                                    if(value == null){
-                                        value = "";
-                                    }
-                                }
-                            }
-                        }
-
-                        StringBuilder valueBuffer = new StringBuilder();
-                        foreach(string part in parmeterParts.Values){
-                            valueBuffer.Append(part);
-                        }
-                    
-                        this[name.Split('*')[0]] = DecodeExtOctet(valueBuffer.ToString(),charset);
-                    }
-                    // Regular parameter.
-                    else{
-                        // Skip parameters without name.
-                        if(!string.IsNullOrEmpty(name)){
-                            this[name] = MIME_Encoding_EncodedWord.DecodeS(value);
-                        }
+                    catch{
                     }
                 }
+
+                // Parameter builder doesn't exist for the specified parameter, create it.
+                if(!parameters.ContainsKey(nameParts[0])){
+                    parameters.Add(nameParts[0],new _ParameterBuilder(nameParts[0]));
+                }
+              
+                parameters[nameParts[0]].AddPart(index,encoded,paramValue);
             }
-                
+
+            // Build parameters from parts.
+            foreach(_ParameterBuilder b in parameters){
+                m_pParameters.Add(b.Name,b.GetParamter());
+            }
+
             m_IsModified = false;
         }
 
