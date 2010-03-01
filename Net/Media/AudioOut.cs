@@ -708,6 +708,8 @@ namespace LumiSoft.Net.Media
                     PlayItem item = new PlayItem(ref headerHandle,ref dataHandle,data.Length);
                     m_pPlayItems.Add(item);
 
+                    m_BytesBuffered += data.Length;
+
                     // We ran out of minimum buffer, we must pause playing while min buffer filled.
                     if(m_BytesBuffered < 1000){
                         if(!m_IsPaused){
@@ -720,9 +722,7 @@ namespace LumiSoft.Net.Media
                         WavMethods.waveOutRestart(m_pWavDevHandle);
                         m_IsPaused = false;
                     }
-
-                    m_BytesBuffered += data.Length;
-
+                                        
                     result = WavMethods.waveOutWrite(m_pWavDevHandle,headerHandle.AddrOfPinnedObject(),Marshal.SizeOf(wavHeader));
                 }
                 else{
