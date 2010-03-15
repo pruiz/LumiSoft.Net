@@ -1080,7 +1080,7 @@ namespace LumiSoft.Net.SMTP.Server
 
             m_pMessageStream = OnGetMessageStream();
             if(m_pMessageStream == null){
-                m_pMessageStream = File.Create(Path.GetTempFileName(),1024,FileOptions.DeleteOnClose);
+                m_pMessageStream = new MemoryStreamEx(32000);
             }
             // RFC 5321.4.4 trace info.
             byte[] recevived = CreateReceivedHeader();
@@ -1224,7 +1224,7 @@ namespace LumiSoft.Net.SMTP.Server
             if(m_pMessageStream == null){
                 m_pMessageStream = OnGetMessageStream();
                 if(m_pMessageStream == null){
-                    m_pMessageStream = File.Create(Path.GetTempFileName(),1024,FileOptions.DeleteOnClose);
+                    m_pMessageStream = new MemoryStreamEx(32000);
                 }
                 // RFC 5321.4.4 trace info.
                 byte[] recevived = CreateReceivedHeader();
