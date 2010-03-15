@@ -12,8 +12,8 @@ namespace LumiSoft.Net.MIME
     /// </summary>
     public abstract class MIME_b_SinglepartBase : MIME_b
     {
-        private bool       m_IsModified         = false;
-        private FileStream m_pEncodedDataStream = null;
+        private bool   m_IsModified         = false;
+        private Stream m_pEncodedDataStream = null;
                 
         /// <summary>
         /// Default constructor.
@@ -26,7 +26,7 @@ namespace LumiSoft.Net.MIME
                 throw new ArgumentNullException("contentType");
             }
 
-            m_pEncodedDataStream = new FileStream(Path.GetTempFileName(),FileMode.Create,FileAccess.ReadWrite,FileShare.None,32000,FileOptions.DeleteOnClose);
+            m_pEncodedDataStream = new MemoryStreamEx(32000);
         }
 
         /// <summary>
@@ -220,7 +220,7 @@ namespace LumiSoft.Net.MIME
             }
 
             if(transferEncoding == MIME_TransferEncodings.QuotedPrintable){
-                using(FileStream fs = File.Create(Path.GetTempFileName(),32000,FileOptions.DeleteOnClose)){
+                using(MemoryStreamEx fs = new MemoryStreamEx(32000)){
                     QuotedPrintableStream encoder = new QuotedPrintableStream(new SmartStream(fs,false),FileAccess.ReadWrite);
                     Net_Utils.StreamCopy(stream,encoder,32000);
                     encoder.Flush();
@@ -229,7 +229,7 @@ namespace LumiSoft.Net.MIME
                 }
             }
             else if(transferEncoding == MIME_TransferEncodings.Base64){
-                using(FileStream fs = File.Create(Path.GetTempFileName(),32000,FileOptions.DeleteOnClose)){
+                using(MemoryStreamEx fs = new MemoryStreamEx(32000)){
                     Base64Stream encoder = new Base64Stream(fs,false,true,FileAccess.ReadWrite);                                     
                     Net_Utils.StreamCopy(stream,encoder,32000);
                     encoder.Finish();
