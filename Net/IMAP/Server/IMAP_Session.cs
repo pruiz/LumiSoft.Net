@@ -3317,7 +3317,7 @@ namespace LumiSoft.Net.IMAP.Server
                     #region RFC822
 
                     else if(dataItem is IMAP_Fetch_DataItem_Rfc822){
-                        using(FileStream tmpFs = new MemoryStreamEx(32000)){
+                        using(MemoryStreamEx tmpFs = new MemoryStreamEx(32000)){
                             message.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8);
                             tmpFs.Position = 0;
 
@@ -3360,7 +3360,7 @@ namespace LumiSoft.Net.IMAP.Server
                     #region RFC822.TEXT
 
                     else if(dataItem is IMAP_Fetch_DataItem_Rfc822Text){
-                        using(FileStream tmpFs = new MemoryStreamEx(32000)){
+                        using(MemoryStreamEx tmpFs = new MemoryStreamEx(32000)){
                             message.Body.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8,false);
                             tmpFs.Position = 0;
 
