@@ -46,6 +46,11 @@ namespace LumiSoft.Net.MIME
             /// "application/x-pkcs7-signature". Defined in RFC 2311,2633.
             /// </summary>
             public static readonly string x_pkcs7_signature = "application/x-pkcs7-signature";
+
+            /// <summary>
+            /// "application/pkcs7-mime". Defined in RFC 5751.
+            /// </summary>
+            public static readonly string pkcs7_mime = "application/pkcs7-mime";
         }
 
         #endregion
