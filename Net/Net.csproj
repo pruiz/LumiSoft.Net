@@ -225,6 +225,7 @@
     <Compile Include="IMAP\Server\IMAP_Session.cs" />
     <Compile Include="IO\Base64.cs" />
     <Compile Include="IO\FifoBuffer.cs" />
+    <Compile Include="IO\MemoryStreamEx.cs" />
     <Compile Include="IO\QuotedPrintableStream.cs" />
     <Compile Include="IO\ReadWriteControlledStream.cs" />
     <Compile Include="KeyValueCollection.cs" />
@@ -243,6 +244,7 @@
     <Compile Include="Media\WavePlayer.cs" />
     <Compile Include="MIME\MIME_b.cs" />
     <Compile Include="MIME\MIME_b_Application.cs" />
+    <Compile Include="MIME\MIME_b_ApplicationPkcs7Mime.cs" />
     <Compile Include="MIME\MIME_b_Audio.cs" />
     <Compile Include="MIME\MIME_b_Image.cs" />
     <Compile Include="MIME\MIME_b_Message.cs" />
