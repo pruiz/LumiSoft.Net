@@ -7,7 +7,7 @@ using LumiSoft.Net.IO;
 namespace LumiSoft.Net.MIME
 {
     /// <summary>
-    /// This class represents MIME message/parallel bodies.  Defined in RFC 2046 5.1.6.
+    /// This class represents MIME multipart/parallel bodies.  Defined in RFC 2046 5.1.6.
     /// </summary>
     /// <remarks>
     /// The "parallel" subtype of "multipart" is intended for use when the body
