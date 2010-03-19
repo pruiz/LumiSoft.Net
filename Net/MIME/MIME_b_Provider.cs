@@ -19,6 +19,7 @@ namespace LumiSoft.Net.MIME
         public MIME_b_Provider()
         {
             m_pBodyTypes = new Dictionary<string,Type>(StringComparer.CurrentCultureIgnoreCase);
+            m_pBodyTypes.Add("application/pkcs7-mime",typeof(MIME_b_ApplicationPkcs7Mime));
             m_pBodyTypes.Add("message/rfc822",typeof(MIME_b_MessageRfc822));
             m_pBodyTypes.Add("message/delivery-status",typeof(MIME_b_MessageDeliveryStatus));
             m_pBodyTypes.Add("multipart/alternative",typeof(MIME_b_MultipartAlternative));
@@ -71,7 +72,7 @@ namespace LumiSoft.Net.MIME
 
             // We have exact body provider for specified mediaType.
             if(m_pBodyTypes.ContainsKey(mediaType)){
-                bodyType = m_pBodyTypes[mediaType];
+                bodyType = m_pBodyTypes[mediaType];                
             }
             // Use default mediaType.
             else{
