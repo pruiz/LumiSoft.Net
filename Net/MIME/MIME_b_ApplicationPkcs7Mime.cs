@@ -10,7 +10,7 @@ using LumiSoft.Net.IO;
 namespace LumiSoft.Net.MIME
 {
     /// <summary>
-    /// This class represents MIME application/pkcs7-mime body. Defined in RFC 5731 3.2.
+    /// This class represents MIME application/pkcs7-mime body. Defined in RFC 5751 3.2.
     /// </summary>
     public class MIME_b_ApplicationPkcs7Mime : MIME_b_Application
     {
@@ -53,6 +53,26 @@ namespace LumiSoft.Net.MIME
 
         #endregion
 
+
+        #region method GetCertificates
+
+        /// <summary>
+        /// Gets certificates contained in pkcs 7.
+        /// </summary>
+        /// <returns>Returns certificates contained in pkcs 7. Returns null if no certificates.</returns>
+        public X509Certificate2Collection GetCertificates()
+        {
+            if(this.Data == null){
+                return null;
+            }
+
+            SignedCms signedCms = new SignedCms();
+            signedCms.Decode(this.Data);
+
+            return signedCms.Certificates;
+        }
+
+        #endregion
                 
         #region method VerifySignature
 
@@ -87,27 +107,7 @@ namespace LumiSoft.Net.MIME
         }
 
         #endregion
-                
-        #region method GetCertificates
-
-        /// <summary>
-        /// Gets certificates contained in pkcs 7.
-        /// </summary>
-        /// <returns>Returns certificates contained in pkcs 7. Returns null if no certificates.</returns>
-        public X509Certificate2Collection GetCertificates()
-        {
-            if(this.Data == null){
-                return null;
-            }
-
-            SignedCms signedCms = new SignedCms();
-            signedCms.Decode(this.Data);
-
-            return signedCms.Certificates;
-        }
-
-        #endregion
-
+               
         #region method GetSignedMime
 
         /// <summary>
@@ -136,19 +136,37 @@ namespace LumiSoft.Net.MIME
         #endregion
 
         // public void Sign(X509Certificate2 cert,MIME_Entity entity)
-                
+
         // public void Encrypt(X509Certificate2 cert,MIME_Entity entity)
 
-        private void Decrypt(X509Certificate2 cert)
+        #region method GetEnvelopedMime
+
+        /// <summary>
+        /// Decrypts enveloped mime content.
+        /// </summary>
+        /// <param name="cert">Decrypting certificate.</param>
+        /// <returns>Returns decrypted enveloped mime content.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>cert</b> is null reference.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when <b>smime-type != enveloped-data</b>.</exception>
+        public MIME_Message GetEnvelopedMime(X509Certificate2 cert)
         {
-          EnvelopedCms envelopedCms = new EnvelopedCms();          
-          //envelopedCms.Decode(encodedEnvelopedCms);
+            if(cert == null){
+                throw new ArgumentNullException("cert");
+            }
+            if(!string.Equals(this.Entity.ContentType.Parameters["smime-type"],"enveloped-data",StringComparison.InvariantCultureIgnoreCase)){
+                throw new InvalidOperationException("The VerifySignature method is only valid if Content-Type parameter smime-type=enveloped-data.");
+            }
 
-          //X509Certificate2Collection col = new X509Certificate2Collection(recipient);
-          //envelopedCms.Decrypt(col);
+            EnvelopedCms envelopedCms = new EnvelopedCms();          
+            envelopedCms.Decode(this.Data);
 
-          //return envelopedCms.Encode();
+            X509Certificate2Collection certificates = new X509Certificate2Collection(cert);
+            envelopedCms.Decrypt(certificates);
+
+            return MIME_Message.ParseFromStream(new MemoryStream(envelopedCms.Encode()));
         }
+
+        #endregion
 
 
         #region Properties implementation
