@@ -28,7 +28,7 @@ namespace LumiSoft.Net.MIME
             /// <summary>
             /// This enum specified multipart reader sate.
             /// </summary>
-            private enum State
+            internal enum State
             {
                 /// <summary>
                 /// First boundary must be seeked.
@@ -164,7 +164,7 @@ namespace LumiSoft.Net.MIME
                 if(m_State == State.InBoundary){
                     throw new InvalidOperationException("You must read all boundary data, before calling this method.");
                 }
-                if(m_State == State.Done){
+                else if(m_State == State.Done){
                     return false;
                 }
                 else if(m_State == State.SeekFirst){
@@ -190,7 +190,25 @@ namespace LumiSoft.Net.MIME
                                     m_State = State.Done;
 
                                     // Last CRLF is no part of preamble, but is part of boundary-tag.
-                                    m_pTextPreamble.Remove(m_pTextPreamble.Length - 2,2);
+                                    if(m_pTextPreamble.Length >= 2){
+                                        m_pTextPreamble.Remove(m_pTextPreamble.Length - 2,2);
+                                    }
+
+                                    // Read "epilogoue",if has any.
+                                    while(true){
+                                        m_pStream.ReadLine(m_pReadLineOP,false);
+
+                                        if(m_pReadLineOP.Error != null){
+                                            throw m_pReadLineOP.Error;
+                                        }
+                                        // We reached end of stream. Epilogue reading completed.
+                                        else if(m_pReadLineOP.BytesInBuffer == 0){
+                                            break;
+                                        }
+                                        else{
+                                            m_pTextEpilogue.Append(m_pReadLineOP.LineUtf8 + "\r\n");
+                                        }
+                                    }
 
                                     return false;
                                 }
@@ -381,11 +399,11 @@ namespace LumiSoft.Net.MIME
                             m_pTextEpilogue.Append(m_pReadLineOP.LineUtf8 + "\r\n");
                         }
                     }
-
-                    // Return previous line data - CRLF, because CRLF if part of boundary tag.
+                                        
                     if(count < m_pPreviousLine.BytesInBuffer){
                         throw new ArgumentException("Argument 'buffer' is to small. This should never happen.");
                     }
+                    // Return previous line data - CRLF, because CRLF if part of boundary tag.
                     if(m_pPreviousLine.BytesInBuffer > 2){
                         Array.Copy(m_pPreviousLine.LineBuffer,0,buffer,offset,m_pPreviousLine.BytesInBuffer - 2);
 
@@ -506,7 +524,7 @@ namespace LumiSoft.Net.MIME
                     throw new NotSupportedException();
                 }
             }
-
+                        
             /// <summary>
             /// Gets "preamble" text. Defined in RFC 2046 5.1.1.
             /// </summary>
@@ -523,6 +541,14 @@ namespace LumiSoft.Net.MIME
             public string TextEpilogue
             {
                 get{ return m_pTextEpilogue.ToString(); }
+            }
+
+            /// <summary>
+            /// Gets reader state.
+            /// </summary>
+            internal State ReaderState
+            {
+                get{ return m_State; }
             }
 
             #endregion
