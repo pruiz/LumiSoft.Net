@@ -1018,7 +1018,11 @@ namespace LumiSoft.Net.IO
             /// </summary>
             /// <param name="x">Exception that occured during async operation.</param>
             private void Buffering_Completed(Exception x)
-            {                
+            {   
+                if(m_pOwner.m_IsDisposed){
+                    return;
+                }
+            
                 if(x != null){
                     m_pException = x;
                     OnCompleted();
