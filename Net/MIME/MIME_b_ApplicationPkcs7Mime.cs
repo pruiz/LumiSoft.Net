@@ -134,11 +134,7 @@ namespace LumiSoft.Net.MIME
         }
 
         #endregion
-
-        // public void Sign(X509Certificate2 cert,MIME_Entity entity)
-
-        // public void Encrypt(X509Certificate2 cert,MIME_Entity entity)
-
+                
         #region method GetEnvelopedMime
 
         /// <summary>
@@ -167,6 +163,11 @@ namespace LumiSoft.Net.MIME
         }
 
         #endregion
+
+
+        // public void CreateSigned(X509Certificate2 cert,MIME_Entity entity)
+
+        // public void CreateEnveloped(X509Certificate2 cert,MIME_Entity entity)
 
 
         #region Properties implementation
