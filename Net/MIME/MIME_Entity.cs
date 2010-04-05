@@ -442,7 +442,7 @@ namespace LumiSoft.Net.MIME
 
                 MIME_h h = m_pHeader.GetFirst("Content-Transfer-Encoding");
                 if(h != null){
-                    return ((MIME_h_Unstructured)h).Value;
+                    return ((MIME_h_Unstructured)h).Value.Trim();
                 }
                 else{
                     return null;
