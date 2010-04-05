@@ -107,7 +107,7 @@ namespace LumiSoft.Net.MIME
             if(type == null){
                 throw new ParseException("Invalid Content-Disposition: header field value '" + value + "'.");
             }
-            retVal.m_DispositionType = type;
+            retVal.m_DispositionType = type.Trim();
 
             retVal.m_pParameters.Parse(r);
 
