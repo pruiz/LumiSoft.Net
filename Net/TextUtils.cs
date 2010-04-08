@@ -206,34 +206,65 @@ namespace LumiSoft.Net
 		/// <returns></returns>
 		public static string[] SplitQuotedString(string text,char splitChar,bool unquote)
 		{
-			List<string>  splitParts         = new List<string>();  // Holds splitted parts
-            int           startPos           = 0;
-			bool          inQuotedString     = false;               // Holds flag if position is quoted string or not
-            char          lastChar           = '0';
+			return SplitQuotedString(text,splitChar,unquote,int.MaxValue);
+		}
+
+        /// <summary>
+		/// Splits string into string arrays. This split method won't split qouted strings, but only text outside of qouted string.
+		/// For example: '"text1, text2",text3' will be 2 parts: "text1, text2" and text3.
+		/// </summary>
+		/// <param name="text">Text to split.</param>
+		/// <param name="splitChar">Char that splits text.</param>
+		/// <param name="unquote">If true, splitted parst will be unqouted if they are qouted.</param>
+        /// <param name="count">Maximum number of substrings to return.</param>
+		/// <returns>Returns splitted string.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>text</b> is null reference.</exception>
+		public static string[] SplitQuotedString(string text,char splitChar,bool unquote,int count)
+		{
+            if(text == null){
+                throw new ArgumentNullException("text");
+            }
+
+			List<string>  splitParts     = new List<string>();  // Holds splitted parts
+            int           startPos       = 0;
+			bool          inQuotedString = false;               // Holds flag if position is quoted string or not
+            char          lastChar       = '0';
 
             for(int i=0;i<text.Length;i++){
 			    char c = text[i];
 
-                // Start/end quoted string area. Ingonre escaped \".
-                if(lastChar != '\\' && c == '\"'){					
-					inQuotedString = !inQuotedString;
-				}
-			
-				// Current char is split char and it isn't in quoted string, do split
-				if(!inQuotedString && c == splitChar){
-					// Add current currentSplitBuffer value to splitted parts list
-                    if(unquote){
-					    splitParts.Add(UnQuoteString(text.Substring(startPos,i - startPos)));
-                    }
-                    else{                        
-                        splitParts.Add(text.Substring(startPos,i - startPos));
-                    }
+                // We have exceeded maximum allowed splitted parts.
+                if((splitParts.Count + 1) >= count){
+                    break;
+                }
 
-                    // Store new split part start position.
-                    startPos = i + 1;
-				}
+                // We have quoted string start/end.
+                if(lastChar != '\\' && c == '\"'){
+                    inQuotedString = !inQuotedString;
+                }
+                // We have escaped or normal char.
+                //else{
+
+                // We igonre split char in quoted-string.
+                if(!inQuotedString){
+                    // We have split char, do split.
+                    if(c == splitChar){
+                        if(unquote){
+					        splitParts.Add(UnQuoteString(text.Substring(startPos,i - startPos)));
+                        }
+                        else{                        
+                            splitParts.Add(text.Substring(startPos,i - startPos));
+                        }
+                                               
+                        // Store new split part start position.
+                        startPos = i + 1;                        
+                    }
+                }
+                //else{
+
                 lastChar = c;
 			}
+                        
 			// Add last split part to splitted parts list
             if(unquote){
 			    splitParts.Add(UnQuoteString(text.Substring(startPos,text.Length - startPos)));
