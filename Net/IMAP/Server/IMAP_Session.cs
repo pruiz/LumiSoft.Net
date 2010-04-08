@@ -1590,7 +1590,7 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }
 
-            string[] parts = cmdText.Split(new char[]{' '},2);
+            string[] parts = TextUtils.SplitQuotedString(cmdText,' ',false,2);
             if(parts.Length != 2){
                 WriteLine(cmdTag + " BAD Error in arguments.");
 
