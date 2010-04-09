@@ -51,6 +51,19 @@ namespace LumiSoft.Net.SIP.Stack
         public static readonly string x202_Ok = "202 Accepted";
 
         /// <summary>
+        /// The user can no longer be found at the address in the Request-URI,
+        /// and the requesting client SHOULD retry at the new address given by
+        /// the Contact header field (Section 20.10). Defined in rfc 3265.
+        /// </summary>
+        public static readonly string x301_Ok = "301 Moved Permanently";
+
+        /// <summary>
+        /// The requesting client SHOULD retry the request at the new address(es)
+        /// given by the Contact header field (Section 20.10). Defined in rfc 3265.
+        /// </summary>
+        public static readonly string x302_Ok = "302 Moved Temporarily";
+
+        /// <summary>
         /// The request could not be understood due to malformed syntax.  The
         /// Reason-Phrase SHOULD identify the syntax problem in more detail, for
         /// example, "Missing Call-ID header field".
