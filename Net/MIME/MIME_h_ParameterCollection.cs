@@ -341,7 +341,7 @@ namespace LumiSoft.Net.MIME
                 string[] nameParts = paramName.Split('*');
                 int      index     = 0;
                 bool     encoded   = nameParts.Length == 3;
-                if(name_value.Length >= 2){
+                if(nameParts.Length >= 2){
                     try{
                         index = Convert.ToInt32(nameParts[1]);
                     }
