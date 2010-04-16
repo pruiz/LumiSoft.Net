@@ -72,6 +72,7 @@ namespace LumiSoft.Net.SMTP.Client
         private string          m_MailFrom           = null;
         private List<string>    m_pRecipients        = null;
         private GenericIdentity m_pAuthdUserIdentity = null;
+        private bool            m_BdatEnabled        = true;
 
         /// <summary>
         /// Default constructor.
@@ -1168,7 +1169,7 @@ namespace LumiSoft.Net.SMTP.Client
         #endregion
 
         #region method SendMessage
-
+                
         /// <summary>
         /// Sends specified raw message to SMTP server.
         /// </summary>
@@ -1192,10 +1193,12 @@ namespace LumiSoft.Net.SMTP.Client
 			
             // See if BDAT supported.
             bool bdatSupported = false;
-            foreach(string feature in this.EsmtpFeatures){
-                if(feature.ToUpper() == SMTP_ServiceExtensions.CHUNKING){
-                    bdatSupported = true;
-                    break;
+            if(m_BdatEnabled){
+                foreach(string feature in this.EsmtpFeatures){
+                    if(feature.ToUpper() == SMTP_ServiceExtensions.CHUNKING){
+                        bdatSupported = true;
+                        break;
+                    }
                 }
             }
 
@@ -2028,6 +2031,16 @@ namespace LumiSoft.Net.SMTP.Client
 
                 return m_pAuthdUserIdentity; 
             }
+        }
+
+        /// <summary>
+        /// Gets or sets if BDAT command can be used.
+        /// </summary>
+        public bool BdatEnabled
+        {
+            get{ return m_BdatEnabled; }
+
+            set{ m_BdatEnabled = value; }
         }
 
         #endregion
