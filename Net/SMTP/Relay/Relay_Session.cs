@@ -151,6 +151,8 @@ namespace LumiSoft.Net.SMTP.Relay
             m_SessionCreateTime = DateTime.Now;
             m_pTargets          = new List<Relay_Target>();
             m_pSmtpClient       = new SMTP_Client();
+
+            m_pSmtpClient.BdatEnabled = false;
         }
 
         /// <summary>
