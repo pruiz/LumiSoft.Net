@@ -1384,7 +1384,7 @@ namespace LumiSoft.Net.SMTP.Client
                 while(line.StartsWith("250-")){
                     line = ReadLine();
 
-                    if(line.StartsWith("250-")){
+                    if(line.StartsWith("250")){
                         m_pEsmtpFeatures.Add(line.Substring(4));
                     }
                 }
