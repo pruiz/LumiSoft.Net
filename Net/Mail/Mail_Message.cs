@@ -6,6 +6,8 @@ using System.Text;
 using LumiSoft.Net.IO;
 using LumiSoft.Net.MIME;
 
+using System.Threading;
+
 namespace LumiSoft.Net.Mail
 {
     /// <summary>
@@ -158,10 +160,55 @@ namespace LumiSoft.Net.Mail
                 throw new ArgumentNullException("headerEncoding");
             }
 
+            // Parse message on another thread.
+            Exception exception = null;
+            Mail_Message retVal = null;
+            ManualResetEvent parseWait = new ManualResetEvent(false);
+            Thread trParse = new Thread(delegate(){               
+                try{
+                    retVal = new Mail_Message();
+                    retVal.Parse(new SmartStream(stream,false),headerEncoding,new MIME_h_ContentType("text/plain"));
+                }
+                // Invalid message syntax, block such message.
+                catch(Exception x){
+                    exception = x;
+                    retVal = null;
+                }
+                parseWait.Set();
+            });                
+            trParse.Start();
+
+            // Wait parse to complete or timeout.
+            DateTime parseStartTime = DateTime.Now;
+            while(!parseWait.WaitOne(10)){
+                // Parse timeout.
+                if(DateTime.Now > parseStartTime.AddSeconds(30)){
+                    try{
+                        trParse.Abort();
+                        retVal = null;
+                    }
+                    catch{
+                    }
+                    break;
+                }
+            }
+
+            if(exception != null){
+                throw exception;
+            }
+            // Message parsing failed.
+            else if(retVal == null){
+                throw new ParseException("Failed to parse message within 30 seconds.");
+            }
+            else{
+                return retVal;
+            }
+
+            /* Abobove is TMP debug, will switch back.
             Mail_Message retVal = new Mail_Message();
             retVal.Parse(new SmartStream(stream,false),headerEncoding,new MIME_h_ContentType("text/plain"));
 
-            return retVal;
+            return retVal;*/
         }
 
         #endregion

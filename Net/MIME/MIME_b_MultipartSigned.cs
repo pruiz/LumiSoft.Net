@@ -7,7 +7,7 @@ using LumiSoft.Net.IO;
 namespace LumiSoft.Net.MIME
 {
     /// <summary>
-    /// This class represents MIME multipart/signed body. Defined in RFC 5731.
+    /// This class represents MIME multipart/signed body. Defined in RFC 5751.
     /// </summary>
     public class MIME_b_MultipartSigned : MIME_b_Multipart
     {
