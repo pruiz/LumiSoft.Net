@@ -785,87 +785,86 @@ namespace LumiSoft.Net.FTP.Client
                                                 
                 ms.Position = 0;
                 SmartStream listStream =  new SmartStream(ms,true);
-                SmartStream.ReadLineAsyncOP args = new SmartStream.ReadLineAsyncOP(new byte[8000],SizeExceededAction.JunkAndThrowException);
-                listStream.ReadLine(args,false);
-                if(args.Error != null){
-                    throw args.Error;
-                }
-                string line = args.LineUtf8;
-            
-                string listingType = "unix";
-                // Dedect listing.
-                if(line != null){
-                    try{
-                        StringReader r = new StringReader(line);
-                        DateTime modified = DateTime.ParseExact(r.ReadWord() + " " + r.ReadWord(),new string[]{"MM-dd-yy hh:mmtt"},System.Globalization.DateTimeFormatInfo.InvariantInfo,System.Globalization.DateTimeStyles.None);
-                        listingType = "win";
-                    }
-                    catch{
-                    }
-                }
-
+                                            
                 string[] winDateFormats = new string[]{"M-d-yy h:mmtt"};
                 string[] unixFormats    = new string[]{"MMM d H:mm","MMM d yyyy"};
 
-                byte[] lineBuffer = new byte[8000];
-                while(line != null){
-                    // Windows listing.                 
-                    if(listingType == "win"){
-                        // MM-dd-yy hh:mm <DIR> directoryName
-                        // MM-dd-yy hh:mm size  fileName
-                                        
-                        StringReader r = new StringReader(line);
-                        // Read date
-                        DateTime modified = DateTime.ParseExact(r.ReadWord() + " " + r.ReadWord(),winDateFormats,System.Globalization.DateTimeFormatInfo.InvariantInfo,System.Globalization.DateTimeStyles.None);
-                     
-                        r.ReadToFirstChar();
-                        // We have directory.
-                        if(r.StartsWith("<dir>",false)){
-                            r.ReadSpecifiedLength(5);
-                            r.ReadToFirstChar();
-
-                            retVal.Add(new FTP_ListItem(r.ReadToEnd(),0,modified,true));
-                        }
-                        // We have file
-                        else{
-                            // Read file size
-                            long size = Convert.ToInt64(r.ReadWord());
-                            r.ReadToFirstChar();
-
-                            retVal.Add(new FTP_ListItem(r.ReadToEnd(),size,modified,false));
-                        }
-                    }
-                    // Unix listing
-                    else{
-                        // "d"directoryAtttributes xx xx xx 0 MMM d HH:mm/yyyy directoryName
-                        // fileAtttributes xx xx xx fileSize MMM d HH:mm/yyyy fileName
-                                        
-                        StringReader r = new StringReader(line);
-                        string attributes = r.ReadWord();
-                        r.ReadWord();
-                        r.ReadWord();
-                        r.ReadWord();
-                        long size = Convert.ToInt64(r.ReadWord());                
-                        DateTime modified = DateTime.ParseExact(r.ReadWord() + " " + r.ReadWord() + " " + r.ReadWord(),unixFormats,System.Globalization.DateTimeFormatInfo.InvariantInfo,System.Globalization.DateTimeStyles.None);
-                        r.ReadToFirstChar();
-                        string name = r.ReadToEnd();
-                        if(name != "." && name != ".."){
-                            if(attributes.StartsWith("d")){
-                                retVal.Add(new FTP_ListItem(name,0,modified,true));
-                            }
-                            else{
-                                retVal.Add(new FTP_ListItem(name,size,modified,false));
-                            }
-                        }
-                    }
-
+                SmartStream.ReadLineAsyncOP args = new SmartStream.ReadLineAsyncOP(new byte[8000],SizeExceededAction.JunkAndThrowException);
+                while(true){
                     listStream.ReadLine(args,false);
                     if(args.Error != null){
                         throw args.Error;
                     }
-                    line = args.LineUtf8;
-                }
+                    else if(args.BytesInBuffer == 0){
+                        break;
+                    }
+                    string line = args.LineUtf8;
 
+                    // Dedect listing.
+                    string listingType = "unix";                    
+                    if(line != null){
+                        StringReader r = new StringReader(line);
+                        DateTime modified;
+                        if(DateTime.TryParseExact(r.ReadWord() + " " + r.ReadWord(),new string[]{"MM-dd-yy hh:mmtt"},System.Globalization.DateTimeFormatInfo.InvariantInfo,System.Globalization.DateTimeStyles.None,out modified)){
+                            listingType = "win";
+                        }
+                    }
+
+                    try{
+                        // Windows listing.                 
+                        if(listingType == "win"){
+                            // MM-dd-yy hh:mm <DIR> directoryName
+                            // MM-dd-yy hh:mm size  fileName
+                                        
+                            StringReader r = new StringReader(line);
+                            // Read date
+                            DateTime modified = DateTime.ParseExact(r.ReadWord() + " " + r.ReadWord(),winDateFormats,System.Globalization.DateTimeFormatInfo.InvariantInfo,System.Globalization.DateTimeStyles.None);
+                     
+                            r.ReadToFirstChar();
+                            // We have directory.
+                            if(r.StartsWith("<dir>",false)){
+                                r.ReadSpecifiedLength(5);
+                                r.ReadToFirstChar();
+
+                                retVal.Add(new FTP_ListItem(r.ReadToEnd(),0,modified,true));
+                            }
+                            // We have file
+                            else{
+                                // Read file size
+                                long size = Convert.ToInt64(r.ReadWord());
+                                r.ReadToFirstChar();
+
+                                retVal.Add(new FTP_ListItem(r.ReadToEnd(),size,modified,false));
+                            }
+                        }
+                        // Unix listing
+                        else{
+                            // "d"directoryAtttributes xx xx xx 0 MMM d HH:mm/yyyy directoryName
+                            // fileAtttributes xx xx xx fileSize MMM d HH:mm/yyyy fileName
+                                        
+                            StringReader r = new StringReader(line);
+                            string attributes = r.ReadWord();
+                            r.ReadWord();
+                            r.ReadWord();
+                            r.ReadWord();
+                            long size = Convert.ToInt64(r.ReadWord());                
+                            DateTime modified = DateTime.ParseExact(r.ReadWord() + " " + r.ReadWord() + " " + r.ReadWord(),unixFormats,System.Globalization.DateTimeFormatInfo.InvariantInfo,System.Globalization.DateTimeStyles.None);
+                            r.ReadToFirstChar();
+                            string name = r.ReadToEnd();
+                            if(name != "." && name != ".."){
+                                if(attributes.StartsWith("d")){
+                                    retVal.Add(new FTP_ListItem(name,0,modified,true));
+                                }
+                                else{
+                                    retVal.Add(new FTP_ListItem(name,size,modified,false));
+                                }
+                            }
+                        }
+                    }
+                    catch{ 
+                        // Skip unknown entries.
+                    }
+                }                
             }
 
             #endregion
