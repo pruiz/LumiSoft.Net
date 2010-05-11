@@ -4188,6 +4188,14 @@ namespace LumiSoft.Net.IMAP.Server
 
                         return;
                     }
+                    // Remote host closed connection.
+                    else if(readLineOP.BytesInBuffer == 0){
+                        LogAddText("Remote host(connected client) closed IMAP connection.");
+                        timer.Dispose();
+                        Dispose();
+
+                        return;
+                    }
 
                     LogAddRead(readLineOP.BytesInBuffer,readLineOP.LineUtf8);
 
@@ -4495,9 +4503,14 @@ namespace LumiSoft.Net.IMAP.Server
             }
             
             try{
-                // Log
                 if(this.Server.Logger != null){
-                    this.Server.Logger.AddText(this.ID,text);
+                    this.Server.Logger.AddText(
+                        this.ID,
+                        this.AuthenticatedUserIdentity,
+                        text,                        
+                        this.LocalEndPoint,
+                        this.RemoteEndPoint
+                    );
                 }
             }
             catch{
