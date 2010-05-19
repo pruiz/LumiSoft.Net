@@ -326,13 +326,24 @@ namespace LumiSoft.Net.SMTP.Client
         {
             /* RFC 2487 STARTTLS 5. STARTTLS Command.
                 STARTTLS with no parameters.
-              
+                                          
                 After the client gives the STARTTLS command, the server responds with
                 one of the following reply codes:
 
                 220 Ready to start TLS
                 501 Syntax error (no parameters allowed)
                 454 TLS not available due to temporary reason
+             
+               5.2 Result of the STARTTLS Command
+                Upon completion of the TLS handshake, the SMTP protocol is reset to
+                the initial state (the state in SMTP after a server issues a 220
+                service ready greeting). The server MUST discard any knowledge
+                obtained from the client, such as the argument to the EHLO command,
+                which was not obtained from the TLS negotiation itself. The client
+                MUST discard any knowledge obtained from the server, such as the list
+                of SMTP service extensions, which was not obtained from the TLS
+                negotiation itself. The client SHOULD send an EHLO command as the
+                first command after a successful TLS negotiation.
             */
 
             if(this.IsDisposed){
@@ -353,6 +364,79 @@ namespace LumiSoft.Net.SMTP.Client
 			}
 
             this.SwitchToSecure();
+
+            #region EHLO/HELO
+
+            // If local host name not specified, get local computer name.
+            string localHostName = m_LocalHostName;
+            if(string.IsNullOrEmpty(localHostName)){
+                localHostName = System.Net.Dns.GetHostName();
+            }
+
+            // Do EHLO/HELO.
+            WriteLine("EHLO " + localHostName);
+
+            // Read server response.
+            line = ReadLine();
+            if(line.StartsWith("250")){
+                m_IsEsmtpSupported = true;
+
+                /* RFC 2821 4.1.1.1 EHLO
+					Examples:
+                        C: EHLO domain<CRLF>
+				    	S: 250-domain freeText<CRLF>
+				        S: 250-EHLO_keyword<CRLF>
+						S: 250 EHLO_keyword<CRLF>
+				 
+						250<SP> specifies that last EHLO response line.
+			    */
+
+                // We may have 250- or 250 SP as domain separator.
+                // 250-
+                if(line.StartsWith("250-")){
+                    m_RemoteHostName = line.Substring(4).Split(new char[]{' '},2)[0];
+                }
+                // 250 SP
+                else{
+                    m_RemoteHostName = line.Split(new char[]{' '},3)[1];
+                }
+
+                m_pEsmtpFeatures = new List<string>();
+                // Read multiline response, EHLO keywords.
+                while(line.StartsWith("250-")){
+                    line = ReadLine();
+
+                    if(line.StartsWith("250")){
+                        m_pEsmtpFeatures.Add(line.Substring(4));
+                    }
+                }
+            }
+            // Probably EHLO not supported, try HELO.
+            else{
+                m_IsEsmtpSupported = false;
+                m_pEsmtpFeatures   = new List<string>();
+
+                WriteLine("HELO " + localHostName);
+
+                line = ReadLine();
+                if(line.StartsWith("250")){
+                    /* Rfc 2821 4.1.1.1 EHLO/HELO
+			            Syntax: "HELO" SP Domain CRLF
+                    
+                        Examples:
+                            C: HELO domain<CRLF>
+                            S: 250 domain freeText<CRLF>
+			        */
+
+                    m_RemoteHostName = line.Split(new char[]{' '},3)[1];
+                }
+                // Server rejects us for some reason.
+                else{
+                    throw new SMTP_ClientException(line);
+                }
+            }
+
+            #endregion
         }
 
         #endregion
