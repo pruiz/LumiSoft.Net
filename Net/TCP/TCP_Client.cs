@@ -28,6 +28,7 @@ namespace LumiSoft.Net.TCP
         private SmartStream                         m_pTcpStream           = null;
         private Logger                              m_pLogger              = null;
         private RemoteCertificateValidationCallback m_pCertificateCallback = null;
+        private int                                 m_Timeout              = 61000;
 
         /// <summary>
         /// Default constructor.
@@ -326,8 +327,8 @@ namespace LumiSoft.Net.TCP
             }
         
             try{                
-                socket.SendTimeout = 61000;
-                socket.ReceiveTimeout = 61000;
+                socket.SendTimeout    = m_Timeout;
+                socket.ReceiveTimeout = m_Timeout;
 
                 if(localEP != null){
                     socket.Bind(localEP);
@@ -888,6 +889,17 @@ namespace LumiSoft.Net.TCP
             get{ return m_pCertificateCallback; }
 
             set{ m_pCertificateCallback = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets default TCP read/write timeout.
+        /// </summary>
+        /// <remarks>This timeout applies only synchronous TCP read/write operations.</remarks>
+        public int Timeout
+        {
+            get{ return m_Timeout; }
+
+            set{ m_Timeout = value; }
         }
 
         #endregion
