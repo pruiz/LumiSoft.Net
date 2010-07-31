@@ -144,10 +144,11 @@ namespace LumiSoft.Net.AUTH
 		/// <param name="hashKey">MD5 key.</param>
 		/// <param name="text">Text to hash.</param>
 		/// <returns>Returns MD5 hash.</returns>
-		private string HmacMd5(string hashKey,string text)
+		private byte[] HmacMd5(string hashKey,string text)
 		{
-			HMACMD5 kMd5 = new HMACMD5(Encoding.Default.GetBytes(text));			
-			return Encoding.Default.GetString(kMd5.ComputeHash(Encoding.ASCII.GetBytes(hashKey)));
+			HMACMD5 kMd5 = new HMACMD5(Encoding.Default.GetBytes(text));
+			
+			return kMd5.ComputeHash(Encoding.ASCII.GetBytes(hashKey));
 		}
 
 		#endregion
