@@ -607,13 +607,13 @@ namespace LumiSoft.Net.SIP.Stack
                 if(value){
                     if(m_pKeepAliveTimer == null){
                         m_pKeepAliveTimer = new TimerEx(15000,true);
-                        m_pKeepAliveTimer.Elapsed += delegate(object s,System.Timers.ElapsedEventArgs e){
-                            // Log:
-                            if(m_pStack.TransportLayer.Stack.Logger != null){
-                                m_pStack.TransportLayer.Stack.Logger.AddWrite("",null,2,"Flow [id='" + this.ID + "'] sent \"ping\"",this.LocalEP,this.RemoteEP);
-                            }
-
+                        m_pKeepAliveTimer.Elapsed += delegate(object s,System.Timers.ElapsedEventArgs e){  
                             try{
+                                // Log:
+                                if(m_pStack.TransportLayer.Stack.Logger != null){
+                                    m_pStack.TransportLayer.Stack.Logger.AddWrite("",null,2,"Flow [id='" + this.ID + "'] sent \"ping\"",this.LocalEP,this.RemoteEP);
+                                }
+
                                 SendInternal(new byte[]{(byte)'\r',(byte)'\n',(byte)'\r',(byte)'\n'});
                             }
                             catch{
