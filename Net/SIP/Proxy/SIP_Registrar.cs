@@ -359,9 +359,11 @@ namespace LumiSoft.Net.SIP.Proxy
             #region 7. Process Contact values
 
             if(starContact == null){
-                SIP_Registration reg = m_pRegistrations[to.Address];
+                bool             newReg = false;
+                SIP_Registration reg    = m_pRegistrations[to.Address];
                 if(reg == null){
-                    reg = new SIP_Registration(userName,to.Address);
+                    newReg = true;
+                    reg    = new SIP_Registration(userName,to.Address);
                     m_pRegistrations.Add(reg);
                 }
 
@@ -393,6 +395,14 @@ namespace LumiSoft.Net.SIP.Proxy
 
                 // Do binding updates.
                 reg.AddOrUpdateBindings(e.ServerTransaction.Flow,request.CallID,request.CSeq.SequenceNumber,request.Contact.GetAllValues());
+
+                // Raise AOR change events.
+                if(newReg){
+                    OnAorRegistered(reg);
+                }
+                else{
+                    OnAorUpdated(reg);
+                }
             }
 
             #endregion
