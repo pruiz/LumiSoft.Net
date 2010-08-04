@@ -864,7 +864,7 @@ namespace LumiSoft.Net.SMTP.Client
                 cmd.Append(" RET=HDRS");
             }
             if(!string.IsNullOrEmpty(envid)){
-                cmd.Append(" ENVID=" + messageSize.ToString());
+                cmd.Append(" ENVID=" + envid);
             }
             WriteLine(cmd.ToString());
 
