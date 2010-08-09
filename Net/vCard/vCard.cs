@@ -83,47 +83,101 @@ namespace LumiSoft.Net.Mime.vCard
         }
 
         #endregion
-        
+
+
+        #region static method ParseMultiple
+
+        /// <summary>
+        /// Parses multiple vCards from the specified file (Apple Address Book and Gmail exports)
+        /// </summary>
+        /// <param name="file">vCard file with path.</param>
+        public static List<vCard> ParseMultiple(string file) {
+            List<vCard> vCards = new List<vCard>();
+            List<string> fileStrings = new List<string>();
+            string line = "";
+            bool hasBeginTag = false;
+            using (FileStream fs = File.OpenRead(file)) {
+                TextReader r = new StreamReader(fs, System.Text.Encoding.Default);          
+                while (line != null) {
+                    line = r.ReadLine();
+                    if (line != null && line.ToUpper() == "BEGIN:VCARD") {
+                        hasBeginTag = true;
+                    }
+                    if (hasBeginTag) {
+                        fileStrings.Add(line);
+                        if (line != null && line.ToUpper() == "END:VCARD") {
+                            // on END line process the Vcard, reinitialize, and will repeat the same thing for any others.
+                            vCard singleVcard = new vCard();
+                            singleVcard.ParseStrings(fileStrings);
+                            vCards.Add(singleVcard);
+                            fileStrings.Clear();
+                            hasBeginTag = false;
+                        }
+                    }
+                }
+            }
+            return vCards;
+        }
+
+        #endregion
 
         #region method Parse
 
         /// <summary>
-        /// Parses vCard from the specified file.
+        /// Parses single vCard from the specified file.
         /// </summary>
         /// <param name="file">vCard file with path.</param>
         public void Parse(string file)
         {
-            using(FileStream fs = File.OpenRead(file)){
-                Parse(fs);
+            List<string> fileStrings = new List<string>();
+            string[] fileStringArray = File.ReadAllLines(file,System.Text.Encoding.Default);
+            foreach (string fileString in fileStringArray) {
+                fileStrings.Add(fileString);
             }
+            ParseStrings(fileStrings);
+        }
+
+        /// <summary>
+        /// Parses single vCard from the specified stream.
+        /// </summary>
+        /// <param name="stream">Stream what contains vCard.</param>
+        public void Parse(FileStream stream) {
+            List<string> fileStrings = new List<string>();
+            string line = "";
+            TextReader r = new StreamReader(stream, System.Text.Encoding.Default); 
+            while (line != null) {
+                line = r.ReadLine();
+                fileStrings.Add(line);
+            }
+            ParseStrings(fileStrings);
         }
 
         /// <summary>
         /// Parses vCard from the specified stream.
         /// </summary>
-        /// <param name="stream">Stream what contains vCard.</param>
-        public void Parse(Stream stream)
+        /// <param name="fileStrings">List of strings that contains vCard.</param>
+        public void ParseStrings(List<string> fileStrings)
         {
             m_pItems.Clear();
             m_pPhoneNumbers = null;
             m_pEmailAddresses = null;
 
-            TextReader r = new StreamReader(stream,System.Text.Encoding.Default);            
-            string line = r.ReadLine();
+            int lineCount = 0;
+            string line = fileStrings[lineCount];
             // Find row BEGIN:VCARD
             while(line != null && line.ToUpper() != "BEGIN:VCARD"){
-                line = r.ReadLine();
+                line = fileStrings[lineCount++];
             }
-            // Read frist vCard line after BEGIN:VCARD
-            line = r.ReadLine();
+            // Read first vCard line after BEGIN:VCARD
+            line = fileStrings[lineCount++];
             while(line != null && line.ToUpper() != "END:VCARD"){
                 StringBuilder item = new StringBuilder();
                 item.Append(line);
                 // Get next line, see if item continues (folded line).
-                line = r.ReadLine();
+                line = fileStrings[lineCount++];
                 while(line != null && (line.StartsWith("\t") || line.StartsWith(" "))){
                     item.Append(line.Substring(1));
-                    line = r.ReadLine();
+                    line = fileStrings[lineCount++];
                 }
 
                 string[] name_value = item.ToString().Split(new char[]{':'},2);
