@@ -61,29 +61,34 @@ namespace LumiSoft.Net.AUTH
 
             if(m_State == 0){
                 m_State++;
-                           
-                return "realm=\"" + m_Realm + "\",nonce=\"" + m_Nonce + "\",qop=\"auth\",algorithm=md5-sess,charset=utf-8";
+                
+                AUTH_SASL_DigestMD5_Challenge callenge = new AUTH_SASL_DigestMD5_Challenge(new string[]{m_Realm},m_Nonce,new string[]{"auth"},false);
+     
+                return callenge.ToChallenge();
             }
             else if(m_State == 1){
                 m_State++;
 
-                Auth_HttpDigest auth = new Auth_HttpDigest(clientResponse,"AUTHENTICATE");
-                auth.Qop = "auth";
-                auth.Algorithm = "md5-sess";
+                try{
+                    AUTH_SASL_DigestMD5_Response response = AUTH_SASL_DigestMD5_Response.Parse(clientResponse);
 
-                // Check realm and nonce value.
-                if(m_Realm != auth.Realm || m_Nonce != auth.Nonce){
-                    return "rspauth=\"\"";
-                }
-
-                m_UserName = auth.UserName;
-                AUTH_e_UserInfo result = OnGetUserInfo(auth.UserName);
-                if(result.UserExists){
-                    if(auth.Authenticate(result.UserName,result.Password)){
-                        m_IsAuthenticated = true;
-
-                        return "rspauth=" + auth.CalculateRspAuth(result.UserName,result.Password);
+                    // Check realm and nonce value.
+                    if(m_Realm != response.Realm || m_Nonce != response.Nonce){
+                        return "rspauth=\"\"";
                     }
+
+                    m_UserName = response.UserName;
+                    AUTH_e_UserInfo result = OnGetUserInfo(response.UserName);
+                    if(result.UserExists){            
+                        if(response.Authenticate(result.UserName,result.Password)){
+                            m_IsAuthenticated = true;
+
+                            return response.ToRspauthResponse(result.UserName,result.Password);
+                        }
+                    }
+                }
+                catch{
+                    // Authentication failed, just reject request.
                 }
 
                 return "rspauth=\"\"";
