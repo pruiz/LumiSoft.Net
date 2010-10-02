@@ -925,7 +925,7 @@ namespace LumiSoft.Net
 			byte[] hash = md5.ComputeHash(Encoding.Default.GetBytes(text));
 
             if(hex){
-			    return ToHex(System.Text.Encoding.Default.GetString(hash)).ToLower();
+			    return ToHex(hash).ToLower();
             }
             else{
                 return System.Text.Encoding.Default.GetString(hash);
