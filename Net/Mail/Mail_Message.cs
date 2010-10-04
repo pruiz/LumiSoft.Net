@@ -34,7 +34,7 @@ namespace LumiSoft.Net.Mail
             this.Header.FieldsProvider.HeaderFields.Add("Resent-Reply-To",typeof(Mail_h_AddressList));
             this.Header.FieldsProvider.HeaderFields.Add("Return-Path",typeof(Mail_h_ReturnPath));
             this.Header.FieldsProvider.HeaderFields.Add("Received",typeof(Mail_h_Received));
-            this.Header.FieldsProvider.HeaderFields.Add("Disposition-Notification-To",typeof(Mail_h_Mailbox));
+            this.Header.FieldsProvider.HeaderFields.Add("Disposition-Notification-To",typeof(Mail_h_MailboxList));
             this.Header.FieldsProvider.HeaderFields.Add("Disposition-Notification-Options",typeof(Mail_h_DispositionNotificationOptions));
         }
 
@@ -1194,14 +1194,16 @@ namespace LumiSoft.Net.Mail
         // public string Encypted
 
         /// <summary>
-        /// Gets or sets mailbox for sending disposition notification. Value null means not specified.
+        /// Gets or sets mailboxes where to send disposition notification message. Value null means not specified.
         /// </summary>
         /// <remarks>Indicates that the sender wants a disposition notification when this message 
         /// is received (read, processed, etc.) by its recipients.</remarks>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
         /// <exception cref="ParseException">Is raised when header field parsing errors.</exception>
-        public Mail_t_Mailbox DispositionNotificationTo
+        public Mail_t_MailboxList DispositionNotificationTo
         {
+            // Defined RFC 3798 2.1.
+
             get{
                 if(this.IsDisposed){
                     throw new ObjectDisposedException(this.GetType().Name);
@@ -1209,11 +1211,11 @@ namespace LumiSoft.Net.Mail
 
                 MIME_h h = this.Header.GetFirst("Disposition-Notification-To");
                 if(h != null){
-                    if(!(h is Mail_h_Mailbox)){
-                        throw new ParseException("Header field 'Disposition-Notification-To' parsing failed.");
+                    if(!(h is Mail_h_MailboxList)){
+                        throw new ParseException("Header field 'From' parsing failed.");
                     }
 
-                    return ((Mail_h_Mailbox)h).Address;
+                    return ((Mail_h_MailboxList)h).Addresses;
                 }
                 else{
                     return null;
@@ -1231,10 +1233,10 @@ namespace LumiSoft.Net.Mail
                 else{
                     MIME_h h = this.Header.GetFirst("Disposition-Notification-To");
                     if(h == null){
-                        this.Header.Add(new Mail_h_Mailbox("Disposition-Notification-To",value));
+                        this.Header.Add(new Mail_h_MailboxList("Disposition-Notification-To",value));
                     }
                     else{
-                        this.Header.ReplaceFirst(new Mail_h_Mailbox("Disposition-Notification-To",value));
+                        this.Header.ReplaceFirst(new Mail_h_MailboxList("Disposition-Notification-To",value));
                     }
                 }
             }
