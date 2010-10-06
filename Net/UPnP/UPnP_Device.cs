@@ -1,8 +1,8 @@
 ﻿using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Text;
 using System.Xml;
-using System.Xml.XPath;
 
 namespace LumiSoft.Net.UPnP
 {
@@ -11,6 +11,7 @@ namespace LumiSoft.Net.UPnP
     /// </summary>
     public class UPnP_Device
     {
+        private string m_BaseUrl          = "";
         private string m_DeviceType       = "";
         private string m_FriendlyName     = "";
         private string m_Manufacturer     = "";
@@ -22,6 +23,7 @@ namespace LumiSoft.Net.UPnP
         private string m_SerialNumber     = "";
         private string m_UDN              = "";
         private string m_PresentationUrl  = "";
+        private string m_DeviceXml        = null;
 
         /// <summary>
         /// Default constructor.
@@ -43,12 +45,15 @@ namespace LumiSoft.Net.UPnP
             XmlDocument xml = new XmlDocument();
             xml.Load(url);
 
+            StringWriter xmlString = new StringWriter();
+            xml.WriteTo(new XmlTextWriter(xmlString));
+            m_DeviceXml = xmlString.ToString();
+
             // Set up namespace manager for XPath   
             XmlNamespaceManager ns = new XmlNamespaceManager(xml.NameTable);   
-            ns.AddNamespace("n",xml.ChildNodes[1].NamespaceURI);  
- 
-            XPathNavigator navigator = xml.CreateNavigator();
+            ns.AddNamespace("n",xml.ChildNodes[1].NamespaceURI);
 
+            m_BaseUrl          = xml.SelectSingleNode("n:root/n:URLBase",ns).InnerText;
             m_DeviceType       = xml.SelectSingleNode("n:root/n:device/n:deviceType",ns).InnerText;
             m_FriendlyName     = xml.SelectSingleNode("n:root/n:device/n:friendlyName",ns).InnerText;
             m_Manufacturer     = xml.SelectSingleNode("n:root/n:device/n:manufacturer",ns).InnerText;
@@ -66,6 +71,14 @@ namespace LumiSoft.Net.UPnP
 
 
         #region Proeprties implementation
+
+        /// <summary>
+        /// Gets device base URL.
+        /// </summary>
+        public string BaseUrl
+        {
+            get{ return m_BaseUrl; }
+        }
 
         /// <summary>
         /// Gets device type.
@@ -157,6 +170,14 @@ namespace LumiSoft.Net.UPnP
         public string PresentationUrl
         {
             get{ return m_PresentationUrl; }
+        }
+
+        /// <summary>
+        /// Gets UPnP device XML description.
+        /// </summary>
+        public string DeviceXml
+        {
+            get{ return m_DeviceXml; }
         }
 
         #endregion
