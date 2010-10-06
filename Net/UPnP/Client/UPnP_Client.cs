@@ -19,14 +19,25 @@ namespace LumiSoft.Net.UPnP.Client
         }
 
 
-        #region method Serach
+        #region method Search
 
+        /// <summary>
+        /// Searches the network for UPnP root devices.
+        /// </summary>
+        /// <param name="timeout">Search wait timeout in milliseconds.</param>
+        /// <returns>Returns matched UPnP devices.</returns>
+        public UPnP_Device[] Search(int timeout)
+        {
+            return Search("upnp:rootdevice",timeout);
+        }
+                
         /// <summary>
         /// Searches the network for UPnP devices.
         /// </summary>
-        /// <param name="timeout">Search wait timeout.</param>
+        /// <param name="deviceType">UPnP device type. For example: "urn:schemas-upnp-org:device:InternetGatewayDevice:1".</param>
+        /// <param name="timeout">Search wait timeout in milliseconds.</param>
         /// <returns>Returns matched UPnP devices.</returns>
-        public UPnP_Device[] Serach(int timeout)
+        public UPnP_Device[] Search(string deviceType,int timeout)
         {
             if(timeout < 1){
                 timeout = 1;
@@ -126,7 +137,7 @@ namespace LumiSoft.Net.UPnP.Client
             query.Append("HOST: 239.255.255.250:1900\r\n");
             query.Append("MAN: \"ssdp:discover\"\r\n");
             query.Append("MX: 1\r\n");
-            query.Append("ST: upnp:rootdevice\r\n");
+            query.Append("ST: " + deviceType + "\r\n");
             query.Append("\r\n");
 
             using(Socket socket = new Socket(AddressFamily.InterNetwork,SocketType.Dgram,ProtocolType.Udp)){
@@ -144,8 +155,8 @@ namespace LumiSoft.Net.UPnP.Client
                     if(socket.Poll(1,SelectMode.SelectRead)){
                         int countReceived = socket.Receive(buffer);
 
-                        string[] responseLinse = Encoding.UTF8.GetString(buffer,0,countReceived).Split('\n');
-                        foreach(string responseLine in responseLinse){
+                        string[] responseLines = Encoding.UTF8.GetString(buffer,0,countReceived).Split('\n');                    
+                        foreach(string responseLine in responseLines){
                             string[] name_value = responseLine.Split(new char[]{':'},2);
                             if(string.Equals(name_value[0],"location",StringComparison.InvariantCultureIgnoreCase)){
                                 deviceLocations.Add(name_value[1].Trim());
@@ -166,6 +177,68 @@ namespace LumiSoft.Net.UPnP.Client
 
                 return devices.ToArray();
             }
+        }
+
+        /// <summary>
+        /// Searches the network for UPnP devices.
+        /// </summary>
+        /// <param name="ip">IP address of UPnP device.</param>
+        /// <param name="deviceType">UPnP device type. For example: "urn:schemas-upnp-org:device:InternetGatewayDevice:1".</param>
+        /// <param name="timeout">Search wait timeout in milliseconds.</param>
+        /// <returns>Returns matched UPnP devices.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>ip</b> is null reference.</exception>
+        public UPnP_Device[] Search(IPAddress ip,string deviceType,int timeout)
+        {
+            if(ip == null){
+                throw new ArgumentNullException("ip");
+            }
+            if(timeout < 1){
+                timeout = 1;
+            }
+                        
+            using(Socket socket = new Socket(AddressFamily.InterNetwork,SocketType.Dgram,ProtocolType.Udp)){
+                socket.SetSocketOption(SocketOptionLevel.Socket,SocketOptionName.IpTimeToLive,2);
+               
+                StringBuilder query = new StringBuilder();
+                query.Append("M-SEARCH * HTTP/1.1\r\n");
+                query.Append("MAN: \"ssdp:discover\"\r\n");
+                query.Append("MX: 1\r\n");
+                query.Append("ST: " + deviceType + "\r\n");
+                query.Append("\r\n");
+
+                socket.SendTo(Encoding.UTF8.GetBytes(query.ToString()),new IPEndPoint(ip,1900));
+
+                List<string> deviceLocations = new List<string>();    
+                byte[]       buffer          = new byte[32000];
+                DateTime     startTime       = DateTime.Now;
+                // Receive responses while timeout reached.
+                while(startTime.AddMilliseconds(timeout) > DateTime.Now){
+                    // We have response, read it.
+                    if(socket.Poll(1,SelectMode.SelectRead)){
+                        int countReceived = socket.Receive(buffer);
+
+                        string[] responseLines = Encoding.UTF8.GetString(buffer,0,countReceived).Split('\n');                    
+                        foreach(string responseLine in responseLines){
+                            string[] name_value = responseLine.Split(new char[]{':'},2);
+                            if(string.Equals(name_value[0],"location",StringComparison.InvariantCultureIgnoreCase)){
+                                deviceLocations.Add(name_value[1].Trim());
+                            }
+                        }
+                    }
+                }
+
+                // Create devices.
+                List<UPnP_Device> devices = new List<UPnP_Device>();
+                foreach(string location in deviceLocations){
+                    try{
+                        devices.Add(new UPnP_Device(location));
+                    }
+                    catch{
+                    }
+                }
+
+                return devices.ToArray();
+            }        
         }
 
         #endregion
