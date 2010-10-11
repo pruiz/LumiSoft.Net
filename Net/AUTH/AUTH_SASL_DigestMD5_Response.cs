@@ -130,6 +130,9 @@ namespace LumiSoft.Net.AUTH
             
             AUTH_SASL_DigestMD5_Response retVal = new AUTH_SASL_DigestMD5_Response();
 
+            // Set default values.
+            retVal.m_Realm = "";
+
             string[] parameters = TextUtils.SplitQuotedString(digestResponse,',');
             foreach(string parameter in parameters){
                 string[] name_value = parameter.Split(new char[]{'='},2);
