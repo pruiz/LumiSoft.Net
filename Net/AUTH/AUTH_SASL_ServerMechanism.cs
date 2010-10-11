@@ -19,6 +19,15 @@ namespace LumiSoft.Net.AUTH
         }
 
 
+        #region abstract method Reset
+
+        /// <summary>
+        /// Resets any authentication state data.
+        /// </summary>
+        public abstract void Reset();
+
+        #endregion
+
         #region abstract method Continue
 
         /// <summary>

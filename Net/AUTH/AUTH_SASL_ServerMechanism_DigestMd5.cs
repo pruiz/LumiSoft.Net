@@ -29,6 +29,21 @@ namespace LumiSoft.Net.AUTH
         }
 
 
+        #region override method Reset
+
+        /// <summary>
+        /// Resets any authentication state data.
+        /// </summary>
+        public override void Reset()
+        {
+            m_IsCompleted     = false;
+            m_IsAuthenticated = false;
+            m_UserName        = "";
+            m_State           = 0;
+        }
+
+        #endregion
+
         #region override method Continue
 
         /// <summary>
