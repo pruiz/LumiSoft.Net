@@ -827,6 +827,7 @@ namespace LumiSoft.Net.IMAP.Server
 
             string clientResponse = "";
             AUTH_SASL_ServerMechanism auth = this.Authentications[mechanism];            
+            auth.Reset();
             while(true){
                 string serverResponse = auth.Continue(clientResponse);
                 // Authentication completed.
@@ -4404,8 +4405,6 @@ namespace LumiSoft.Net.IMAP.Server
             }
             Disconnect();
             Dispose();
-
-            throw new NotImplementedException();
         }
 
         #endregion
