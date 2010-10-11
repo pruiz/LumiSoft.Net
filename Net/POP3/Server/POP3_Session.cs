@@ -614,7 +614,8 @@ namespace LumiSoft.Net.POP3.Server
             }
 
             string clientResponse = "";
-            AUTH_SASL_ServerMechanism auth = this.Authentications[mechanism];            
+            AUTH_SASL_ServerMechanism auth = this.Authentications[mechanism];
+            auth.Reset();
             while(true){
                 string serverResponse = auth.Continue(clientResponse);
                 // Authentication completed.
