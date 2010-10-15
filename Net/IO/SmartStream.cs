@@ -2104,7 +2104,7 @@ namespace LumiSoft.Net.IO
                             }
 
                             if(exceededAction == SizeExceededAction.ThrowException){                                
-                                return true;
+                                break;
                             }
                         }
                         // Store byte.
