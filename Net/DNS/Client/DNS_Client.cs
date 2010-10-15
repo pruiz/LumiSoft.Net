@@ -518,7 +518,7 @@ namespace LumiSoft.Net.DNS.Client
         /// </summary>
         private void StartWaitingIPv4Packet()
         {
-            byte[] buffer = new byte[1500];
+            byte[] buffer = new byte[8000];
             EndPoint rtpRemoteEP = new IPEndPoint(IPAddress.Any,0);
             m_pIPv4Socket.BeginReceiveFrom(
                 buffer,
@@ -540,7 +540,7 @@ namespace LumiSoft.Net.DNS.Client
         /// </summary>
         private void StartWaitingIPv6Packet()
         {
-            byte[] buffer = new byte[1500];
+            byte[] buffer = new byte[8000];
             EndPoint rtpRemoteEP = new IPEndPoint(IPAddress.IPv6Any,0);
             m_pIPv6Socket.BeginReceiveFrom(
                 buffer,
@@ -571,7 +571,10 @@ namespace LumiSoft.Net.DNS.Client
                 EndPoint remoteEP = new IPEndPoint(IPAddress.Any,0);
                 int count = m_pIPv4Socket.EndReceiveFrom(ar,ref remoteEP);
 
-                DnsServerResponse serverResponse = ParseQuery((byte[])ar.AsyncState);
+                byte[] response = new byte[count];
+                Array.Copy((byte[])ar.AsyncState,response,count);
+
+                DnsServerResponse serverResponse = ParseQuery(response);
                 DnsTransaction transaction = null;
                 // Pass response to transaction.
                 if(m_pTransactions.TryGetValue(serverResponse.ID,out transaction)){
@@ -615,7 +618,10 @@ namespace LumiSoft.Net.DNS.Client
                 EndPoint remoteEP = new IPEndPoint(IPAddress.Any,0);
                 int count = m_pIPv6Socket.EndReceiveFrom(ar,ref remoteEP);
 
-                DnsServerResponse serverResponse = ParseQuery((byte[])ar.AsyncState);
+                byte[] response = new byte[count];
+                Array.Copy((byte[])ar.AsyncState,response,count);
+
+                DnsServerResponse serverResponse = ParseQuery(response);
                 DnsTransaction transaction = null;
                 // Pass response to transaction.
                 if(m_pTransactions.TryGetValue(serverResponse.ID,out transaction)){
@@ -836,7 +842,8 @@ namespace LumiSoft.Net.DNS.Client
 						// 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7  # byte 2 # 0 | 1 | 2 | | 3 | 4 | 5 | 6 | 7
 						// empty | < ---- pointer location number --------------------------------->
 						int pStart = ((reply[offset] & 0x3F) << 8) | (reply[++offset]);
-						offset++;						
+						offset++;
+			
 						return GetQName(reply,ref pStart,ref name);
 					}
 					else{
@@ -863,7 +870,7 @@ namespace LumiSoft.Net.DNS.Client
 
 				return true;
 			}
-			catch{
+			catch(Exception x){
 				return false;
 			}
 		}
@@ -937,7 +944,6 @@ namespace LumiSoft.Net.DNS.Client
 				pos += 4;
 			}
 			//--------------------------------------//
-			
 
 			// 1) parse answers
 			// 2) parse authoritive answers
@@ -988,10 +994,10 @@ namespace LumiSoft.Net.DNS.Client
 
 			List<DNS_rr> answers = new List<DNS_rr>();
 			//---- Start parsing answers ------------------------------------------------------------------//
-			for(int i=0;i<answerCount;i++){	
+			for(int i=0;i<answerCount;i++){        
 				string name = "";
 				if(!GetQName(reply,ref offset,ref name)){
-					throw new Exception("Error parsing anser");
+					break;
 				}
 
 				int type     = reply[offset++] << 8  | reply[offset++];
