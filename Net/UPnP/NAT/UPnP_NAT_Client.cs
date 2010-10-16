@@ -268,9 +268,10 @@ namespace LumiSoft.Net.UPnP.NAT
         /// <param name="remoteHost">Remote host IP address.</param>
         /// <param name="publicPort">Desired public port.</param>
         /// <param name="localEP">Local IP end point.</param>
+        /// <param name="leaseDuration">Lease duration in seconds. Value null means never expires.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>description</b>,<b>protocol</b> or <b>localEP</b> is null reference.</exception>
         /// <exception cref="UPnP_Exception">Is raised when UPnP device returns error.</exception>
-        public void AddPortMapping(bool enabled,string description,string protocol,string remoteHost,int publicPort,IPEndPoint localEP)
+        public void AddPortMapping(bool enabled,string description,string protocol,string remoteHost,int publicPort,IPEndPoint localEP,int leaseDuration)
         {
             if(description == null){
                 throw new ArgumentNullException("description");
@@ -314,7 +315,7 @@ namespace LumiSoft.Net.UPnP.NAT
                 "<NewInternalClient>" + localEP.Address.ToString() + "</NewInternalClient>\r\n" +
                 "<NewEnabled>" + Convert.ToInt32(enabled) + "</NewEnabled>\r\n" +
                 "<NewPortMappingDescription>" + description + "</NewPortMappingDescription>\r\n" +
-                "<NewLeaseDuration>0</NewLeaseDuration>\r\n" +
+                "<NewLeaseDuration>" + leaseDuration + "</NewLeaseDuration>\r\n" +
                 "</u:AddPortMapping>\r\n" +
                 "</s:Body>\r\n" +
                 "</s:Envelope>\r\n";
