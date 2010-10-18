@@ -35,9 +35,9 @@ namespace LumiSoft.Net.DNS
         public static DNS_rr_AAAA Parse(byte[] reply,ref int offset,int rdLength,int ttl)
         {
             // IPv6 = 16xbyte
-
 			byte[] ip = new byte[rdLength];
 			Array.Copy(reply,offset,ip,0,rdLength);
+            offset += rdLength;
 	
 			return new DNS_rr_AAAA(new IPAddress(ip),ttl);	
         }
