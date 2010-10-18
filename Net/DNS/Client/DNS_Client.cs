@@ -829,48 +829,56 @@ namespace LumiSoft.Net.DNS.Client
 
 		internal static bool GetQName(byte[] reply,ref int offset,ref string name)
 		{				
-			try{
-				// Do while not terminator
-				while(reply[offset] != 0){
-					
+			try{				
+				while(true){
+                    // Invalid DNS packet, offset goes beyound reply size, probably terminator missing.
+                    if(offset >= reply.Length){
+                        return false;
+                    }
+                    // We have label terminator "0".
+                    if(reply[offset] == 0){
+                        break;
+                    }
+
 					// Check if it's pointer(In pointer first two bits always 1)
 					bool isPointer = ((reply[offset] & 0xC0) == 0xC0);
 					
 					// If pointer
 					if(isPointer){
-						// Pointer location number is 2 bytes long
-						// 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7  # byte 2 # 0 | 1 | 2 | | 3 | 4 | 5 | 6 | 7
-						// empty | < ---- pointer location number --------------------------------->
+						/* Pointer location number is 2 bytes long
+						    0 | 1 | 2 | 3 | 4 | 5 | 6 | 7  # byte 2 # 0 | 1 | 2 | | 3 | 4 | 5 | 6 | 7
+						    empty | < ---- pointer location number --------------------------------->
+                        */
 						int pStart = ((reply[offset] & 0x3F) << 8) | (reply[++offset]);
 						offset++;
 			
 						return GetQName(reply,ref pStart,ref name);
 					}
 					else{
-						// label length (length = 8Bit and first 2 bits always 0)
-						// 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
-						// empty | lablel length in bytes 
+						/* Label length (length = 8Bit and first 2 bits always 0)
+						    0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
+						    empty | lablel length in bytes 
+                        */
 						int labelLength = (reply[offset] & 0x3F);
 						offset++;
-						
+				
 						// Copy label into name 
-						name += Encoding.ASCII.GetString(reply,offset,labelLength);
+						name += Encoding.UTF8.GetString(reply,offset,labelLength);
 						offset += labelLength;
 					}
 									
-					// If the next char isn't terminator,
-					// label continues - add dot between two labels
+					// If the next char isn't terminator, label continues - add dot between two labels.
 					if (reply[offset] != 0){
 						name += ".";
 					}					
 				}
 
-				// Move offset by terminator length
+				// Move offset by terminator length.
 				offset++;
 
 				return true;
 			}
-			catch(Exception x){
+			catch{
 				return false;
 			}
 		}
