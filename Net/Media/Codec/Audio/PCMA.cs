@@ -71,6 +71,9 @@ namespace LumiSoft.Net.Media.Codec.Audio
 
         #endregion
 
+        private AudioFormat m_pAudioFormat           = new AudioFormat(8000,16,1);
+        private AudioFormat m_pCompressedAudioFormat = new AudioFormat(8000,8,1);
+
         /// <summary>
         /// Default constructor.
         /// </summary>
@@ -201,19 +204,19 @@ namespace LumiSoft.Net.Media.Codec.Audio
         }
 
         /// <summary>
-        /// Gets sample number of samples in second(hz). 
+        /// Gets uncompressed audio format info.
         /// </summary>
-        public override int SampleRate
+        public override AudioFormat AudioFormat
         {
-            get{ return 8000; }
+            get{ return m_pAudioFormat; }
         }
 
         /// <summary>
-        /// Gets number of bits per sample.
+        /// Gets compressed audio format info.
         /// </summary>
-        public override int BitsPerSample
+        public override AudioFormat CompressedAudioFormat
         {
-            get{ return 8; }
+            get{ return m_pCompressedAudioFormat; }
         }
 
         #endregion

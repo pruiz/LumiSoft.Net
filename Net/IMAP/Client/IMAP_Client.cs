@@ -153,7 +153,13 @@ namespace LumiSoft.Net.IMAP.Client
                         // Eat FLAGS word.
                         m_pFetchReader.ReadWord();
 
-                        m_pHandler.OnFlags(m_pFetchReader.ReadParenthesized().Split(' '));
+                        string   flagsList = m_pFetchReader.ReadParenthesized();
+                        string[] flags     = new string[0];
+                        if(!string.IsNullOrEmpty(flagsList)){
+                            flags = flagsList.Split(' ');
+                        }
+
+                        m_pHandler.OnFlags(flags);
                     }
 
                     #endregion

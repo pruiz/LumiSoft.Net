@@ -348,7 +348,7 @@ namespace LumiSoft.Net.SIP.Stack
                             );
                         }
                     }
-                    catch{                        
+                    catch{
                         /* RFC 3261 13.2.2.4.
                             Once the ACK has been constructed, the procedures of [4] are used to
                             determine the destination address, port and transport.  However, the

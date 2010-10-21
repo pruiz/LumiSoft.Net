@@ -31,6 +31,20 @@ namespace LumiSoft.Net.RTP
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         public static RTCP_Packet Parse(byte[] buffer,ref int offset)
         {
+            return Parse(buffer, ref offset,false);
+        }
+
+        /// <summary>
+        /// Parses 1 RTCP packet from the specified buffer.
+        /// </summary>
+        /// <param name="buffer">Buffer which contains RTCP packet.</param>
+        /// <param name="offset">Offset in buffer.</param>
+        /// <param name="noException">If true and parsing failed, no exception is raised.</param>
+        /// <returns>Returns parsed RTCP packet or null if parsing is failed and <b>noException=true</b>.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>buffer</b> is null.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        public static RTCP_Packet Parse(byte[] buffer,ref int offset,bool noException)
+        {
             if(buffer == null){
                 throw new ArgumentNullException("buffer");
             }
@@ -89,7 +103,12 @@ namespace LumiSoft.Net.RTP
                 int length = buffer[offset++] << 8 | buffer[offset++];
                 offset += length;
 
-                throw new ArgumentException("Unknown RTCP packet type '" + type + "'.");
+                if(noException){
+                    return null;
+                }
+                else{
+                    throw new ArgumentException("Unknown RTCP packet type '" + type + "'.");
+                }
             }
         }
 

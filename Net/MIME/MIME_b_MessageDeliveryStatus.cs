@@ -78,15 +78,18 @@ namespace LumiSoft.Net.MIME
             // from stream.
             MemoryStream msBuffer = new MemoryStream();
             Net_Utils.StreamCopy(stream,msBuffer,32000);
-            msBuffer.Position = 0;            
+            msBuffer.Position = 0;
+
+            SmartStream parseStream = new SmartStream(msBuffer,true);
 
             MIME_b_MessageDeliveryStatus retVal = new MIME_b_MessageDeliveryStatus();
             //Pare per-message fields.
-            retVal.m_pMessageFields.Parse(stream);
+            retVal.m_pMessageFields.Parse(parseStream);
+
             // Parse per-recipient fields.
-            while(msBuffer.Position < msBuffer.Length){
+            while(parseStream.Position - parseStream.BytesInReadBuffer < parseStream.Length){
                 MIME_h_Collection recipientFields = new MIME_h_Collection(new MIME_h_Provider());
-                recipientFields.Parse(new SmartStream(msBuffer,true));
+                recipientFields.Parse(parseStream);
                 retVal.m_pRecipientBlocks.Add(recipientFields);                
             }                     
 

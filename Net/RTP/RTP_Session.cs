@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using System.Threading;
 
 using LumiSoft.Net.Media.Codec;
+using LumiSoft.Net.STUN.Client;
 
 namespace LumiSoft.Net.RTP
 {
@@ -18,6 +19,7 @@ namespace LumiSoft.Net.RTP
     public class RTP_Session : IDisposable
     {
         private bool                               m_IsDisposed                 = false;
+        private bool                               m_IsStarted                  = false;
         private RTP_MultimediaSession              m_pSession                   = null;
         private RTP_Address                        m_pLocalEP                   = null;
         private RTP_Clock                          m_pRtpClock                  = null;
@@ -201,6 +203,10 @@ namespace LumiSoft.Net.RTP
             if(m_IsDisposed){
                 throw new ObjectDisposedException(this.GetType().Name);
             }
+            if(m_IsStarted){
+                return;
+            }
+            m_IsStarted = true;
 
             /* RFC 3550 6.3.2 Initialization
                 Upon joining the session, the participant initializes tp to 0, tc to
@@ -397,7 +403,50 @@ namespace LumiSoft.Net.RTP
 
         #endregion
 
-        
+        #region method StunPublicEndPoints
+
+        /// <summary>
+        /// Gets RTP and RTCP public end points.
+        /// </summary>
+        /// <param name="server">STUN server name.</param>
+        /// <param name="port">STUN server port.</param>
+        /// <param name="rtpEP">RTP public end point.</param>
+        /// <param name="rtcpEP">RTCP public end point.</param>
+        /// <returns>Returns true if public end points allocated, otherwise false.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>server</b> is null reference.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when RTP session is in invalid state and this method is called.</exception>
+        public bool StunPublicEndPoints(string server,int port,out IPEndPoint rtpEP,out IPEndPoint rtcpEP)
+        {
+            if(server == null){
+                throw new ArgumentNullException("server");
+            }
+            if(this.m_IsStarted){
+                throw new InvalidOperationException("Method 'StunPublicEndPoints' may be called only if RTP session has not started.");
+            }
+
+            rtpEP  = null;
+            rtcpEP = null;
+
+            try{
+                STUN_Result rtpResult = STUN_Client.Query(server,port,m_pRtpSocket);
+                if(rtpResult.NetType == STUN_NetType.FullCone || rtpResult.NetType == STUN_NetType.PortRestrictedCone || rtpResult.NetType == STUN_NetType.RestrictedCone){
+                    STUN_Result rtcpResult = STUN_Client.Query(server,port,m_pRtcpSocket);
+
+                    rtpEP  = rtpResult.PublicEndPoint;
+                    rtcpEP = rtcpResult.PublicEndPoint;
+       
+                    return true;
+                }                
+            }
+            catch{
+            }
+
+            return false;
+        }
+
+        #endregion
+
+
         #region method SendRtcpPacket
 
         /// <summary>
@@ -663,7 +712,7 @@ namespace LumiSoft.Net.RTP
                     }
                 }
             }
-            catch(Exception x){ 
+            catch(Exception x){
                 m_pSession.OnError(x);
             }
         }

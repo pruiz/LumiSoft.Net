@@ -315,8 +315,8 @@ namespace LumiSoft.Net.STUN.Client
         {                        
             byte[] requestBytes = request.ToByteData();                              
             DateTime startTime = DateTime.Now;
-            // We do it only 2 sec and retransmit with 100 ms.
-            while(startTime.AddSeconds(2) > DateTime.Now){
+            // We do it only 1 sec and retransmit with 100 ms.
+            while(startTime.AddSeconds(1) > DateTime.Now){
                 try{
                     socket.SendTo(requestBytes,remoteEndPoint);
 

@@ -61,11 +61,9 @@ namespace LumiSoft.Net.RTP
 
             RTCP_CompoundPacket packet = new RTCP_CompoundPacket();
             while(offset < count){
-                try{
-                    packet.m_pPackets.Add(RTCP_Packet.Parse(buffer,ref offset));
-                }
-                catch{
-                    // Skip invalid or unknown packets.
+                RTCP_Packet p = RTCP_Packet.Parse(buffer,ref offset,true);
+                if(p != null){
+                    packet.m_pPackets.Add(p);
                 }
             }
 

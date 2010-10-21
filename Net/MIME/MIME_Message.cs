@@ -275,7 +275,7 @@ namespace LumiSoft.Net.MIME
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                List<MIME_Entity>  retVal       = new List<MIME_Entity>();
+                List<MIME_Entity> retVal        = new List<MIME_Entity>();
                 List<MIME_Entity> entitiesQueue = new List<MIME_Entity>();
                 entitiesQueue.Add(this);
             

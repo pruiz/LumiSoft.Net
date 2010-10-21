@@ -9,20 +9,20 @@ namespace LumiSoft.Net.Media.Codec.Audio
     /// </summary>
     public abstract class AudioCodec : Codec
     {
-        #region properties implementation
+        #region Properties implementation
 
         /// <summary>
-        /// Gets sample number of samples in second(hz). 
+        /// Gets uncompressed audio format info.
         /// </summary>
-        public abstract int SampleRate
+        public abstract AudioFormat AudioFormat
         {
             get;
         }
 
         /// <summary>
-        /// Gets number of bits per sample.
+        /// Gets compressed audio format info.
         /// </summary>
-        public abstract int BitsPerSample
+        public abstract AudioFormat CompressedAudioFormat
         {
             get;
         }

@@ -593,6 +593,7 @@ namespace LumiSoft.Net.Media
                 try{
                     // If playing, we need to reset wav device first.
                     WavMethods.waveOutReset(m_pWavDevHandle);
+                    WavMethods.waveOutClose(m_pWavDevHandle);
 
                     // If there are unprepared wav headers, we need to unprepare these.
                     foreach(PlayItem item in m_pPlayItems){
@@ -608,7 +609,7 @@ namespace LumiSoft.Net.Media
                     m_pPlayItems    = null;
                     m_pWaveOutProc  = null;
                 }
-                catch{                
+                catch{
                 }
             }
 
@@ -648,6 +649,10 @@ namespace LumiSoft.Net.Media
             /// <param name="state">User data.</param>
             private void OnCleanUpFirstBlock(object state)
             {
+                if(m_IsDisposed){
+                    return;
+                }
+
                 try{            
                     lock(m_pPlayItems){
                         PlayItem item = m_pPlayItems[0];
@@ -830,10 +835,29 @@ namespace LumiSoft.Net.Media
 
         private bool           m_IsDisposed    = false;
         private AudioOutDevice m_pDevice       = null;
-        private int            m_SamplesPerSec = 8000;
-        private int            m_BitsPerSample = 16;
-        private int            m_Channels      = 1;
+        private AudioFormat    m_pAudioFormat  = null;
         private WaveOut        m_pWaveOut      = null;
+
+        /// <summary>
+        /// Default constructor.
+        /// </summary>
+        /// <param name="device">Audio output device.</param>
+        /// <param name="format">Audio output format.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>device</b> or <b>format</b> is null reference.</exception>
+        public AudioOut(AudioOutDevice device,AudioFormat format)
+        {
+            if(device == null){
+                throw new ArgumentNullException("device");
+            }
+            if(format == null){
+                throw new ArgumentNullException("format");
+            }
+
+            m_pDevice      = device;
+            m_pAudioFormat = format;
+
+            m_pWaveOut = new WaveOut(device,format.SamplesPerSecond,format.BitsPerSample,format.Channels);
+        }
 
         /// <summary>
         /// Default constructor.
@@ -859,10 +883,8 @@ namespace LumiSoft.Net.Media
                 throw new ArgumentException("Argument 'channels' value must be >= 1.","channels");
             }
 
-            m_pDevice       = device;
-            m_SamplesPerSec = samplesPerSec;
-            m_BitsPerSample = bitsPerSample;
-            m_Channels      = channels;
+            m_pDevice      = device;
+            m_pAudioFormat = new AudioFormat(samplesPerSec,bitsPerSample,channels);
 
             m_pWaveOut = new WaveOut(device,samplesPerSec,bitsPerSample,channels);
         }
@@ -944,6 +966,21 @@ namespace LumiSoft.Net.Media
         }
 
         /// <summary>
+        /// Gets audio format.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this property is accessed.</exception>
+        public AudioFormat AudioFormat
+        {
+            get{
+                if(m_IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+ 
+                return m_pAudioFormat; 
+            }
+        }
+
+        /// <summary>
         /// Gets number of samples per second.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this property is accessed.</exception>
@@ -954,7 +991,7 @@ namespace LumiSoft.Net.Media
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
  
-                return m_SamplesPerSec; 
+                return m_pAudioFormat.SamplesPerSecond; 
             }
         }
 
@@ -969,7 +1006,7 @@ namespace LumiSoft.Net.Media
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
             
-                return m_BitsPerSample; 
+                return m_pAudioFormat.BitsPerSample; 
             }
         }
 
@@ -984,7 +1021,7 @@ namespace LumiSoft.Net.Media
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
              
-                return m_Channels; 
+                return m_pAudioFormat.Channels; 
             }
         }
 
@@ -999,7 +1036,7 @@ namespace LumiSoft.Net.Media
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                return m_Channels * (m_BitsPerSample / 8); 
+                return m_pAudioFormat.Channels * (m_pAudioFormat.BitsPerSample / 8); 
             }
         }
 

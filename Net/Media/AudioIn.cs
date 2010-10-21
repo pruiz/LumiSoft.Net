@@ -661,7 +661,7 @@ namespace LumiSoft.Net.Media
 
 
             #region method OnWaveInProc
-int lastTicks = Environment.TickCount;
+
             /// <summary>
             /// This method is called when wav device generates some event.
             /// </summary>
@@ -675,8 +675,12 @@ int lastTicks = Environment.TickCount;
                 // NOTE: MSDN warns, we may not call any wav related methods here.
                 // This will cause deadlock.
 
+                if(m_IsDisposed){
+                    return;
+                }
+
                 // Do we need to lock here ? OnWaveInProc may be called for another buffer same time when we are here ?
-//Console.WriteLine((Environment.TickCount - lastTicks));lastTicks = Environment.TickCount;
+
                 lock(m_pLock){
                     try{
                         if(uMsg == WavConstants.MM_WIM_DATA){
@@ -689,12 +693,20 @@ int lastTicks = Environment.TickCount;
 
                             // Free buffer and queue it for reuse.
                             ThreadPool.QueueUserWorkItem(new WaitCallback(delegate(object state){
-                                // Prepare buffer for reuse.
-                                waveInUnprepareHeader(m_pWavDevHandle,buffer.HeaderHandle.AddrOfPinnedObject(),Marshal.SizeOf(buffer.Header));
-                                // Prepare new buffer.
-                                waveInPrepareHeader(m_pWavDevHandle,buffer.HeaderHandle.AddrOfPinnedObject(),Marshal.SizeOf(buffer.Header));
-                                // Append buffer for recording.
-                                waveInAddBuffer(m_pWavDevHandle,buffer.HeaderHandle.AddrOfPinnedObject(),Marshal.SizeOf(buffer.Header));
+                                try{
+                                    if(m_IsDisposed){
+                                        return;
+                                    }
+
+                                    // Prepare buffer for reuse.
+                                    waveInUnprepareHeader(m_pWavDevHandle,buffer.HeaderHandle.AddrOfPinnedObject(),Marshal.SizeOf(buffer.Header));
+                                    // Prepare new buffer.
+                                    waveInPrepareHeader(m_pWavDevHandle,buffer.HeaderHandle.AddrOfPinnedObject(),Marshal.SizeOf(buffer.Header));
+                                    // Append buffer for recording.
+                                    waveInAddBuffer(m_pWavDevHandle,buffer.HeaderHandle.AddrOfPinnedObject(),Marshal.SizeOf(buffer.Header));
+                                }
+                                catch{
+                                }
                             }));
                         }
                     }
