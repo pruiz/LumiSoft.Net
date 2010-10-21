@@ -107,9 +107,12 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="AsyncOP.cs" />
-    <Compile Include="AUTH\AuthHelper.cs">
+    <Compile Include="UPnP\UPnP_Exception.cs" />
+    <Compile Include="_Obsolete\AuthHelper.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="AUTH\AUTH_SASL_DigestMD5_Challenge.cs" />
+    <Compile Include="AUTH\AUTH_SASL_DigestMD5_Response.cs" />
     <Compile Include="AUTH\AUTH_e_Authenticate.cs" />
     <Compile Include="AUTH\AUTH_e_UserInfo.cs" />
     <Compile Include="AUTH\Auth_HttpDigest.cs" />
@@ -241,7 +244,9 @@
     <Compile Include="Mail\Mail_t_Mailbox.cs" />
     <Compile Include="Mail\Mail_t_MailboxList.cs" />
     <Compile Include="Mail\Mail_Utils.cs" />
-    <None Include="Media\AudioFormat.cs" />
+    <Compile Include="Media\AudioFormat.cs" />
+    <Compile Include="Media\AudioIn_RTP.cs" />
+    <Compile Include="Media\AudioOut_RTP.cs" />
     <Compile Include="Media\WavePlayer.cs" />
     <Compile Include="MIME\MIME_b.cs" />
     <Compile Include="MIME\MIME_b_Application.cs" />
@@ -249,7 +254,8 @@
     <Compile Include="MIME\MIME_b_Audio.cs" />
     <Compile Include="MIME\MIME_b_Image.cs" />
     <Compile Include="MIME\MIME_b_Message.cs" />
-    <Compile Include="MIME\MIME_b_MessageDeliveryStatus.cs" />
+    <Compile Include="MIME\MIME_b_MessageDeliveryStatus.cs">
+    </Compile>
     <Compile Include="MIME\MIME_b_MessageRfc822.cs" />
     <Compile Include="MIME\MIME_b_Multipart.cs" />
     <Compile Include="MIME\MIME_b_MultipartAlternative.cs" />
@@ -304,6 +310,8 @@
     <Compile Include="SMTP\SMTP_DSN_Ret.cs" />
     <Compile Include="SMTP\SMTP_t_Mailbox.cs" />
     <Compile Include="UPnP\Client\UPnP_Client.cs" />
+    <Compile Include="UPnP\NAT\UPnP_NAT_Client.cs" />
+    <Compile Include="UPnP\NAT\UPnP_NAT_Map.cs" />
     <Compile Include="UPnP\UPnP_Device.cs" />
     <Compile Include="WebDav\Client\WebDav_Client.cs" />
     <Compile Include="WebDav\WebDav_MultiStatus.cs" />
