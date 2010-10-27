@@ -8,7 +8,7 @@ using LumiSoft.Net.SIP.Message;
 namespace LumiSoft.Net.SIP.Stack
 {
     /// <summary>
-    /// Implements SIP client transaction. Defined in rfc 3261 17.1.
+    /// Implements SIP client transaction. Defined in RFC 3261 17.1.
     /// </summary>
     public class SIP_ClientTransaction : SIP_Transaction
     {
@@ -18,6 +18,7 @@ namespace LumiSoft.Net.SIP.Stack
         private TimerEx m_pTimerE     = null;
         private TimerEx m_pTimerF     = null;
         private TimerEx m_pTimerK     = null;
+        private TimerEx m_pTimerM     = null;
         private bool    m_IsCanceling = false;
         
         /// <summary>
@@ -79,6 +80,10 @@ namespace LumiSoft.Net.SIP.Stack
                 if(m_pTimerK != null){
                     m_pTimerK.Dispose();
                     m_pTimerK = null;
+                }
+                if(m_pTimerM != null){
+                    m_pTimerM.Dispose();
+                    m_pTimerM = null;
                 }
 
                 this.ResponseReceived = null;
@@ -339,6 +344,32 @@ namespace LumiSoft.Net.SIP.Stack
 
         #endregion
 
+        #region method m_pTimerM_Elapsed
+
+        /// <summary>
+        /// Is called when INVITE timer M triggered.
+        /// </summary>
+        /// <param name="sender">Sender.</param>
+        /// <param name="e">Event data.</param>
+        private void m_pTimerM_Elapsed(object sender,System.Timers.ElapsedEventArgs e)
+        {
+            /* RFC 6026 7.2.
+                When Timer M fires and the state machine is in the "Accepted" state,
+                the machine MUST transition to the "Terminated" state.
+            */
+
+            lock(this.SyncRoot){
+                // Log
+                if(this.Stack.Logger != null){
+                    this.Stack.Logger.AddText(this.ID,"Transaction [branch='" + this.ID + "';method='" + this.Method + "';IsServer=false] timer M(2xx response retransmission wait) triggered.");
+                }
+
+                SetState(SIP_TransactionState.Terminated);                
+            }
+        }
+
+        #endregion
+
         #endregion
 
 
@@ -572,45 +603,45 @@ namespace LumiSoft.Net.SIP.Stack
 
                 #region INVITE
 
-                /* RFC 3261 17.1.1.2.
-                                                   |INVITE from TU
-                                 Timer A fires     |INVITE sent
-                                 Reset A,          V                      Timer B fires
-                                 INVITE sent +-----------+                or Transport Err.
-                                   +---------|           |---------------+inform TU
-                                   |         |  Calling  |               |
-                                   +-------->|           |-------------->|
-                                             +-----------+ 2xx           |
-                                                |  |       2xx to TU     |
-                                                |  |1xx                  |
-                        300-699 +---------------+  |1xx to TU            |
-                       ACK sent |                  |                     |
-                    resp. to TU |  1xx             V                     |
-                                |  1xx to TU  -----------+               |
-                                |  +---------|           |               |
-                                |  |         |Proceeding |-------------->|
-                                |  +-------->|           | 2xx           |
-                                |            +-----------+ 2xx to TU     |
-                                |       300-699    |                     |
-                                |       ACK sent,  |                     |
-                                |       resp. to TU|                     |
-                                |                  |                     |      NOTE:
-                                |  300-699         V                     |
-                                |  ACK sent  +-----------+Transport Err. |  transitions
-                                |  +---------|           |Inform TU      |  labeled with
-                                |  |         | Completed |-------------->|  the event
-                                |  +-------->|           |               |  over the action
-                                |            +-----------+               |  to take
-                                |              ^   |                     |
-                                |              |   | Timer D fires       |
-                                +--------------+   | -                   |
-                                                   |                     |
-                                                   V                     |
-                                             +-----------+               |
-                                             |           |               |
-                                             | Terminated|<--------------+
-                                             |           |
-                                             +-----------+
+                /* RFC 6026 7.2. INVITE client transaction. (Udpates RFC 3261)
+                      +-----------+                        +-----------+
+                      |           |                        |           |
+                      |  Calling  |                        |  Calling  |
+                      |           |----------->+           |           |-----------+
+                      +-----------+ 2xx        |           +-----------+ 2xx       |
+                                    2xx to TU  |                         2xx to TU |
+                                               |                                   |
+                                               |                                   |
+                                               |                                   |
+                                               |                                   |
+                      +-----------+            |           +-----------+           |
+                      |           |            |           |           |           |
+                      |Proceeding |----------->|           |Proceeding |---------->|
+                      |           | 2xx        |           |           | 2xx       |
+                      +-----------+ 2xx to TU  |           +-----------+ 2xx to TU |
+                                               |                                   |
+                                               |                                   |
+                                               |                                   |
+                                               |                                   V
+                                               |                            +-----------+
+                                               |                            |           |
+                                               |                            | Accepted  |
+                                               |                        +---|           |
+                                               |              2xx       |   +-----------+
+                                               |              2xx to TU |     ^    |
+                                               |                        |     |    |
+                                               |                        +-----+    |
+                                               |                                   |
+                                               |                 +-----------------+
+                                               |                 | Timer M fires
+                                               |                 | -
+                                               |                 V
+                      +-----------+            |           +-----------+
+                      |           |            |           |           |
+                      | Terminated|<-----------+           | Terminated|
+                      |           |                        |           |
+                      +-----------+                        +-----------+
+
 
                 */
 
@@ -649,7 +680,19 @@ namespace LumiSoft.Net.SIP.Stack
                         // 2xx response.
                         else if(response.StatusCodeType == SIP_StatusCodeType.Success){
                             OnResponseReceived(response);
-                            SetState(SIP_TransactionState.Terminated);
+                            SetState(SIP_TransactionState.Accpeted);
+
+                            /* RFC 6025 7.1.
+                                When the "Accepted" state is entered, timer L MUST be set to fire in 64*T1.
+                            */
+                            m_pTimerM = new TimerEx(64 * SIP_TimerConstants.T1);
+                            m_pTimerM.Elapsed += new System.Timers.ElapsedEventHandler(m_pTimerM_Elapsed);
+                            m_pTimerM.Enabled = true;
+
+                            // Log
+                            if(this.Stack.Logger != null){
+                                this.Stack.Logger.AddText(this.ID,"Transaction [branch='" + this.ID + "';method='" + this.Method + "';IsServer=true] timer M(2xx retransmission wait) started, will trigger after " + m_pTimerM.Interval + ".");
+                            }
                         }
                         // 3xx - 6xx response.
                         else{
@@ -687,7 +730,19 @@ namespace LumiSoft.Net.SIP.Stack
                         // 2xx response.
                         else if(response.StatusCodeType == SIP_StatusCodeType.Success){
                             OnResponseReceived(response);
-                            SetState(SIP_TransactionState.Terminated);
+                            SetState(SIP_TransactionState.Accpeted);
+
+                            /* RFC 6025 7.1.
+                                When the "Accepted" state is entered, timer L MUST be set to fire in 64*T1.
+                            */
+                            m_pTimerM = new TimerEx(64 * SIP_TimerConstants.T1);
+                            m_pTimerM.Elapsed += new System.Timers.ElapsedEventHandler(m_pTimerM_Elapsed);
+                            m_pTimerM.Enabled = true;
+
+                            // Log
+                            if(this.Stack.Logger != null){
+                                this.Stack.Logger.AddText(this.ID,"Transaction [branch='" + this.ID + "';method='" + this.Method + "';IsServer=true] timer M(2xx retransmission wait) started, will trigger after " + m_pTimerM.Interval + ".");
+                            }
                         }
                         // 3xx - 6xx response.
                         else{
@@ -707,6 +762,16 @@ namespace LumiSoft.Net.SIP.Stack
                                 this.Stack.Logger.AddText(this.ID,"Transaction [branch='" + this.ID + "';method='" + this.Method + "';IsServer=false] timer D(INVITE 3xx - 6xx response retransmission wait) started, will trigger after " + m_pTimerD.Interval + ".");
                             }
                             m_pTimerD.Enabled = true;
+                        }
+                    }
+
+                    #endregion
+
+                    #region Accepted
+
+                    else if(this.State == SIP_TransactionState.Accpeted){
+                        if(response.StatusCodeType == SIP_StatusCodeType.Success){
+                            OnResponseReceived(response);
                         }
                     }
 
@@ -898,7 +963,7 @@ namespace LumiSoft.Net.SIP.Stack
                 #endregion
             }
         }
-                                
+                                                
         #endregion
 
         #region method SendCancel
