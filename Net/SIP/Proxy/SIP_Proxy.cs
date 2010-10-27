@@ -233,9 +233,18 @@ namespace LumiSoft.Net.SIP.Proxy
             if((m_ProxyMode & SIP_ProxyMode.B2BUA) != 0){
                 m_pB2BUA.OnResponseReceived(e);
             }
+            else if((m_ProxyMode & SIP_ProxyMode.Statefull) != 0){
+                /* RFC 6026 7.3. Proxy Considerations.
+                    This document changes the behavior of transaction-stateful proxies to
+                    not forward stray INVITE responses.  When receiving any SIP response,
+                    a transaction-stateful proxy MUST compare the transaction identifier
+                    in that response against its existing transaction state machines.
+                    The proxy MUST NOT forward the response if there is no matching
+                    transaction state machine.
+                */
+            }
             else{
-                /* This method is called when stateless proxy gets response or statefull proxy
-                   has no matching server transaction.
+                /* This method is called when stateless proxy gets response.
                 */
                                
                 /* RFC 3261 16.11.
