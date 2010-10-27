@@ -16,6 +16,7 @@ namespace LumiSoft.Net.SIP.Stack
         private TimerEx m_pTimerH   = null;
         private TimerEx m_pTimerI   = null;
         private TimerEx m_pTimerJ   = null;
+        private TimerEx m_pTimerL   = null;
 
         /// <summary>
         /// Default constructor.
@@ -62,6 +63,10 @@ namespace LumiSoft.Net.SIP.Stack
                 if(m_pTimerJ != null){
                     m_pTimerJ.Dispose();
                     m_pTimerJ = null;
+                }                
+                if(m_pTimerL != null){
+                    m_pTimerL.Dispose();
+                    m_pTimerL = null;
                 }
             }
         }
@@ -245,6 +250,32 @@ namespace LumiSoft.Net.SIP.Stack
 
         #endregion
 
+        #region method m_pTimerL_Elapsed
+
+        /// <summary>
+        /// Is called when INVITE time L triggered.
+        /// </summary>
+        /// <param name="sender">Sender.</param>
+        /// <param name="e">Event data.</param>
+        private void m_pTimerL_Elapsed(object sender,System.Timers.ElapsedEventArgs e)
+        {
+            /* RFC 6026 7.1.
+                When Timer L fires and the state machine is in the "Accepted" state,
+                the machine MUST transition to the "Terminated" state.
+            */
+
+            lock(this.SyncRoot){
+                // Log
+                if(this.Stack.Logger != null){
+                    this.Stack.Logger.AddText(this.ID,"Transaction [branch='" + this.ID + "';method='" + this.Method + "';IsServer=true] timer L(ACK wait) triggered.");
+                }
+
+                SetState(SIP_TransactionState.Terminated);
+            }
+        }
+
+        #endregion
+
         #endregion
 
 
@@ -307,48 +338,52 @@ namespace LumiSoft.Net.SIP.Stack
                 try{
                     #region INVITE
 
-                    /* RFC 3261 17.2.1.
-                                           |INVITE
-                                           |pass INV to TU
-                        INVITE             V send 100 if TU won't in 200ms
-                        send response+-----------+
-                            +--------|           |--------+101-199 from TU
-                            |        | Proceeding|        |send response
-                            +------->|           |<-------+
-                                     |           |          Transport Err.
-                                     |           |          Inform TU
-                                     |           |--------------->+
-                                     +-----------+                |
-                        300-699 from TU |     |2xx from TU        |
-                        send response   |     |send response      |
-                                        |     +------------------>+
-                                        |                         |
-                        INVITE          V          Timer G fires  |
-                        send response+-----------+ send response  |
-                            +--------|           |--------+       |
-                            |        | Completed |        |       |
-                            +------->|           |<-------+       |
-                                     +-----------+                |
-                                        |     |                   |
-                                    ACK |     |                   |
-                                    -   |     +------------------>+
-                                        |        Timer H fires    |
-                                        V        or Transport Err.|
-                                     +-----------+  Inform TU     |
-                                     |           |                |
-                                     | Confirmed |                |
-                                     |           |                |
-                                     +-----------+                |
-                                           |                      |
-                                           |Timer I fires         |
-                                           |-                     |
-                                           |                      |
-                                           V                      |
-                                     +-----------+                |
-                                     |           |                |
-                                     | Terminated|<---------------+
-                                     |           |
-                                     +-----------+
+                    /* RFC 6026 7.1. INVITE server transaction. (Udpates RFC 3261)   
+                     
+                                                             |INVITE
+                                                             |pass INV to TU
+                                          INVITE             V send 100 if TU won't in 200 ms
+                                          send response+------------+
+                                              +--------|            |--------+ 101-199 from TU
+                                              |        |            |        | send response
+                                              +------->|            |<-------+
+                                                       | Proceeding |
+                                                       |            |--------+ Transport Err.
+                                                       |            |        | Inform TU
+                                                       |            |<-------+
+                                                       +------------+
+                                          300-699 from TU |    |2xx from TU
+                                          send response   |    |send response
+                                           +--------------+    +------------+
+                                           |                                |
+                          INVITE           V          Timer G fires         |
+                          send response +-----------+ send response         |
+                               +--------|           |--------+              |
+                               |        |           |        |              |
+                               +------->| Completed |<-------+      INVITE  |  Transport Err.
+                                        |           |               -       |  Inform TU
+                               +--------|           |----+          +-----+ |  +---+
+                               |        +-----------+    | ACK      |     | v  |   v
+                               |          ^   |          | -        |  +------------+
+                               |          |   |          |          |  |            |---+ ACK
+                               +----------+   |          |          +->|  Accepted  |   | to TU
+                               Transport Err. |          |             |            |<--+
+                               Inform TU      |          V             +------------+
+                                              |      +-----------+        |  ^     |
+                                              |      |           |        |  |     |
+                                              |      | Confirmed |        |  +-----+
+                                              |      |           |        |  2xx from TU
+                                Timer H fires |      +-----------+        |  send response
+                                -             |          |                |
+                                              |          | Timer I fires  |
+                                              |          | -              | Timer L fires
+                                              |          V                | -
+                                              |        +------------+     |
+                                              |        |            |<----+
+                                              +------->| Terminated |
+                                                       |            |
+                                                       +------------+
+
                     */
 
                     if(this.Method == SIP_Methods.INVITE){
@@ -366,7 +401,19 @@ namespace LumiSoft.Net.SIP.Stack
                             else if(response.StatusCodeType == SIP_StatusCodeType.Success){
                                 this.Stack.TransportLayer.SendResponse(this,response);
                                 OnResponseSent(response);
-                                SetState(SIP_TransactionState.Terminated);
+                                SetState(SIP_TransactionState.Accpeted);
+
+                                /* RFC 6025 7.1.
+                                    When the "Accepted" state is entered, timer L MUST be set to fire in 64*T1.
+                                */
+                                m_pTimerL = new TimerEx(64 * SIP_TimerConstants.T1);
+                                m_pTimerL.Elapsed += new System.Timers.ElapsedEventHandler(m_pTimerL_Elapsed);
+                                m_pTimerL.Enabled = true;
+
+                                // Log
+                                if(this.Stack.Logger != null){
+                                    this.Stack.Logger.AddText(this.ID,"Transaction [branch='" + this.ID + "';method='" + this.Method + "';IsServer=true] timer L(ACK wait) started, will trigger after " + m_pTimerL.Interval + ".");
+                                }
                             }
                             // 3xx - 6xx
                             else{
@@ -404,8 +451,17 @@ namespace LumiSoft.Net.SIP.Stack
 
                         #endregion
 
+                        #region Accepted
+
+                        else if(this.State == SIP_TransactionState.Accpeted){
+                            this.Stack.TransportLayer.SendResponse(this,response);
+                            OnResponseSent(response);
+                        }
+
+                        #endregion
+
                         #region Completed
-        
+
                         else if(this.State == SIP_TransactionState.Completed){
                             // We do nothing here, we just wait ACK to arrive.
                         }
@@ -572,11 +628,10 @@ namespace LumiSoft.Net.SIP.Stack
                     }
 
                     OnTransportError(x);
-                    SetState(SIP_TransactionState.Terminated);
                 }
             }
         }
-                                                
+                                                                
         #endregion
 
         #region method Cancel
@@ -686,16 +741,26 @@ namespace LumiSoft.Net.SIP.Stack
                         #region ACK
 
                         else if(request.RequestLine.Method == SIP_Methods.ACK){
-                            /* RFC 3261 17.2.1
-                                If an ACK is received while the server transaction is in the "Completed" state, the server transaction 
-                                MUST transition to the "Confirmed" state.  As Timer G is ignored in this state, any retransmissions of the 
-                                response will cease.
-                         
-                                When this state is entered, timer I is set to fire in T4 seconds for unreliable transports, 
-                                and zero seconds for reliable transports.
-                            */
+                            #region Accepeted
 
-                            if(this.State == SIP_TransactionState.Completed){
+                            if(this.State == SIP_TransactionState.Accpeted){
+                                OnInviteAckReceived(request);
+                            }
+
+                            #endregion
+
+                            #region Completed
+
+                            else if(this.State == SIP_TransactionState.Completed){
+                                /* RFC 3261 17.2.1
+                                    If an ACK is received while the server transaction is in the "Completed" state, the server transaction 
+                                    MUST transition to the "Confirmed" state.  As Timer G is ignored in this state, any retransmissions of the 
+                                    response will cease.
+                         
+                                    When this state is entered, timer I is set to fire in T4 seconds for unreliable transports, 
+                                    and zero seconds for reliable transports.
+                                */
+
                                 SetState(SIP_TransactionState.Confirmed);
 
                                 // Stop timers G,H
@@ -727,6 +792,8 @@ namespace LumiSoft.Net.SIP.Stack
                                 }
                                 m_pTimerI.Enabled = true;
                             }
+
+                            #endregion
                         }
 
                         #endregion
@@ -765,7 +832,6 @@ namespace LumiSoft.Net.SIP.Stack
                     }
 
                     OnTransportError(x);
-                    SetState(SIP_TransactionState.Terminated);
                 }
             }
         }
@@ -813,6 +879,26 @@ namespace LumiSoft.Net.SIP.Stack
         {
             if(this.Canceled != null){
                 this.Canceled(this,new EventArgs());
+            }
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when INVITE transaction gets ACK in Accepted state.
+        /// </summary>
+        public event EventHandler<SIP_RequestReceivedEventArgs> InviteAckReceived = null;
+
+        #region method OnInviteAckReceived
+
+        /// <summary>
+        /// Raises <b>InviteAckReceived</b> event.
+        /// </summary>
+        /// <param name="ack">SIP ACK request.</param>
+        private void OnInviteAckReceived(SIP_Request ack)
+        {
+            if(this.InviteAckReceived != null){
+                this.InviteAckReceived(this,new SIP_RequestReceivedEventArgs(this.Stack,this.Flow,ack));
             }
         }
 
