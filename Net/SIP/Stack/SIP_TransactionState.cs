@@ -30,6 +30,11 @@ namespace LumiSoft.Net.SIP.Stack
         Proceeding,
 
         /// <summary>
+        /// INVITE transaction has sent or received 2xx response.
+        /// </summary>
+        Accpeted,
+
+        /// <summary>
         /// Transaction has got final response.
         /// </summary>
         Completed,
