@@ -7,7 +7,7 @@ using LumiSoft.Net.IO;
 namespace LumiSoft.Net.MIME
 {
     /// <summary>
-    /// This class represents MIME multipart/from-data body. Defined in RFC 2046.
+    /// This class represents MIME multipart/form-data body. Defined in RFC 2046.
     /// </summary>
     public class MIME_b_MultipartFormData : MIME_b_Multipart
     {
@@ -19,8 +19,8 @@ namespace LumiSoft.Net.MIME
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         public MIME_b_MultipartFormData(MIME_h_ContentType contentType) : base(contentType)
         {
-            if(!string.Equals(contentType.TypeWithSubtype,"multipart/from-data",StringComparison.CurrentCultureIgnoreCase)){
-                throw new ArgumentException("Argument 'contentType.TypeWithSubype' value must be 'multipart/from-data'.");
+            if(!string.Equals(contentType.TypeWithSubtype,"multipart/form-data",StringComparison.CurrentCultureIgnoreCase)){
+                throw new ArgumentException("Argument 'contentType.TypeWithSubype' value must be 'multipart/form-data'.");
             }
         }
 
