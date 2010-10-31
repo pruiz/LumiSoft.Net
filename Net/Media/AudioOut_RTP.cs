@@ -197,6 +197,7 @@ namespace LumiSoft.Net.Media
         /// Gets audio-out device is used to play out sound.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when null reference passed.</exception>
         public AudioOutDevice AudioOutDevice
         {
             get{   
@@ -205,6 +206,22 @@ namespace LumiSoft.Net.Media
                 }
                 
                 return m_pAudioOutDevice; 
+            }
+
+            set{
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+                if(value == null){
+                    throw new ArgumentNullException("AudioOutDevice");
+                }
+
+                m_pAudioOutDevice = value;
+
+                if(this.IsRunning){
+                    Stop();
+                    Start();
+                }
             }
         }
 
