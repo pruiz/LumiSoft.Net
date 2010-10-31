@@ -899,29 +899,30 @@ namespace LumiSoft.Net.Media
 
         #endregion
 
-        private bool           m_IsDisposed     = false;
-        private bool           m_IsRunning      = false;
-        private AudioInDevice  m_pAudioInDevice = null;
-        private int            m_AudioFrameSize = 20;
-        private RTP_SendStream m_pRTP_Stream    = null;
-        private AudioCodec     m_pAudioCodec    = null;
-        private _WaveIn        m_pWaveIn        = null;
+        private bool                       m_IsDisposed     = false;
+        private bool                       m_IsRunning      = false;
+        private AudioInDevice              m_pAudioInDevice = null;
+        private int                        m_AudioFrameSize = 20;
+        private Dictionary<int,AudioCodec> m_pAudioCodecs   = null;
+        private RTP_SendStream             m_pRTP_Stream    = null;
+        private AudioCodec                 m_pActiveCodec   = null;
+        private _WaveIn                    m_pWaveIn        = null;
 
         /// <summary>
         /// Default constructor.
         /// </summary>
         /// <param name="audioInDevice">Audio-in device to capture.</param>
         /// <param name="audioFrameSize">Audio frame size in milliseconds.</param>
-        /// <param name="codec">Audio codec to use for audio sending.</param>
+        /// <param name="codecs">Audio codecs with RTP payload number. For example: 0-PCMU,8-PCMA.</param>
         /// <param name="stream">RTP stream to use for audio sending.</param>
-        /// <exception cref="ArgumentNullException">Is raised when <b>audioInDevice</b>,<b>codec</b> or <b>stream</b> is null reference.</exception>
-        public AudioIn_RTP(AudioInDevice audioInDevice,int audioFrameSize,AudioCodec codec,RTP_SendStream stream)
+        /// <exception cref="ArgumentNullException">Is raised when <b>audioInDevice</b>,<b>codecs</b> or <b>stream</b> is null reference.</exception>
+        public AudioIn_RTP(AudioInDevice audioInDevice,int audioFrameSize,Dictionary<int,AudioCodec> codecs,RTP_SendStream stream)
         {
             if(audioInDevice == null){
                 throw new ArgumentNullException("audioInDevice");
             }
-            if(codec == null){
-                throw new ArgumentNullException("codec");
+            if(codecs == null){
+                throw new ArgumentNullException("codecs");
             }
             if(stream == null){
                 throw new ArgumentNullException("stream");
@@ -929,10 +930,13 @@ namespace LumiSoft.Net.Media
 
             m_pAudioInDevice = audioInDevice;
             m_AudioFrameSize = audioFrameSize;
-            m_pAudioCodec    = codec;
+            m_pAudioCodecs   = codecs;
             m_pRTP_Stream    = stream;
-        }
 
+            m_pRTP_Stream.Session.PayloadChanged += new EventHandler(m_pRTP_Stream_PayloadChanged);
+            m_pAudioCodecs.TryGetValue(m_pRTP_Stream.Session.Payload,out m_pActiveCodec);
+        }
+                
         #region method Dispose
 
         /// <summary>
@@ -950,14 +954,37 @@ namespace LumiSoft.Net.Media
 
             this.Error        = null;
             m_pAudioInDevice  = null;
+            m_pAudioCodecs    = null;
+            m_pRTP_Stream.Session.PayloadChanged -= new EventHandler(m_pRTP_Stream_PayloadChanged);
             m_pRTP_Stream     = null;
-            m_pAudioCodec     = null;
+            m_pActiveCodec    = null;
         }
 
         #endregion
 
 
         #region Events handling
+
+        #region method m_pRTP_Stream_PayloadChanged
+
+        /// <summary>
+        /// Is called when RTP session sending payload has changed.
+        /// </summary>
+        /// <param name="sender">Sender.</param>
+        /// <param name="e">Event data.</param>
+        private void m_pRTP_Stream_PayloadChanged(object sender,EventArgs e)
+        {
+            if(m_IsRunning){
+                Stop();
+
+                m_pActiveCodec = null;
+                m_pAudioCodecs.TryGetValue(m_pRTP_Stream.Session.Payload,out m_pActiveCodec);
+
+                Start();
+            }
+        }
+
+        #endregion
 
         #region method m_pWaveIn_AudioFrameReceived
 
@@ -969,11 +996,13 @@ namespace LumiSoft.Net.Media
         private void m_pWaveIn_AudioFrameReceived(object sender,EventArgs<byte[]> e)
         {
             try{  
-                RTP_Packet rtpPacket = new RTP_Packet();
-                rtpPacket.Data = m_pAudioCodec.Encode(e.Value,0,e.Value.Length);
-                rtpPacket.Timestamp = m_pRTP_Stream.Session.RtpClock.RtpTimestamp;
+                if(m_pActiveCodec != null){
+                    RTP_Packet rtpPacket = new RTP_Packet();
+                    rtpPacket.Data = m_pActiveCodec.Encode(e.Value,0,e.Value.Length);
+                    rtpPacket.Timestamp = m_pRTP_Stream.Session.RtpClock.RtpTimestamp;
  	        
-                m_pRTP_Stream.Send(rtpPacket);
+                    m_pRTP_Stream.Send(rtpPacket);
+                }
             }
             catch(Exception x){
                 if(!this.IsDisposed){
@@ -1005,12 +1034,14 @@ namespace LumiSoft.Net.Media
 
             m_IsRunning = true;
 
-            // Calculate buffer size.
-            int bufferSize = (m_pAudioCodec.AudioFormat.SamplesPerSecond / (1000 / m_AudioFrameSize)) * (m_pAudioCodec.AudioFormat.BitsPerSample / 8);
+            if(m_pActiveCodec != null){
+                // Calculate buffer size.
+                int bufferSize = (m_pActiveCodec.AudioFormat.SamplesPerSecond / (1000 / m_AudioFrameSize)) * (m_pActiveCodec.AudioFormat.BitsPerSample / 8);
 
-            m_pWaveIn = new _WaveIn(m_pAudioInDevice,m_pAudioCodec.AudioFormat.SamplesPerSecond,m_pAudioCodec.AudioFormat.BitsPerSample,1,bufferSize);
-            m_pWaveIn.AudioFrameReceived += new EventHandler<EventArgs<byte[]>>(m_pWaveIn_AudioFrameReceived);
-            m_pWaveIn.Start();
+                m_pWaveIn = new _WaveIn(m_pAudioInDevice,m_pActiveCodec.AudioFormat.SamplesPerSecond,m_pActiveCodec.AudioFormat.BitsPerSample,1,bufferSize);
+                m_pWaveIn.AudioFrameReceived += new EventHandler<EventArgs<byte[]>>(m_pWaveIn_AudioFrameReceived);
+                m_pWaveIn.Start();
+            }
         }
 
         #endregion
@@ -1030,7 +1061,9 @@ namespace LumiSoft.Net.Media
                 return;
             }
 
-            m_pWaveIn.Dispose();
+            if(m_pWaveIn != null){
+                m_pWaveIn.Dispose();
+            }
             m_pWaveIn = null;
         }
 
@@ -1066,6 +1099,7 @@ namespace LumiSoft.Net.Media
         /// Gets audio-in device is used to capture sound.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when null reference is passed.</exception>
         public AudioInDevice AudioInDevice
         {
             get{   
@@ -1074,6 +1108,22 @@ namespace LumiSoft.Net.Media
                 }
                 
                 return m_pAudioInDevice; 
+            }
+
+            set{
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+                if(value == null){
+                    throw new ArgumentNullException("AudioInDevice");
+                }
+
+                m_pAudioInDevice = value;
+
+                if(this.IsRunning){
+                    Stop();
+                    Start();
+                }
             }
         }
 
@@ -1106,7 +1156,34 @@ namespace LumiSoft.Net.Media
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
                 
-                return m_pAudioCodec; 
+                return m_pActiveCodec; 
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets audio codecs.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when null reference passed.</exception>
+        public Dictionary<int,AudioCodec> AudioCodecs
+        {
+            get{ 
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return m_pAudioCodecs; 
+            }
+
+            set{
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+                if(value == null){
+                    throw new ArgumentNullException("AudioCodecs");
+                }
+
+                m_pAudioCodecs = value;
             }
         }
 
