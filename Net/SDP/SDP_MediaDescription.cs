@@ -28,7 +28,7 @@ namespace LumiSoft.Net.SDP
         /// <param name="ports">Number of continuos transport ports. </param>
         /// <param name="protocol">Gets or sets transport protocol.</param>
         /// <param name="mediaFormats">Media formats. See MediaFormats property for more info.</param>
-        /// <exception cref="ArgumentNullException">Is raised when <b>mediaType</b>, <b>protocol</b> or <b>mediaFormats</b> is null reference.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>mediaType</b> or <b>protocol</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         public SDP_MediaDescription(string mediaType,int port,int ports,string protocol,string[] mediaFormats)
         {
@@ -50,12 +50,6 @@ namespace LumiSoft.Net.SDP
             if(protocol == string.Empty){
                 throw new ArgumentException("Argument 'protocol' value msut be specified.");
             }
-            if(mediaFormats == null){
-                throw new ArgumentNullException("mediaFormats");
-            }
-            if(mediaFormats.Length < 1){
-                throw new ArgumentException("Argument 'mediaFormats' must contain at least 1 value.");
-            }
 
             m_MediaType     = mediaType;
             m_Port          = port;
@@ -66,7 +60,9 @@ namespace LumiSoft.Net.SDP
             m_pAttributes = new List<SDP_Attribute>();
             m_pTags = new Dictionary<string,object>();
 
-            m_pMediaFormats.AddRange(mediaFormats);
+            if(mediaFormats != null){
+                m_pMediaFormats.AddRange(mediaFormats);
+            }
         }
 
         /// <summary>
@@ -133,6 +129,48 @@ namespace LumiSoft.Net.SDP
             }
 
             return media;
+        }
+
+        #endregion
+
+
+        #region method SetStreamMode
+
+        /// <summary>
+        /// Sets SDP media stream mode.
+        /// </summary>
+        /// <param name="streamMode">Stream mode.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>streamMode</b> is null reference.</exception>
+        public void SetStreamMode(string streamMode)
+        {
+            if(streamMode == null){
+                throw new ArgumentNullException("streamMode");
+            }
+
+            // Remove all old stream mode attributes.
+            for(int i=0;i<m_pAttributes.Count;i++){
+                SDP_Attribute sdpAttribute = m_pAttributes[i];
+                if(string.Equals(sdpAttribute.Name,"sendrecv",StringComparison.InvariantCultureIgnoreCase)){
+                    m_pAttributes.RemoveAt(i);
+                    i--;
+                }
+                else if(string.Equals(sdpAttribute.Name,"sendonly",StringComparison.InvariantCultureIgnoreCase)){
+                    m_pAttributes.RemoveAt(i);
+                    i--;
+                }
+                else if(string.Equals(sdpAttribute.Name,"recvonly",StringComparison.InvariantCultureIgnoreCase)){
+                    m_pAttributes.RemoveAt(i);
+                    i--;
+                }
+                else if(string.Equals(sdpAttribute.Name,"inactive",StringComparison.InvariantCultureIgnoreCase)){
+                    m_pAttributes.RemoveAt(i);
+                    i--;
+                }
+            }
+
+            if(streamMode != ""){
+                m_pAttributes.Add(new SDP_Attribute(streamMode,""));
+            }
         }
 
         #endregion
