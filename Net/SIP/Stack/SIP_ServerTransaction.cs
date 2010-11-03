@@ -744,7 +744,7 @@ namespace LumiSoft.Net.SIP.Stack
                             #region Accepeted
 
                             if(this.State == SIP_TransactionState.Accpeted){
-                                OnInviteAckReceived(request);
+                                
                             }
 
                             #endregion
@@ -879,26 +879,6 @@ namespace LumiSoft.Net.SIP.Stack
         {
             if(this.Canceled != null){
                 this.Canceled(this,new EventArgs());
-            }
-        }
-
-        #endregion
-
-        /// <summary>
-        /// Is raised when INVITE transaction gets ACK in Accepted state.
-        /// </summary>
-        public event EventHandler<SIP_RequestReceivedEventArgs> InviteAckReceived = null;
-
-        #region method OnInviteAckReceived
-
-        /// <summary>
-        /// Raises <b>InviteAckReceived</b> event.
-        /// </summary>
-        /// <param name="ack">SIP ACK request.</param>
-        private void OnInviteAckReceived(SIP_Request ack)
-        {
-            if(this.InviteAckReceived != null){
-                this.InviteAckReceived(this,new SIP_RequestReceivedEventArgs(this.Stack,this.Flow,ack));
             }
         }
 
