@@ -396,6 +396,7 @@ namespace LumiSoft.Net.Media
 
 
         private bool           m_IsPlaying     = false;
+        private bool           m_Stop          = false;
         private AudioOutDevice m_pOutputDevice = null;
 
         /// <summary>
@@ -442,7 +443,12 @@ namespace LumiSoft.Net.Media
                 throw new ArgumentNullException("stream");
             }
 
+            if(m_IsPlaying){
+                Stop();
+            }
+
             m_IsPlaying = true;
+            m_Stop      = false;
 
             ThreadPool.QueueUserWorkItem(new WaitCallback(delegate(object state){                        
                 using(BinaryReader waveFile = new BinaryReader(stream)){
@@ -478,7 +484,9 @@ namespace LumiSoft.Net.Media
                                     int    totalReaded = 0;
                                     byte[] buffer      = new byte[8000];
                                     while(totalReaded < data.ChunkSize){
-                                        if(!m_IsPlaying){
+                                        if(m_Stop){
+                                            m_IsPlaying = false;
+
                                             return;
                                         }
 
@@ -523,7 +531,11 @@ namespace LumiSoft.Net.Media
         /// </summary>
         public void Stop()
         {
-            m_IsPlaying = false;
+            m_Stop = true;
+
+            while(m_IsPlaying){
+                Thread.Sleep(5);
+            }
         }
 
         #endregion
