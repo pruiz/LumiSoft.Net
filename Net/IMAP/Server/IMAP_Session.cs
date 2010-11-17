@@ -3230,7 +3230,7 @@ namespace LumiSoft.Net.IMAP.Server
                                     #region part-number only
 
                                     else{
-                                        entity.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8);
+                                        entity.Body.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8,false);
                                         tmpFs.Position = 0;
                                     }
 
