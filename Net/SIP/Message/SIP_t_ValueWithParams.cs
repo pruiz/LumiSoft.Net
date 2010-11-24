@@ -75,7 +75,7 @@ namespace LumiSoft.Net.SIP.Message
             StringBuilder retVal = new StringBuilder();
             foreach(SIP_Parameter parameter in m_pParameters){
                 if(!string.IsNullOrEmpty(parameter.Value)){
-                    retVal.Append(";" + parameter.Name + "=" + parameter.Value);
+                    retVal.Append(";" + parameter.Name + "=" + TextUtils.QuoteString(parameter.Value));
                 }
                 else{
                     retVal.Append(";" + parameter.Name);
