@@ -9,6 +9,8 @@ using LumiSoft.Net;
 
 namespace LumiSoft.Net.FTP.Server
 {
+    #pragma warning disable
+
 	/// <summary>
 	/// FTP Session.
 	/// </summary>
@@ -1267,4 +1269,6 @@ namespace LumiSoft.Net.FTP.Server
 		#endregion
 
 	}
+
+    #pragma warning enable
 }
