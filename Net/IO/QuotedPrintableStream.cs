@@ -139,12 +139,21 @@ namespace LumiSoft.Net.IO
                             if(b == '=' && i == (lineLength - 1)){
                                 softLineBreak = true;
                             }
-                            // We should have =XX char.
+                            // We should have =XX hex-byte.
                             else if(b == '='){
                                 byte b1 = readLineOP.Buffer[++i];
                                 byte b2 = readLineOP.Buffer[++i];
                         
-                                m_pDecodedBuffer[m_DecodedCount++] = byte.Parse(new string(new char[]{(char)b1,(char)b2}),System.Globalization.NumberStyles.HexNumber);
+                                byte b3 = 0;
+                                if(byte.TryParse(new string(new char[]{(char)b1,(char)b2}),System.Globalization.NumberStyles.HexNumber,null,out b3)){
+                                    m_pDecodedBuffer[m_DecodedCount++] = b3;
+                                }
+                                // Not hex number, leave it as it is.
+                                else{
+                                    m_pDecodedBuffer[m_DecodedCount++] = (byte)'=';
+                                    m_pDecodedBuffer[m_DecodedCount++] = b1;
+                                    m_pDecodedBuffer[m_DecodedCount++] = b2;
+                                }
                             }
                             // Normal char.
                             else{
@@ -160,7 +169,7 @@ namespace LumiSoft.Net.IO
                     }
                 }
 
-                // We some decoded data, return it.
+                // We have some decoded data, return it.
                 if(m_DecodedOffset < m_DecodedCount){
                     int countToCopy = Math.Min(count,m_DecodedCount - m_DecodedOffset);
                     Array.Copy(m_pDecodedBuffer,m_DecodedOffset,buffer,offset,countToCopy);
