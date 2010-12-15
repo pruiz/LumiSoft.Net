@@ -264,7 +264,7 @@ namespace LumiSoft.Net.DNS.Client
 		/// </summary>
 		static Dns_Client()
 		{
-			// Try to get system dns servers
+			// Try to get default NIC dns servers.
 			try{
 				List<IPAddress> dnsServers = new List<IPAddress>();
                 foreach(NetworkInterface nic in NetworkInterface.GetAllNetworkInterfaces()){
@@ -276,6 +276,8 @@ namespace LumiSoft.Net.DNS.Client
                                 }
                             }
                         }
+
+                        break;
                     }
                 }
 
