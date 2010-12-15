@@ -27,6 +27,8 @@ namespace LumiSoft.Net.FTP.Server
 
 	#endregion
 
+    #pragma warning disable
+
 	/// <summary>
 	/// FTP Server component.
 	/// </summary>
@@ -357,4 +359,6 @@ namespace LumiSoft.Net.FTP.Server
 		#endregion
 
 	}
+
+    #pragma warning enable
 }
