@@ -107,6 +107,12 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="AsyncOP.cs" />
+    <None Include="Media\Codec\Audio\ILBC.cs" />
+    <Compile Include="DNS\Client\DNS_ClientTransaction.cs" />
+    <Compile Include="DNS\Client\DNS_ClientTransactionState.cs" />
+    <Compile Include="Media\_WaveIn.cs" />
+    <Compile Include="UDP\UDP_DataReceiver.cs" />
+    <Compile Include="UDP\UDP_e_PacketReceived.cs" />
     <Compile Include="UPnP\UPnP_Exception.cs" />
     <Compile Include="_Obsolete\AuthHelper.cs">
       <SubType>Code</SubType>
@@ -357,8 +363,6 @@
     <Compile Include="Log\WriteLogEventArgs.cs" />
     <Compile Include="Media\Codec\Audio\PCMA.cs" />
     <Compile Include="Media\Codec\Audio\PCMU.cs" />
-    <None Include="Media\MultimediaSession.cs" />
-    <None Include="Media\MediaStream.cs" />
     <Compile Include="MIME\MIME_DispositionTypes .cs" />
     <Compile Include="Mail\Mail_h_Received.cs" />
     <Compile Include="MIME\MIME_MediaTypes.cs" />
