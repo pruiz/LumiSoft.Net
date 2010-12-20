@@ -8,10 +8,12 @@ using System.Text;
 using System.Net.NetworkInformation;
 using System.Threading;
 
+using LumiSoft.Net.UDP;
+
 namespace LumiSoft.Net.DNS.Client
 {
 	/// <summary>
-	/// Dns client.
+	/// DNS client.
 	/// </summary>
 	/// <example>
 	/// <code>
@@ -34,230 +36,15 @@ namespace LumiSoft.Net.DNS.Client
 	/// </code>
 	/// </example>
 	public class Dns_Client : IDisposable
-    {        
-        #region class DnsTransaction
-
-        /// <summary>
-        /// This class represents DNS client transaction.
-        /// </summary>
-        private class DnsTransaction : IDisposable
-        {
-            private DateTime          m_CreateTime;
-            private Dns_Client        m_pOwner        = null;
-            private int               m_ID            = 1;
-            private string            m_QName         = "";
-            private int               m_QType         = 0;
-            private byte[]            m_pQuery        = null;
-            private TimerEx           m_pTimeoutTimer = null;
-            private DnsServerResponse m_pResponse     = null;
-
-            /// <summary>
-            /// Default constructor.
-            /// </summary>
-            /// <param name="owner">Owner DNS client.</param>
-            /// <param name="id">Transaction ID.</param>
-            /// <param name="qname">QNAME value.</param>
-            /// <param name="qtype">QTYPE value.</param>
-            /// <param name="timeout">Timeout in milliseconds.</param>
-            /// <param name="query">Raw DNS query.</param>
-            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> or <b>query</b> is null reference.</exception>
-            public DnsTransaction(Dns_Client owner,int id,string qname,int qtype,int timeout,byte[] query)
-            {
-                if(owner == null){
-                    throw new ArgumentNullException("owner");
-                }
-                if(query == null){
-                    throw new ArgumentNullException("query");
-                }
-
-                m_pOwner = owner;
-                m_ID     = id;
-                m_pQuery = query;
-                m_QName  = qname;
-                m_QType  = qtype;
-
-                m_CreateTime    = DateTime.Now;
-                m_pTimeoutTimer = new TimerEx(timeout);
-                m_pTimeoutTimer.Elapsed += new System.Timers.ElapsedEventHandler(m_pTimeoutTimer_Elapsed);
-            }
-                        
-            #region method Dispose
-
-            /// <summary>
-            /// Cleans up any resource being used.
-            /// </summary>
-            public void Dispose()
-            {
-                m_pTimeoutTimer.Dispose();
-                m_pTimeoutTimer = null;
-
-                m_pOwner.m_pTransactions.Remove(this.ID);
-                m_pOwner = null;
-
-                m_pQuery = null;
-                m_pResponse = null;
-
-                this.Timeout = null;
-                this.Completed = null;
-            }
-
-            #endregion
-
-
-            #region Evants handling
-
-            #region method m_pTimeoutTimer_Elapsed
-
-            private void m_pTimeoutTimer_Elapsed(object sender,System.Timers.ElapsedEventArgs e)
-            {
-                OnTimeout();
-            }
-
-            #endregion
-
-            #endregion
-
-
-            #region method Start
-
-            /// <summary>
-            /// Starts DNS transaction processing.
-            /// </summary>
-            public void Start()
-            {         
-                // Send parallel query to DNS server(s).
-                foreach(string server in Dns_Client.DnsServers){
-                    try{
-                        if(Net_Utils.IsIPAddress(server)){
-                            IPAddress ip = IPAddress.Parse(server);
-                            if(ip.AddressFamily == AddressFamily.InterNetwork){
-                                m_pOwner.m_pIPv4Socket.SendTo(m_pQuery,new IPEndPoint(ip,53));
-                            }
-                            else if(ip.AddressFamily == AddressFamily.InterNetworkV6){
-                                m_pOwner.m_pIPv6Socket.SendTo(m_pQuery,new IPEndPoint(ip,53));
-                            }
-                        }
-                    }
-                    catch{
-                    }
-                }
-
-                m_pTimeoutTimer.Start();
-            }
-
-            #endregion
-
-
-            #region method ProcessResponse
-
-            /// <summary>
-            /// Processes DNS server response through this transaction.
-            /// </summary>
-            /// <param name="response">DNS server response.</param>
-            /// <exception cref="ArgumentNullException">Is raised when <b>response</b> is null reference.</exception>
-            internal void ProcessResponse(DnsServerResponse response)
-            {
-                if(response == null){
-                    throw new ArgumentNullException("response");
-                }
-
-                m_pResponse = response;
-
-                OnCompleted();
-            }
-
-            #endregion
-
-
-            #region Properties implementaion
-
-            /// <summary>
-            /// Gets DNS transaction ID.
-            /// </summary>
-            public int ID
-            {
-                get{ return m_ID; }
-            }
-
-            /// <summary>
-            /// Gets QNAME value.
-            /// </summary>
-            public string QName
-            {
-                get{ return m_QName; }
-            }
-
-            /// <summary>
-            /// Gets QTYPE value.
-            /// </summary>
-            public int QType
-            {
-                get{ return m_QType; }
-            }
-
-            /// <summary>
-            /// Gets DNS server response. Value null means no response received yet.
-            /// </summary>
-            public DnsServerResponse Response
-            {
-                get{ return m_pResponse; }
-            }
-
-            #endregion
-
-            #region Events implementation
-
-            /// <summary>
-            /// This event is raised when DNS transaction times out.
-            /// </summary>
-            public event EventHandler Timeout = null;
-
-            #region method OnTimeout
-
-            /// <summary>
-            /// Raises <b>Timeout</b> event.
-            /// </summary>
-            private void OnTimeout()
-            {
-                if(this.Timeout != null){
-                    this.Timeout(this,new EventArgs());
-                }
-            }
-
-            #endregion
-
-            /// <summary>
-            /// This event is raised when DNS server response received.
-            /// </summary>
-            public event EventHandler Completed = null;
-
-            #region method OnCompleted
-
-            /// <summary>
-            /// Raises <b>Completed</b> event.
-            /// </summary>
-            private void OnCompleted()
-            {
-                if(this.Completed != null){
-                    this.Completed(this,new EventArgs());
-                }
-            }
-
-            #endregion
-
-            #endregion
-        }
-
-        #endregion
-        
+    {                
         private static IPAddress[] m_DnsServers  = null;
 		private static bool        m_UseDnsCache = true;
-		private static int         m_ID          = 100;
         // 
-        private bool                           m_IsDisposed    = false;
-        private Dictionary<int,DnsTransaction> m_pTransactions = null;
-        private Socket                         m_pIPv4Socket   = null;
-        private Socket                         m_pIPv6Socket   = null;
+        private bool                                  m_IsDisposed    = false;
+        private Dictionary<int,DNS_ClientTransaction> m_pTransactions = null;
+        private Socket                                m_pIPv4Socket   = null;
+        private Socket                                m_pIPv6Socket   = null;
+        private List<UDP_DataReceiver>                m_pReceivers    = null;
 
 		/// <summary>
 		/// Static constructor.
@@ -292,7 +79,7 @@ namespace LumiSoft.Net.DNS.Client
 		/// </summary>
 		public Dns_Client()
 		{
-            m_pTransactions = new Dictionary<int,DnsTransaction>();
+            m_pTransactions = new Dictionary<int,DNS_ClientTransaction>();
 
             m_pIPv4Socket = new Socket(AddressFamily.InterNetwork,SocketType.Dgram,ProtocolType.Udp);
             m_pIPv4Socket.Bind(new IPEndPoint(IPAddress.Any,0));
@@ -300,11 +87,28 @@ namespace LumiSoft.Net.DNS.Client
             if(Socket.OSSupportsIPv6){
                 m_pIPv6Socket = new Socket(AddressFamily.InterNetworkV6,SocketType.Dgram,ProtocolType.Udp);
                 m_pIPv6Socket.Bind(new IPEndPoint(IPAddress.IPv6Any,0));
-
-                StartWaitingIPv6Packet();
             }
 
-            StartWaitingIPv4Packet();
+            m_pReceivers = new List<UDP_DataReceiver>();
+
+            // Create UDP data receivers.
+            for(int i=0;i<5;i++){
+                UDP_DataReceiver ipv4Receiver = new UDP_DataReceiver(m_pIPv4Socket);
+                ipv4Receiver.PacketReceived += delegate(object s1,UDP_e_PacketReceived e1){
+                    ProcessUdpPacket(e1);
+                };
+                m_pReceivers.Add(ipv4Receiver);
+                ipv4Receiver.Start();
+
+                if(m_pIPv6Socket != null){
+                    UDP_DataReceiver ipv6Receiver = new UDP_DataReceiver(m_pIPv6Socket);
+                    ipv6Receiver.PacketReceived += delegate(object s1,UDP_e_PacketReceived e1){
+                        ProcessUdpPacket(e1);
+                    };
+                    m_pReceivers.Add(ipv6Receiver);
+                    ipv6Receiver.Start();
+                }
+            }
         }
 
         #region method Dispose
@@ -328,34 +132,41 @@ namespace LumiSoft.Net.DNS.Client
             }
 
             m_pTransactions = null;
+            m_pReceivers = null;
         }
 
         #endregion
 
 
-        #region method Query
+        #region method CreateTransaction
 
         /// <summary>
-		/// Queries server with specified query.
-		/// </summary>
-		/// <param name="queryText">Query text. It depends on queryType.</param>
-		/// <param name="queryType">Query type.</param>
-		/// <returns>Returns DSN server response.</returns>
-		public DnsServerResponse Query(string queryText,DNS_QType queryType)
-		{
-            return Query(queryText,queryType,2000);
-        }
+        /// Creates new DNS client transaction.
+        /// </summary>
+        /// <param name="queryType">Query type.</param>
+        /// <param name="queryText">Query text. It depends on queryType.</param>
+        /// <param name="timeout">Transaction timeout in milliseconds. DNS default value is 2000, value 0 means no timeout - this is not suggested.</param>
+        /// <returns>Returns DNS client transaction.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>queryText</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <remarks>Creates asynchronous(non-blocking) DNS transaction. Call <see cref="DNS_ClientTransaction.Start"/> to start transaction.
+        /// It is allowd to create multiple conccurent transactions.</remarks>
+        public DNS_ClientTransaction CreateTransaction(DNS_QType queryType,string queryText,int timeout)
+        {            
+            if(queryType == DNS_QType.PTR){
+                IPAddress ip = null;
+                if(!IPAddress.TryParse(queryText,out ip)){
+                    throw new ArgumentException("Argument 'queryText' value must be IP address if queryType == DNS_QType.PTR.","queryText");
+                }
+            }
+            if(queryText == null){
+                throw new ArgumentNullException("queryText");
+            }
+            if(queryText == string.Empty){
+                throw new ArgumentException("Argument 'queryText' value may not be \"\".","queryText");
+            }
 
-		/// <summary>
-		/// Queries server with specified query.
-		/// </summary>
-		/// <param name="queryText">Query text. It depends on queryType.</param>
-		/// <param name="queryType">Query type.</param>
-        /// <param name="timeout">Query timeout in milli seconds.</param>
-		/// <returns>Returns DSN server response.</returns>
-		public DnsServerResponse Query(string queryText,DNS_QType queryType,int timeout)
-		{
-			if(queryType == DNS_QType.PTR){
+            if(queryType == DNS_QType.PTR){
 				string ip = queryText;
 
 				// See if IP is ok.
@@ -389,11 +200,65 @@ namespace LumiSoft.Net.DNS.Client
 				}
 			}
 
-			return QueryServer(timeout,queryText,queryType,1);
+            DNS_ClientTransaction retVal = new DNS_ClientTransaction(this,new Random().Next(0xFFFF),queryType,queryText,timeout);
+            retVal.StateChanged += delegate(object s1,EventArgs<DNS_ClientTransaction> e1){
+                if(retVal.State == DNS_ClientTransactionState.Completed){
+                    m_pTransactions.Remove(e1.Value.ID);
+                }
+            };
+            m_pTransactions.Add(retVal.ID,retVal);
+
+            return retVal;
+        }
+
+        #endregion
+
+        #region method Query
+
+        /// <summary>
+		/// Queries server with specified query.
+		/// </summary>
+		/// <param name="queryText">Query text. It depends on queryType.</param>
+		/// <param name="queryType">Query type.</param>
+		/// <returns>Returns DSN server response.</returns>
+		public DnsServerResponse Query(string queryText,DNS_QType queryType)
+		{
+            return Query(queryText,queryType,2000);
+        }
+
+		/// <summary>
+		/// Queries server with specified query.
+		/// </summary>
+		/// <param name="queryText">Query text. It depends on queryType.</param>
+		/// <param name="queryType">Query type.</param>
+        /// <param name="timeout">Query timeout in milli seconds.</param>
+		/// <returns>Returns DSN server response.</returns>
+		public DnsServerResponse Query(string queryText,DNS_QType queryType,int timeout)
+		{
+            DnsServerResponse retVal = null;
+            ManualResetEvent  wait   = new ManualResetEvent(false);
+
+            DNS_ClientTransaction transaction = CreateTransaction(queryType,queryText,timeout);            
+            transaction.Timeout += delegate(object s,EventArgs e){
+                wait.Set();
+            };
+            transaction.StateChanged += delegate(object s1,EventArgs<DNS_ClientTransaction> e1){
+                if(transaction.State == DNS_ClientTransactionState.Completed || transaction.State == DNS_ClientTransactionState.Disposed){ 
+                    retVal = transaction.Response;
+
+                    wait.Set();
+                }
+            };
+            transaction.Start();
+
+            // Wait transaction to complete.
+            wait.WaitOne();
+
+            return retVal;
 		}
 
 		#endregion
-
+        
         #region method GetHostAddresses
 
         /// <summary>
@@ -513,323 +378,80 @@ namespace LumiSoft.Net.DNS.Client
 		#endregion
 
 
-        #region method StartWaitingIPv4Packet
+        #region method Send
 
         /// <summary>
-        /// Starts waiting DNS server response.
+        /// Sends specified packet to the specified target IP end point.
         /// </summary>
-        private void StartWaitingIPv4Packet()
+        /// <param name="target">Target end point.</param>
+        /// <param name="packet">Packet to send.</param>
+        /// <param name="count">Number of bytes to send from <b>packet</b>.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>target</b> or <b>packet</b> is null reference.</exception>
+        internal void Send(IPAddress target,byte[] packet,int count)
         {
-            byte[] buffer = new byte[8000];
-            EndPoint rtpRemoteEP = new IPEndPoint(IPAddress.Any,0);
-            m_pIPv4Socket.BeginReceiveFrom(
-                buffer,
-                0,
-                buffer.Length,
-                SocketFlags.None,
-                ref rtpRemoteEP,
-                new AsyncCallback(this.IPv4ReceiveCompleted),
-                buffer
-            );
+            if(target == null){
+                throw new ArgumentNullException("target");
+            }
+            if(packet == null){
+                throw new ArgumentNullException("packet");
+            }
+
+            try{
+                if(target.AddressFamily == AddressFamily.InterNetwork){
+                    m_pIPv4Socket.SendTo(packet,count,SocketFlags.None,new IPEndPoint(target,53));
+                }
+                else if(target.AddressFamily == AddressFamily.InterNetworkV6){
+                    m_pIPv6Socket.SendTo(packet,count,SocketFlags.None,new IPEndPoint(target,53));
+                }                
+            }
+            catch{
+            }
         }
 
         #endregion
 
-        #region method StartWaitingIPv6Packet
+
+        #region method ProcessUdpPacket
 
         /// <summary>
-        /// Starts waiting DNS server response.
+        /// Processes received UDP packet.
         /// </summary>
-        private void StartWaitingIPv6Packet()
-        {
-            byte[] buffer = new byte[8000];
-            EndPoint rtpRemoteEP = new IPEndPoint(IPAddress.IPv6Any,0);
-            m_pIPv6Socket.BeginReceiveFrom(
-                buffer,
-                0,
-                buffer.Length,
-                SocketFlags.None,
-                ref rtpRemoteEP,
-                new AsyncCallback(this.IPv6ReceiveCompleted),
-                buffer
-            );
-        }
-
-        #endregion
-
-        #region method IPv4ReceiveCompleted
-
-        /// <summary>
-        /// Is called when IPv4 socket has received data.
-        /// </summary>
-        /// <param name="ar">The result of the asynchronous operation.</param>
-        private void IPv4ReceiveCompleted(IAsyncResult ar)
+        /// <param name="e">UDP packet.</param>
+        private void ProcessUdpPacket(UDP_e_PacketReceived e)
         {
             try{
                 if(m_IsDisposed){
                     return;
                 }
-
-                EndPoint remoteEP = new IPEndPoint(IPAddress.Any,0);
-                int count = m_pIPv4Socket.EndReceiveFrom(ar,ref remoteEP);
-
-                byte[] response = new byte[count];
-                Array.Copy((byte[])ar.AsyncState,response,count);
-
-                DnsServerResponse serverResponse = ParseQuery(response);
-                DnsTransaction transaction = null;
+                                
+                DnsServerResponse serverResponse = ParseQuery(e.Buffer);
+                DNS_ClientTransaction transaction = null;
                 // Pass response to transaction.
                 if(m_pTransactions.TryGetValue(serverResponse.ID,out transaction)){
-                    transaction.ProcessResponse(serverResponse);
+                    if(transaction.State == DNS_ClientTransactionState.Active){
+                        // Cache query.
+                        if(m_UseDnsCache && serverResponse.ResponseCode == DNS_RCode.NO_ERROR){
+	                        DnsCache.AddToCache(transaction.QName,(int)transaction.QType,serverResponse);
+		                }
+                        
+                        transaction.ProcessResponse(serverResponse);
+                    }
                 }
                 // No such transaction or transaction has timed out before answer received.
                 //else{
                 //}
-
-                // Cache query.
-                if(m_UseDnsCache && serverResponse.ResponseCode == DNS_RCode.NO_ERROR){
-	                DnsCache.AddToCache(transaction.QName,transaction.QType,serverResponse);
-		        }
             }
             catch{
-                // Skip receiving socket errors.                
-            }
-
-            try{
-                StartWaitingIPv4Packet();
-            }
-            catch{
-            }
-        }
-
-        #endregion
-
-        #region method IPv6ReceiveCompleted
-
-        /// <summary>
-        /// Is called when IPv6 socket has received data.
-        /// </summary>
-        /// <param name="ar">The result of the asynchronous operation.</param>
-        private void IPv6ReceiveCompleted(IAsyncResult ar)
-        {
-            try{
-                if(m_IsDisposed){
-                    return;
-                }
-
-                EndPoint remoteEP = new IPEndPoint(IPAddress.Any,0);
-                int count = m_pIPv6Socket.EndReceiveFrom(ar,ref remoteEP);
-
-                byte[] response = new byte[count];
-                Array.Copy((byte[])ar.AsyncState,response,count);
-
-                DnsServerResponse serverResponse = ParseQuery(response);
-                DnsTransaction transaction = null;
-                // Pass response to transaction.
-                if(m_pTransactions.TryGetValue(serverResponse.ID,out transaction)){
-                    transaction.ProcessResponse(serverResponse);
-                }
-                // No such transaction or transaction has timed out before answer received.
-                //else{
-                //}
-
-                // Cache query.
-                if(m_UseDnsCache && serverResponse.ResponseCode == DNS_RCode.NO_ERROR){
-	                DnsCache.AddToCache(transaction.QName,transaction.QType,serverResponse);
-		        }
-            }
-            catch{
-                // Skip receiving socket errors.                
-            }
-
-            try{
-                StartWaitingIPv6Packet();
-            }
-            catch{
+                // We don't care about receiving errors here, skip them.
             }
         }
 
         #endregion
 
 
-        #region method QueryServer
+        #region method GetQName
 
-        /// <summary>
-		/// Sends query to server.
-		/// </summary>
-        /// <param name="timeout">Query timeout in milli seconds.</param>
-		/// <param name="qname">Query text.</param>
-		/// <param name="qtype">Query type.</param>
-		/// <param name="qclass">Query class.</param>
-		/// <returns>Returns DNS server response.</returns>
-		private DnsServerResponse QueryServer(int timeout,string qname,DNS_QType qtype,int qclass)
-		{	
-			if(m_DnsServers == null || m_DnsServers.Length == 0){
-				throw new Exception("Dns server isn't specified !");
-			}
-
-			// See if query is in cache
-			if(m_UseDnsCache){
-				DnsServerResponse resopnse = DnsCache.GetFromCache(qname,(int)qtype);
-				if(resopnse != null){
-					return resopnse;
-				}
-			}                           
-
-			int    queryID = Dns_Client.ID;
-			byte[] query   = CreateQuery(queryID,qname,qtype,qclass);
-            
-            // Create transcation and start processing it.            
-            using(DnsTransaction transaction = new DnsTransaction(this,queryID,qname,(int)qtype,timeout,query)){
-                ManualResetEvent wait = new ManualResetEvent(false);
-
-                transaction.Timeout += delegate(object s,EventArgs e){
-                    wait.Set();
-                };
-                transaction.Completed += delegate(object s,EventArgs e){
-                    wait.Set();
-                };
-                m_pTransactions.Add(transaction.ID,transaction);
-
-                // Start transaction processing and wait transaction to complete.
-                transaction.Start();                
-                wait.WaitOne();
-
-                // DNS server response received.
-                if(transaction.Response != null){
-                    return transaction.Response;
-                }
-                // No server response - timeout.
-                else{
-                    throw new Exception("Timeout - no response from DNS server.");
-                }
-            }
-		}
-
-		#endregion
-
-		#region method CreateQuery
-
-		/// <summary>
-		/// Creates new query.
-		/// </summary>
-		/// <param name="ID">Query ID.</param>
-		/// <param name="qname">Query text.</param>
-		/// <param name="qtype">Query type.</param>
-		/// <param name="qclass">Query class.</param>
-		/// <returns></returns>
-		private byte[] CreateQuery(int ID,string qname,DNS_QType qtype,int qclass)
-		{
-			byte[] query = new byte[512];
-
-			//---- Create header --------------------------------------------//
-			// Header is first 12 bytes of query
-
-			/* 4.1.1. Header section format
-										  1  1  1  1  1  1
-			0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
-			+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-			|                      ID                       |
-			+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-			|QR|   Opcode  |AA|TC|RD|RA|   Z    |   RCODE   |
-			+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-			|                    QDCOUNT                    |
-			+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-			|                    ANCOUNT                    |
-			+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-			|                    NSCOUNT                    |
-			+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-			|                    ARCOUNT                    |
-			+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-			
-			QR  A one bit field that specifies whether this message is a
-                query (0), or a response (1).
-				
-			OPCODE          A four bit field that specifies kind of query in this
-                message.  This value is set by the originator of a query
-                and copied into the response.  The values are:
-
-                0               a standard query (QUERY)
-
-                1               an inverse query (IQUERY)
-
-                2               a server status request (STATUS)
-				
-			*/
-
-			//--------- Header part -----------------------------------//
-			query[0]  = (byte) (ID >> 8); query[1]  = (byte) (ID & 0xFF);
-			query[2]  = (byte) 1;         query[3]  = (byte) 0;
-			query[4]  = (byte) 0;         query[5]  = (byte) 1;
-			query[6]  = (byte) 0;         query[7]  = (byte) 0;
-			query[8]  = (byte) 0;         query[9]  = (byte) 0;
-			query[10] = (byte) 0;         query[11] = (byte) 0;
-			//---------------------------------------------------------//
-
-			//---- End of header --------------------------------------------//
-
-
-			//----Create query ------------------------------------//
-
-			/* 	Rfc 1035 4.1.2. Question section format
-											  1  1  1  1  1  1
-			0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
-			+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-			|                                               |
-			/                     QNAME                     /
-			/                                               /
-			+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-			|                     QTYPE                     |
-			+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-			|                     QCLASS                    |
-			+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-			
-			QNAME
-				a domain name represented as a sequence of labels, where
-				each label consists of a length octet followed by that
-				number of octets.  The domain name terminates with the
-				zero length octet for the null label of the root.  Note
-				that this field may be an odd number of octets; no
-				padding is used.
-			*/
-			string[] labels = qname.Split(new char[] {'.'});
-			int position = 12;
-					
-			// Copy all domain parts(labels) to query
-			// eg. lumisoft.ee = 2 labels, lumisoft and ee.
-			// format = label.length + label(bytes)
-			foreach(string label in labels){
-				// add label lenght to query
-				query[position++] = (byte)(label.Length); 
-
-				// convert label string to byte array
-				byte[] b = Encoding.ASCII.GetBytes(label);
-				b.CopyTo(query,position);
-
-				// Move position by label length
-				position += b.Length;
-			}
-
-			// Terminate domain (see note above)
-			query[position++] = (byte) 0; 
-			
-			// Set QTYPE 
-			query[position++] = (byte) 0;
-			query[position++] = (byte)qtype;
-				
-			// Set QCLASS
-			query[position++] = (byte) 0;
-			query[position++] = (byte)qclass;
-			//-------------------------------------------------------//
-			
-			return query;
-		}
-
-		#endregion
-
-		#region method GetQName
-
-		internal static bool GetQName(byte[] reply,ref int offset,ref string name)
+        internal static bool GetQName(byte[] reply,ref int offset,ref string name)
 		{				
 			try{				
 				while(true){
@@ -1016,40 +638,40 @@ namespace LumiSoft.Net.DNS.Client
 				int rdLength = reply[offset++] << 8  | reply[offset++];
                 				
                 if((DNS_QType)type == DNS_QType.A){
-                    answers.Add(DNS_rr_A.Parse(reply,ref offset,rdLength,ttl));
+                    answers.Add(DNS_rr_A.Parse(name,reply,ref offset,rdLength,ttl));
                 }
                 else if((DNS_QType)type == DNS_QType.NS){
-                    answers.Add(DNS_rr_NS.Parse(reply,ref offset,rdLength,ttl));
+                    answers.Add(DNS_rr_NS.Parse(name,reply,ref offset,rdLength,ttl));
                 }
                 else if((DNS_QType)type == DNS_QType.CNAME){
-                    answers.Add(DNS_rr_CNAME.Parse(reply,ref offset,rdLength,ttl));
+                    answers.Add(DNS_rr_CNAME.Parse(name,reply,ref offset,rdLength,ttl));
                 }
                 else if((DNS_QType)type == DNS_QType.SOA){
-                    answers.Add(DNS_rr_SOA.Parse(reply,ref offset,rdLength,ttl));
+                    answers.Add(DNS_rr_SOA.Parse(name,reply,ref offset,rdLength,ttl));
                 }
                 else if((DNS_QType)type == DNS_QType.PTR){
-                    answers.Add(DNS_rr_PTR.Parse(reply,ref offset,rdLength,ttl));
+                    answers.Add(DNS_rr_PTR.Parse(name,reply,ref offset,rdLength,ttl));
                 }
                 else if((DNS_QType)type == DNS_QType.HINFO){
-                    answers.Add(DNS_rr_HINFO.Parse(reply,ref offset,rdLength,ttl));
+                    answers.Add(DNS_rr_HINFO.Parse(name,reply,ref offset,rdLength,ttl));
                 }
                 else if((DNS_QType)type == DNS_QType.MX){
-                    answers.Add(DNS_rr_MX.Parse(reply,ref offset,rdLength,ttl));
+                    answers.Add(DNS_rr_MX.Parse(name,reply,ref offset,rdLength,ttl));
                 }
                 else if((DNS_QType)type == DNS_QType.TXT){
-                    answers.Add(DNS_rr_TXT.Parse(reply,ref offset,rdLength,ttl));
+                    answers.Add(DNS_rr_TXT.Parse(name,reply,ref offset,rdLength,ttl));
                 }
                 else if((DNS_QType)type == DNS_QType.AAAA){
-                    answers.Add(DNS_rr_AAAA.Parse(reply,ref offset,rdLength,ttl));
+                    answers.Add(DNS_rr_AAAA.Parse(name,reply,ref offset,rdLength,ttl));
                 }
                 else if((DNS_QType)type == DNS_QType.SRV){
-                    answers.Add(DNS_rr_SRV.Parse(reply,ref offset,rdLength,ttl));
+                    answers.Add(DNS_rr_SRV.Parse(name,reply,ref offset,rdLength,ttl));
                 }
                 else if((DNS_QType)type == DNS_QType.NAPTR){
-                    answers.Add(DNS_rr_NAPTR.Parse(reply,ref offset,rdLength,ttl));
+                    answers.Add(DNS_rr_NAPTR.Parse(name,reply,ref offset,rdLength,ttl));
                 }
                 else if((DNS_QType)type == DNS_QType.SPF){
-                    answers.Add(DNS_rr_SPF.Parse(reply,ref offset,rdLength,ttl));
+                    answers.Add(DNS_rr_SPF.Parse(name,reply,ref offset,rdLength,ttl));
                 }
                 else{
                     // Unknown record, skip it.
@@ -1127,19 +749,6 @@ namespace LumiSoft.Net.DNS.Client
 			get{ return m_UseDnsCache; }
 
 			set{ m_UseDnsCache = value; }
-		}
-
-		/// <summary>
-		/// Get next query ID.
-		/// </summary>
-		internal static int ID
-		{
-			get{
-				if(m_ID >= 65535){
-					m_ID = 100;
-				}
-				return m_ID++; 
-			}
 		}
 
 		#endregion
