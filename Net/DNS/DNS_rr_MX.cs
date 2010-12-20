@@ -16,10 +16,11 @@ namespace LumiSoft.Net.DNS
 		/// <summary>
 		/// Default constructor.
 		/// </summary>
+        /// <param name="name">DNS domain name that owns a resource record.</param>
 		/// <param name="preference">MX record preference.</param>
 		/// <param name="host">Mail host dns name.</param>
 		/// <param name="ttl">TTL value.</param>
-		public DNS_rr_MX(int preference,string host,int ttl) : base(DNS_QType.MX,ttl)
+		public DNS_rr_MX(string name,int preference,string host,int ttl) : base(name,DNS_QType.MX,ttl)
 		{
 			m_Preference = preference;
 			m_Host       = host;
@@ -31,11 +32,12 @@ namespace LumiSoft.Net.DNS
         /// <summary>
         /// Parses resource record from reply data.
         /// </summary>
+        /// <param name="name">DNS domain name that owns a resource record.</param>
         /// <param name="reply">DNS server reply data.</param>
         /// <param name="offset">Current offset in reply data.</param>
         /// <param name="rdLength">Resource record data length.</param>
         /// <param name="ttl">Time to live in seconds.</param>
-        public static DNS_rr_MX Parse(byte[] reply,ref int offset,int rdLength,int ttl)
+        public static DNS_rr_MX Parse(string name,byte[] reply,ref int offset,int rdLength,int ttl)
         {
             /* RFC 1035	3.3.9. MX RDATA format
 
@@ -60,9 +62,9 @@ namespace LumiSoft.Net.DNS
 
 			int pref = reply[offset++] << 8 | reply[offset++];
 		
-			string name = "";			
-			if(Dns_Client.GetQName(reply,ref offset,ref name)){
-				return new DNS_rr_MX(pref,name,ttl);
+			string server = "";			
+			if(Dns_Client.GetQName(reply,ref offset,ref server)){
+				return new DNS_rr_MX(name,pref,server,ttl);
 			}
             else{
                 throw new ArgumentException("Invalid MX resource record data !");

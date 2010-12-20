@@ -22,6 +22,7 @@ namespace LumiSoft.Net.DNS
         /// <summary>
         /// Default constructor.
         /// </summary>
+        /// <param name="name">DNS domain name that owns a resource record.</param>
         /// <param name="order">Oorder in which the NAPTR records MUST be processed.</param>
         /// <param name="preference">Order in which NAPTR records with equal Order values SHOULD be processed.</param>
         /// <param name="flags">Flags which control the rewriting and interpretation of the fields in the record.</param>
@@ -29,7 +30,7 @@ namespace LumiSoft.Net.DNS
         /// <param name="regexp">Regular expression that is applied to the original string.</param>
         /// <param name="replacement">Regular expressions replacement value.</param>
         /// <param name="ttl">Time to live value in seconds.</param>
-        public DNS_rr_NAPTR(int order,int preference,string flags,string services,string regexp,string replacement,int ttl) : base(DNS_QType.NAPTR,ttl)
+        public DNS_rr_NAPTR(string name,int order,int preference,string flags,string services,string regexp,string replacement,int ttl) : base(name,DNS_QType.NAPTR,ttl)
         {
             m_Order       = order;
             m_Preference  = preference;
@@ -45,11 +46,12 @@ namespace LumiSoft.Net.DNS
         /// <summary>
         /// Parses resource record from reply data.
         /// </summary>
+        /// <param name="name">DNS domain name that owns a resource record.</param>
         /// <param name="reply">DNS server reply data.</param>
         /// <param name="offset">Current offset in reply data.</param>
         /// <param name="rdLength">Resource record data length.</param>
         /// <param name="ttl">Time to live in seconds.</param>
-        public static DNS_rr_NAPTR Parse(byte[] reply,ref int offset,int rdLength,int ttl)
+        public static DNS_rr_NAPTR Parse(string name,byte[] reply,ref int offset,int rdLength,int ttl)
         {
             /* RFC 3403.
                 The packet format for the NAPTR record is as follows
@@ -84,7 +86,7 @@ namespace LumiSoft.Net.DNS
             string replacement = "";
             Dns_Client.GetQName(reply,ref offset,ref replacement);
 
-            return new DNS_rr_NAPTR(order,preference,flags,services,regexp,replacement,ttl);
+            return new DNS_rr_NAPTR(name,order,preference,flags,services,regexp,replacement,ttl);
         }
 
         #endregion

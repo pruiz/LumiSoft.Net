@@ -15,9 +15,10 @@ namespace LumiSoft.Net.DNS
 		/// <summary>
 		/// Default constructor.
 		/// </summary>
+        /// <param name="name">DNS domain name that owns a resource record.</param>
 		/// <param name="alias">Alias.</param>
 		/// <param name="ttl">TTL value.</param>
-		public DNS_rr_CNAME(string alias,int ttl) : base(DNS_QType.CNAME,ttl)
+		public DNS_rr_CNAME(string name,string alias,int ttl) : base(name,DNS_QType.CNAME,ttl)
 		{
 			m_Alias = alias;
         }
@@ -28,15 +29,16 @@ namespace LumiSoft.Net.DNS
         /// <summary>
         /// Parses resource record from reply data.
         /// </summary>
+        /// <param name="name">DNS domain name that owns a resource record.</param>
         /// <param name="reply">DNS server reply data.</param>
         /// <param name="offset">Current offset in reply data.</param>
         /// <param name="rdLength">Resource record data length.</param>
         /// <param name="ttl">Time to live in seconds.</param>
-        public static DNS_rr_CNAME Parse(byte[] reply,ref int offset,int rdLength,int ttl)
+        public static DNS_rr_CNAME Parse(string name,byte[] reply,ref int offset,int rdLength,int ttl)
         {
-            string name = "";			
-			if(Dns_Client.GetQName(reply,ref offset,ref name)){			
-				return new DNS_rr_CNAME(name,ttl);
+            string alias = "";			
+			if(Dns_Client.GetQName(reply,ref offset,ref alias)){			
+				return new DNS_rr_CNAME(name,alias,ttl);
 			}
             else{
                 throw new ArgumentException("Invalid CNAME resource record data !");

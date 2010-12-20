@@ -20,12 +20,13 @@ namespace LumiSoft.Net.DNS
         /// <summary>
         /// Default constructor.
         /// </summary>
+        /// <param name="name">DNS domain name that owns a resource record.</param>
         /// <param name="priority">Service priority.</param>
         /// <param name="weight">Weight value.</param>
         /// <param name="port">Service port.</param>
         /// <param name="target">Service provider host name or IP address.</param>
         /// <param name="ttl">Time to live value in seconds.</param>
-        public DNS_rr_SRV(int priority,int weight,int port,string target,int ttl) : base(DNS_QType.SRV,ttl)
+        public DNS_rr_SRV(string name,int priority,int weight,int port,string target,int ttl) : base(name,DNS_QType.SRV,ttl)
         {
             m_Priority = priority;
             m_Weight   = weight;
@@ -39,11 +40,12 @@ namespace LumiSoft.Net.DNS
         /// <summary>
         /// Parses resource record from reply data.
         /// </summary>
+        /// <param name="name">DNS domain name that owns a resource record.</param>
         /// <param name="reply">DNS server reply data.</param>
         /// <param name="offset">Current offset in reply data.</param>
         /// <param name="rdLength">Resource record data length.</param>
         /// <param name="ttl">Time to live in seconds.</param>
-        public static DNS_rr_SRV Parse(byte[] reply,ref int offset,int rdLength,int ttl)
+        public static DNS_rr_SRV Parse(string name,byte[] reply,ref int offset,int rdLength,int ttl)
         {
             // Priority Weight Port Target
             
@@ -60,7 +62,7 @@ namespace LumiSoft.Net.DNS
             string target = "";
             Dns_Client.GetQName(reply,ref offset,ref target);
 
-            return new DNS_rr_SRV(priority,weight,port,target,ttl);
+            return new DNS_rr_SRV(name,priority,weight,port,target,ttl);
         }
 
         #endregion

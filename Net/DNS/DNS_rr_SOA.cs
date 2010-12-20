@@ -21,6 +21,7 @@ namespace LumiSoft.Net.DNS
 		/// <summary>
 		/// Default constructor.
 		/// </summary>
+        /// <param name="name">DNS domain name that owns a resource record.</param>
 		/// <param name="nameServer">Name server.</param>
 		/// <param name="adminEmail">Zone administrator email.</param>
 		/// <param name="serial">Version number of the original copy of the zone.</param>
@@ -29,7 +30,7 @@ namespace LumiSoft.Net.DNS
 		/// <param name="expire">Time value(in seconds) that specifies the upper limit on the time interval that can elapse before the zone is no longer authoritative.</param>
 		/// <param name="minimum">Minimum TTL(in seconds) field that should be exported with any RR from this zone.</param>
 		/// <param name="ttl">TTL value.</param>
-		public DNS_rr_SOA(string nameServer,string adminEmail,long serial,long refresh,long retry,long expire,long minimum,int ttl) : base(DNS_QType.SOA,ttl)
+		public DNS_rr_SOA(string name,string nameServer,string adminEmail,long serial,long refresh,long retry,long expire,long minimum,int ttl) : base(name,DNS_QType.SOA,ttl)
 		{
 			m_NameServer = nameServer;
 			m_AdminEmail = adminEmail;
@@ -46,11 +47,12 @@ namespace LumiSoft.Net.DNS
         /// <summary>
         /// Parses resource record from reply data.
         /// </summary>
+        /// <param name="name">DNS domain name that owns a resource record.</param>
         /// <param name="reply">DNS server reply data.</param>
         /// <param name="offset">Current offset in reply data.</param>
         /// <param name="rdLength">Resource record data length.</param>
         /// <param name="ttl">Time to live in seconds.</param>
-        public static DNS_rr_SOA Parse(byte[] reply,ref int offset,int rdLength,int ttl)
+        public static DNS_rr_SOA Parse(string name,byte[] reply,ref int offset,int rdLength,int ttl)
         {
             /* RFC 1035 3.3.13. SOA RDATA format
 
@@ -136,7 +138,7 @@ namespace LumiSoft.Net.DNS
 			long minimum = reply[offset++] << 24 | reply[offset++] << 16 | reply[offset++] << 8 | reply[offset++];
 			//--------------------------------------------------------------------------------//
 
-			return new DNS_rr_SOA(nameserver,adminMailBox,serial,refresh,retry,expire,minimum,ttl);
+			return new DNS_rr_SOA(name,nameserver,adminMailBox,serial,refresh,retry,expire,minimum,ttl);
         }
 
         #endregion

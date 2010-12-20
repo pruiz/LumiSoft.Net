@@ -17,7 +17,10 @@ namespace LumiSoft.Net.DNS
         /// <summary>
         /// Default constructor.
         /// </summary>
-        public DNS_rr_SPF(string text,int ttl) : base(DNS_QType.SPF,ttl)
+        /// <param name="name">DNS domain name that owns a resource record.</param>
+        /// <param name="text">SPF text.</param>
+		/// <param name="ttl">TTL (time to live) value in seconds.</param>
+        public DNS_rr_SPF(string name,string text,int ttl) : base(name,DNS_QType.SPF,ttl)
         {
         }
 
@@ -27,17 +30,18 @@ namespace LumiSoft.Net.DNS
         /// <summary>
         /// Parses resource record from reply data.
         /// </summary>
+        /// <param name="name">DNS domain name that owns a resource record.</param>
         /// <param name="reply">DNS server reply data.</param>
         /// <param name="offset">Current offset in reply data.</param>
         /// <param name="rdLength">Resource record data length.</param>
         /// <param name="ttl">Time to live in seconds.</param>
-        public static DNS_rr_SPF Parse(byte[] reply,ref int offset,int rdLength,int ttl)
+        public static DNS_rr_SPF Parse(string name,byte[] reply,ref int offset,int rdLength,int ttl)
         {
             // SPF RR
 
             string text = Dns_Client.ReadCharacterString(reply,ref offset);
 
-			return new DNS_rr_SPF(text,ttl);
+			return new DNS_rr_SPF(name,text,ttl);
         }
 
         #endregion

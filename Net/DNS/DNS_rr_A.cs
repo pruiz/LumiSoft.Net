@@ -14,9 +14,10 @@ namespace LumiSoft.Net.DNS
 		/// <summary>
 		/// Default constructor.
 		/// </summary>
+        /// <param name="name">DNS domain name that owns a resource record.</param>
 		/// <param name="ip">IP address.</param>
 		/// <param name="ttl">TTL value.</param>
-		public DNS_rr_A(IPAddress ip,int ttl) : base(DNS_QType.A,ttl)
+		public DNS_rr_A(string name,IPAddress ip,int ttl) : base(name,DNS_QType.A,ttl)
 		{
 			m_IP = ip;
 		}
@@ -27,11 +28,12 @@ namespace LumiSoft.Net.DNS
         /// <summary>
         /// Parses resource record from reply data.
         /// </summary>
+        /// <param name="name">DNS domain name that owns a resource record.</param>
         /// <param name="reply">DNS server reply data.</param>
         /// <param name="offset">Current offset in reply data.</param>
         /// <param name="rdLength">Resource record data length.</param>
         /// <param name="ttl">Time to live in seconds.</param>
-        public static DNS_rr_A Parse(byte[] reply,ref int offset,int rdLength,int ttl)
+        public static DNS_rr_A Parse(string name,byte[] reply,ref int offset,int rdLength,int ttl)
         {
             // IPv4 = byte byte byte byte
 
@@ -39,7 +41,7 @@ namespace LumiSoft.Net.DNS
 			Array.Copy(reply,offset,ip,0,rdLength);
             offset += rdLength;
             
-			return new DNS_rr_A(new IPAddress(ip),ttl);
+			return new DNS_rr_A(name,new IPAddress(ip),ttl);
         }
 
         #endregion
