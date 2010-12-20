@@ -113,6 +113,7 @@ namespace LumiSoft.Net.RTP
             int length = 0;
             length += m_Sources.Length * 4;
             if(!string.IsNullOrEmpty(m_LeavingReason)){
+                length++;
                 length += Encoding.UTF8.GetByteCount(m_LeavingReason);
             }
 
@@ -198,6 +199,7 @@ namespace LumiSoft.Net.RTP
                     size += 4 * m_Sources.Length;
                 }
                 if(!string.IsNullOrEmpty(m_LeavingReason)){
+                    size++;
                     size += Encoding.UTF8.GetByteCount(m_LeavingReason);
                 }
 

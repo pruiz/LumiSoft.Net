@@ -364,11 +364,15 @@ namespace LumiSoft.Net.RTP
         /// <remarks>Once RTP session opened, RTCP reports sent to that target and also each local sending stream data.</remarks>
         /// <param name="target">Session remote target.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>target</b> is null reference.</exception>
+        /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this method is accessed.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid values.</exception>
         public void AddTarget(RTP_Address target)
         {
             if(target == null){
                 throw new ArgumentNullException("target");
+            }
+            if(m_IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
             }
             if(m_pLocalEP.Equals(target)){
                 throw new ArgumentException("Argument 'target' value collapses with property 'LocalEP'.","target");
@@ -392,13 +396,34 @@ namespace LumiSoft.Net.RTP
         /// </summary>
         /// <param name="target">Session remote target.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>target</b> is null reference.</exception>
+        /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this method is accessed.</exception>
         public void RemoveTarget(RTP_Address target)
         {
             if(target == null){
                 throw new ArgumentNullException("target");
             }
+            if(m_IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
 
             m_pTargets.Remove(target);
+        }
+
+        #endregion
+
+        #region method RemoveTargets
+
+        /// <summary>
+        /// Removes all targets.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this method is accessed.</exception>
+        public void RemoveTargets()
+        {
+            if(m_IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+
+            m_pTargets.Clear();
         }
 
         #endregion
@@ -429,12 +454,10 @@ namespace LumiSoft.Net.RTP
 
             try{
                 STUN_Result rtpResult = STUN_Client.Query(server,port,m_pRtpSocket);
-                if(rtpResult.NetType == STUN_NetType.FullCone || rtpResult.NetType == STUN_NetType.PortRestrictedCone || rtpResult.NetType == STUN_NetType.RestrictedCone){
-                    STUN_Result rtcpResult = STUN_Client.Query(server,port,m_pRtcpSocket);
-
+                if(rtpResult.NetType == STUN_NetType.FullCone || rtpResult.NetType == STUN_NetType.PortRestrictedCone || rtpResult.NetType == STUN_NetType.RestrictedCone){                                        
                     rtpEP  = rtpResult.PublicEndPoint;
-                    rtcpEP = rtcpResult.PublicEndPoint;
-       
+                    rtcpEP = STUN_Client.GetPublicEP(server,port,m_pRtcpSocket);
+                                               
                     return true;
                 }                
             }
@@ -530,10 +553,7 @@ namespace LumiSoft.Net.RTP
             // Send packet to each remote target.
             foreach(RTP_Address target in this.Targets){
                 try{
-                    m_pRtpSocket.SendTo(packetBytes,count,SocketFlags.None,target.RtpEP);
-
-                    m_RtpPacketsSent++;
-                    m_RtpBytesSent += packetBytes.Length;
+                    m_pRtpSocket.BeginSendTo(packetBytes,0,count,SocketFlags.None,target.RtpEP,this.RtpAsyncSocketSendCompleted,null);
                 }
                 catch{
                     m_RtpFailedTransmissions++;
@@ -668,7 +688,7 @@ namespace LumiSoft.Net.RTP
                             if(source != null){
                                 source.SetLastRtcpPacket(DateTime.Now);
 
-                                RTP_Participant_Remote participant = m_pSession.GetOrCreateParticipant(sdes.CName);
+                                RTP_Participant_Remote participant = m_pSession.GetOrCreateParticipant(string.IsNullOrEmpty(sdes.CName) ? "null" : sdes.CName);
 
                                 // Map participant to source.
                                 ((RTP_Source_Remote)source).SetParticipant(participant);
@@ -677,7 +697,7 @@ namespace LumiSoft.Net.RTP
                                 participant.EnsureSource(source);
                             
                                 // Update participant SDES items.
-                                participant.Update(sdes);
+                                participant.Update(sdes);                                
                             }                            
                         }
                     }
@@ -1334,6 +1354,10 @@ namespace LumiSoft.Net.RTP
                 TimeOutSsrc();
             }
             catch(Exception x){
+                if(this.IsDisposed){
+                    return;
+                }
+
                 m_pSession.OnError(x);
             }
 
@@ -1381,6 +1405,25 @@ namespace LumiSoft.Net.RTP
 
         #endregion
 
+        #region method RtpAsyncSocketSendCompleted
+
+        /// <summary>
+        /// Is called when RTP socket has finisehd data sending.
+        /// </summary>
+        /// <param name="ar">The result of the asynchronous operation.</param>
+        private void RtpAsyncSocketSendCompleted(IAsyncResult ar)
+        {
+            try{
+                m_RtpBytesSent += m_pRtpSocket.EndSendTo(ar);
+                m_RtpPacketsSent++;
+            }
+            catch{
+                m_RtpFailedTransmissions++;
+            }
+        }
+
+        #endregion
+
         #region method RtcpAsyncSocketReceiveCompleted
 
         /// <summary>
@@ -1415,7 +1458,7 @@ namespace LumiSoft.Net.RTP
         }
 
         #endregion
-
+                
         #region method RtpIOCompletionReceive
 
         /// <summary>
@@ -1606,7 +1649,11 @@ namespace LumiSoft.Net.RTP
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                m_Payload = value;
+                if(m_Payload != value){
+                    m_Payload = value;
+
+                    OnPayloadChanged();
+                }
             }
         }
 
@@ -2057,6 +2104,25 @@ namespace LumiSoft.Net.RTP
         {
             if(this.NewReceiveStream != null){
                 this.NewReceiveStream(this,new RTP_ReceiveStreamEventArgs(stream));
+            }
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when session sending payload has changed.
+        /// </summary>
+        public event EventHandler PayloadChanged = null;
+
+        #region method OnPayloadChanged
+
+        /// <summary>
+        /// Raises <b>PayloadChanged</b> event.
+        /// </summary>
+        private void OnPayloadChanged()
+        {
+            if(this.PayloadChanged != null){
+                this.PayloadChanged(this,new EventArgs());
             }
         }
 

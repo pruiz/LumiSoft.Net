@@ -158,6 +158,11 @@ namespace LumiSoft.Net.SIP.Stack
                     }
                 });
 
+                SIP_Dialog dialog = MatchDialog(request);
+                if(dialog != null){
+                    dialog.AddTransaction(transaction);
+                }
+
                 return transaction;
             }
         }
@@ -196,6 +201,11 @@ namespace LumiSoft.Net.SIP.Stack
                         }
                     }
                 });
+
+                SIP_Dialog dialog = MatchDialog(request);
+                if(dialog != null){
+                    dialog.AddTransaction(transaction);
+                }
 
                 return transaction;
             }

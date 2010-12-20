@@ -24,6 +24,7 @@ namespace LumiSoft.Net.SIP.Stack
     /// </remarks>
     public class SIP_Flow : IDisposable
     {
+        private object       m_pLock           = new object();
         private bool         m_IsDisposed      = false;
         private bool         m_IsServer        = false;
         private SIP_Stack    m_pStack          = null;
@@ -35,12 +36,12 @@ namespace LumiSoft.Net.SIP.Stack
         private IPEndPoint   m_pRemoteEP       = null;
         private string       m_Transport       = "";
         private DateTime     m_LastActivity;
+        private DateTime     m_LastPing;
         private long         m_BytesWritten    = 0;
         private MemoryStream m_pMessage        = null;
         private bool         m_LastCRLF        = false;
         private TimerEx      m_pKeepAliveTimer = null;
-        private object       m_pLock           = new object();
-
+        
         /// <summary>
         /// Default constructor.
         /// </summary>
@@ -177,6 +178,31 @@ namespace LumiSoft.Net.SIP.Stack
                 }
 
                 SendInternal(response.ToByteData());
+                m_LastPing = DateTime.Now;
+            }
+        }
+
+        #endregion
+
+        #region method SendPing
+
+        /// <summary>
+        /// Send ping request to flow remote end point.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        public void SendPing()
+        {
+            lock(m_pLock){
+                if(m_IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                // Log:
+                if(m_pStack.TransportLayer.Stack.Logger != null){
+                    m_pStack.TransportLayer.Stack.Logger.AddWrite("",null,2,"Flow [id='" + this.ID + "'] sent \"ping\"",this.LocalEP,this.RemoteEP);
+                }
+
+                SendInternal(new byte[]{(byte)'\r',(byte)'\n',(byte)'\r',(byte)'\n'});
             }
         }
 
@@ -649,6 +675,21 @@ namespace LumiSoft.Net.SIP.Stack
                 else{
                     return m_LastActivity; 
                 }
+            }
+        }
+
+        /// <summary>
+        /// Gets time when last ping request was sent.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        public DateTime LastPing
+        {
+            get{
+                if(m_IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return m_LastPing;
             }
         }
 

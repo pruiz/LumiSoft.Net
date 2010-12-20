@@ -44,7 +44,7 @@ namespace LumiSoft.Net.SIP.Message
                     if(paramString != ""){
                         string[] name_value = paramString.Split(new char[]{'='},2);
                         if(name_value.Length == 2){
-                           this.Parameters.Add(name_value[0],name_value[1]);
+                           this.Parameters.Add(name_value[0],TextUtils.UnQuoteString(name_value[1]));
                         }
                         else{
                             this.Parameters.Add(name_value[0],null);
@@ -75,7 +75,12 @@ namespace LumiSoft.Net.SIP.Message
             StringBuilder retVal = new StringBuilder();
             foreach(SIP_Parameter parameter in m_pParameters){
                 if(!string.IsNullOrEmpty(parameter.Value)){
-                    retVal.Append(";" + parameter.Name + "=" + TextUtils.QuoteString(parameter.Value));
+                    if(TextUtils.IsToken(parameter.Value)){
+                        retVal.Append(";" + parameter.Name + "=" + parameter.Value);
+                    }
+                    else{
+                        retVal.Append(";" + parameter.Name + "=" + TextUtils.QuoteString(parameter.Value));
+                    }
                 }
                 else{
                     retVal.Append(";" + parameter.Name);

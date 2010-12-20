@@ -50,7 +50,8 @@ namespace LumiSoft.Net.STUN.Message
         #endregion
 
         private STUN_MessageType     m_Type             = STUN_MessageType.BindingRequest;
-        private Guid                 m_pTransactionID   = Guid.Empty;
+        private int                  m_MagicCookie      = 0;
+        private byte[]               m_pTransactionID   = null;
         private IPEndPoint           m_pMappedAddress   = null;
         private IPEndPoint           m_pResponseAddress = null;
         private STUN_t_ChangeRequest m_pChangeRequest   = null;
@@ -67,7 +68,8 @@ namespace LumiSoft.Net.STUN.Message
         /// </summary>
         public STUN_Message()
         {
-            m_pTransactionID = Guid.NewGuid();
+            m_pTransactionID = new byte[12];
+            new Random().NextBytes(m_pTransactionID);
         }
 
 
@@ -77,24 +79,29 @@ namespace LumiSoft.Net.STUN.Message
         /// Parses STUN message from raw data packet.
         /// </summary>
         /// <param name="data">Raw STUN message.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>data</b> is null reference.</exception>
         public void Parse(byte[] data)
         {
-            /* RFC 3489 11.1.             
-                All STUN messages consist of a 20 byte header:
+            if(data == null){
+                throw new ArgumentNullException("data");
+            }
 
-                0                   1                   2                   3
-                0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-               |      STUN Message Type        |         Message Length        |
-               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-               |
-               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+            /* RFC 5389 6.             
+                All STUN messages MUST start with a 20-byte header followed by zero
+                or more Attributes.  The STUN header contains a STUN message type,
+                magic cookie, transaction ID, and message length.
 
-               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-                                        Transaction ID
-               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-                                                                               |
-               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                 0                   1                   2                   3
+                 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+                 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                 |0 0|     STUN Message Type     |         Message Length        |
+                 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                 |                         Magic Cookie                          |
+                 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                 |                                                               |
+                 |                     Transaction ID (96 bits)                  |
+                 |                                                               |
+                 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
               
                The message length is the count, in bytes, of the size of the
                message, not including the 20 byte header.
@@ -135,11 +142,13 @@ namespace LumiSoft.Net.STUN.Message
             // Message Length
             int messageLength = (data[offset++] << 8 | data[offset++]);
 
+            // Magic Cookie
+            m_MagicCookie = (data[offset++] << 24 | data[offset++] << 16 | data[offset++] << 8 | data[offset++]);
+
             // Transaction ID
-            byte[] guid = new byte[16];
-            Array.Copy(data,offset,guid,0,16);            
-            m_pTransactionID = new Guid(guid);
-            offset += 16;
+            m_pTransactionID = new byte[12];
+            Array.Copy(data,offset,m_pTransactionID,0,12);
+            offset += 12;
 
             //--- Message attributes ---------------------------------------------
             while((offset - 20) < messageLength){
@@ -157,26 +166,25 @@ namespace LumiSoft.Net.STUN.Message
         /// <returns>Returns raw STUN packet.</returns>
         public byte[] ToByteData()
         {
-            /* RFC 3489 11.1.             
-                All STUN messages consist of a 20 byte header:
+            /* RFC 5389 6.             
+                All STUN messages MUST start with a 20-byte header followed by zero
+                or more Attributes.  The STUN header contains a STUN message type,
+                magic cookie, transaction ID, and message length.
 
-                0                   1                   2                   3
-                0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-               |      STUN Message Type        |         Message Length        |
-               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-               |
-               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-
-               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-                                        Transaction ID
-               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-                                                                               |
-               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-             
+                 0                   1                   2                   3
+                 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+                 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                 |0 0|     STUN Message Type     |         Message Length        |
+                 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                 |                         Magic Cookie                          |
+                 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                 |                                                               |
+                 |                     Transaction ID (96 bits)                  |
+                 |                                                               |
+                 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+              
                The message length is the count, in bytes, of the size of the
                message, not including the 20 byte header.
-
             */
 
             // We allocate 512 for header, that should be more than enough.
@@ -187,16 +195,22 @@ namespace LumiSoft.Net.STUN.Message
             //--- message header -------------------------------------
 
             // STUN Message Type (2 bytes)
-            msg[offset++] = (byte)((int)this.Type >> 8);
+            msg[offset++] = (byte)(((int)this.Type >> 8) & 0x3F);
             msg[offset++] = (byte)((int)this.Type & 0xFF);
 
             // Message Length (2 bytes) will be assigned at last.
             msg[offset++] = 0;
             msg[offset++] = 0;
 
+            // Magic Cookie           
+            msg[offset++] = (byte)((this.MagicCookie >> 24) & 0xFF);
+            msg[offset++] = (byte)((this.MagicCookie >> 16) & 0xFF);
+            msg[offset++] = (byte)((this.MagicCookie >> 8)  & 0xFF);
+            msg[offset++] = (byte)((this.MagicCookie >> 0)  & 0xFF);
+
             // Transaction ID (16 bytes)
-            Array.Copy(m_pTransactionID.ToByteArray(),0,msg,offset,16);
-            offset += 16;
+            Array.Copy(m_pTransactionID,0,msg,offset,12);
+            offset += 12;
 
             //--- Message attributes ------------------------------------
       
@@ -563,9 +577,17 @@ namespace LumiSoft.Net.STUN.Message
         }
 
         /// <summary>
+        /// Gets magic cookie value. This is always 0x2112A442.
+        /// </summary>
+        public int MagicCookie
+        {
+            get{ return m_MagicCookie; }
+        }
+
+        /// <summary>
         /// Gets transaction ID.
         /// </summary>
-        public Guid TransactionID
+        public byte[] TransactionID
         {
             get{ return m_pTransactionID; }
         }

@@ -14,7 +14,7 @@ namespace LumiSoft.Net.SIP.Stack
         private SIP_Flow              m_pFlow        = null;
         private SIP_Request           m_pRequest     = null;
         private SIP_ServerTransaction m_pTransaction = null;
-        private SIP_Dialog            m_pDialog      = null;
+        private bool                  m_IsHandled    = false;
 
         /// <summary>
         /// Default constructor.
@@ -22,7 +22,7 @@ namespace LumiSoft.Net.SIP.Stack
         /// <param name="stack">Reference to SIP stack.</param>
         /// <param name="flow">SIP data flow.</param>
         /// <param name="request">Recieved request.</param>
-        internal SIP_RequestReceivedEventArgs(SIP_Stack stack,SIP_Flow flow,SIP_Request request) : this(stack,flow,request,null,null)
+        internal SIP_RequestReceivedEventArgs(SIP_Stack stack,SIP_Flow flow,SIP_Request request) : this(stack,flow,request,null)
         {           
         }
 
@@ -32,14 +32,12 @@ namespace LumiSoft.Net.SIP.Stack
         /// <param name="stack">Reference to SIP stack.</param>
         /// <param name="flow">SIP data flow.</param>
         /// <param name="request">Recieved request.</param>
-        /// <param name="dialog">SIP dialog which received request.</param>
         /// <param name="transaction">SIP server transaction which must be used to send response back to request maker.</param>
-        internal SIP_RequestReceivedEventArgs(SIP_Stack stack,SIP_Flow flow,SIP_Request request,SIP_Dialog dialog,SIP_ServerTransaction transaction)
+        internal SIP_RequestReceivedEventArgs(SIP_Stack stack,SIP_Flow flow,SIP_Request request,SIP_ServerTransaction transaction)
         {
             m_pStack       = stack;
             m_pFlow        = flow;
             m_pRequest     = request;
-            m_pDialog      = dialog;
             m_pTransaction = transaction;
         }
 
@@ -90,7 +88,17 @@ namespace LumiSoft.Net.SIP.Stack
         /// </summary>
         public SIP_Dialog Dialog
         {
-            get{ return m_pDialog; }
+            get{ return m_pStack.TransactionLayer.MatchDialog(m_pRequest); }
+        }
+
+        /// <summary>
+        /// Gets or sets if request is handled.
+        /// </summary>
+        public bool IsHandled
+        {
+            get{ return m_IsHandled; }
+
+            set{ m_IsHandled = true; }
         }
 
         #endregion

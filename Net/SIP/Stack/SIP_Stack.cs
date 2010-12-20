@@ -147,17 +147,18 @@ namespace LumiSoft.Net.SIP.Stack
 
             // Terminate dialogs.
             foreach(SIP_Dialog dialog in m_pTransactionLayer.Dialogs){
-                dialog.Terminate("SIP Shutting Down",true);
+                dialog.Terminate();
             }
 
-            // Wait while all active transactions has "completed","terminated" or "Disposed".
+            // Wait while all active transactions has completed.
             DateTime start = DateTime.Now;
             while(true){
                 bool activeTransactions = false;
                 foreach(SIP_Transaction tr in m_pTransactionLayer.Transactions){
                     // We have active transactions.
-                    if(!(tr.State == SIP_TransactionState.Completed || tr.State == SIP_TransactionState.Terminated || tr.State == SIP_TransactionState.Disposed)){
+                    if(tr.State == SIP_TransactionState.WaitingToStart || tr.State == SIP_TransactionState.Calling || tr.State == SIP_TransactionState.Proceeding || tr.State == SIP_TransactionState.Trying){
                         activeTransactions = true;
+                
                         break;
                     }
                 }
@@ -533,14 +534,9 @@ namespace LumiSoft.Net.SIP.Stack
                     response.RecordRoute.Add(route.ToStringValue());
                 }
                 
-                if(response.StatusCodeType == SIP_StatusCodeType.Success && response.Contact.GetTopMostValue() ==  null && flow != null){
-                    try{
-                        string user = ((SIP_Uri)response.To.Address.Uri).User;
-                        response.Contact.Add((flow.IsSecure ? "sips:" : "sip:") + user + "@" + flow.LocalPublicEP.ToString());
-                    }
-                    catch{
-                        // TODO: Log
-                    }
+                if(response.Contact.GetTopMostValue() ==  null && flow != null){
+                    string user = ((SIP_Uri)response.To.Address.Uri).User;
+                    response.Contact.Add((flow.IsSecure ? "sips:" : "sip:") + user + "@" + flow.LocalPublicEP.ToString());
                 }
             }
                         

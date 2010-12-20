@@ -21,7 +21,7 @@ namespace LumiSoft.Net.SIP.UA
         private SDP_Message               m_pLocalSDP                 = null;
         private SDP_Message               m_pRemoteSDP                = null;
         private DateTime                  m_StartTime;
-        private List<SIP_Dialog>          m_pEarlyDialogs             = null;
+        private List<SIP_Dialog_Invite>   m_pEarlyDialogs             = null;
         private SIP_Dialog                m_pDialog                   = null;
         private bool                      m_IsRedirected              = false;
         private SIP_RequestSender         m_pInitialInviteSender      = null;
@@ -57,7 +57,7 @@ namespace LumiSoft.Net.SIP.UA
 
             m_State = SIP_UA_CallState.WaitingForStart;
 
-            m_pEarlyDialogs = new List<SIP_Dialog>();
+            m_pEarlyDialogs = new List<SIP_Dialog_Invite>();
             m_pTags = new Dictionary<string,object>();
         }
 
@@ -179,7 +179,7 @@ namespace LumiSoft.Net.SIP.UA
                             defined in Section 12.1.2.
                         */
                         if(e.Response.StatusCode > 100 && e.Response.To.Tag != null){
-                            m_pEarlyDialogs.Add(m_pUA.Stack.TransactionLayer.GetOrCreateDialog(e.ClientTransaction,e.Response));
+                            m_pEarlyDialogs.Add((SIP_Dialog_Invite)m_pUA.Stack.TransactionLayer.GetOrCreateDialog(e.ClientTransaction,e.Response));
                         }
                     }
                     else if(e.Response.StatusCodeType == SIP_StatusCodeType.Success){
@@ -193,7 +193,7 @@ namespace LumiSoft.Net.SIP.UA
                            That is not defined in RFC but, since UAC can send BYE to early and confirmed dialogs, 
                            because of this all 100% valid.
                         */
-                        foreach(SIP_Dialog dialog in m_pEarlyDialogs.ToArray()){
+                        foreach(SIP_Dialog_Invite dialog in m_pEarlyDialogs.ToArray()){
                             if(!m_pDialog.Equals(dialog)){
                                 dialog.Terminate("Another forking leg accepted.",true);
                             }
@@ -203,7 +203,7 @@ namespace LumiSoft.Net.SIP.UA
                         /* RFC 3261 13.2.2.3.
                             All early dialogs are considered terminated upon reception of the non-2xx final response.
                         */
-                        foreach(SIP_Dialog dialog in m_pEarlyDialogs.ToArray()){
+                        foreach(SIP_Dialog_Invite dialog in m_pEarlyDialogs.ToArray()){
                             dialog.Terminate("All early dialogs are considered terminated upon reception of the non-2xx final response. (RFC 3261 13.2.2.3)",false);
                         }
                         m_pEarlyDialogs.Clear();

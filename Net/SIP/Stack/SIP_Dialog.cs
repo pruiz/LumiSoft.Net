@@ -12,34 +12,34 @@ namespace LumiSoft.Net.SIP.Stack
     /// </summary>
     public class SIP_Dialog
     {
-        private SIP_DialogState        m_State                     = SIP_DialogState.Early;
-        private SIP_Stack              m_pStack                    = null;
+        private object                 m_pLock            = new object();
+        private SIP_DialogState        m_State            = SIP_DialogState.Early;
+        private SIP_Stack              m_pStack           = null;
         private DateTime               m_CreateTime;
-        private string                 m_CallID                    = "";
-        private string                 m_LocalTag                  = "";
-        private string                 m_RemoteTag                 = "";
-        private int                    m_LocalSeqNo                = 0;
-        private int                    m_RemoteSeqNo               = 0;
-        private AbsoluteUri            m_pLocalUri                 = null;
-        private AbsoluteUri            m_pRemoteUri                = null;
-        private SIP_Uri                m_pLocalContact             = null;
-        private SIP_Uri                m_pRemoteTarget             = null;
-        private bool                   m_IsSecure                  = false;
-        private SIP_t_AddressParam[]   m_pRouteSet                 = null;
-        private string[]               m_pRemoteAllow              = null;
-        private string[]               m_pRemoteSupported          = null;
-        private bool                   m_IsTerminatedByRemoteParty = false;
-        private SIP_Flow               m_pFlow                     = null;
-        private List<SIP_Dialog_Usage> m_pUsages                   = null;
-        private object                 m_pLock                     = new object();
+        private string                 m_CallID           = "";
+        private string                 m_LocalTag         = "";
+        private string                 m_RemoteTag        = "";
+        private int                    m_LocalSeqNo       = 0;
+        private int                    m_RemoteSeqNo      = 0;
+        private AbsoluteUri            m_pLocalUri        = null;
+        private AbsoluteUri            m_pRemoteUri       = null;
+        private SIP_Uri                m_pLocalContact    = null;
+        private SIP_Uri                m_pRemoteTarget    = null;
+        private bool                   m_IsSecure         = false;
+        private SIP_t_AddressParam[]   m_pRouteSet        = null;
+        private string[]               m_pRemoteAllow     = null;
+        private string[]               m_pRemoteSupported = null;
+        private SIP_Flow               m_pFlow            = null;
+        private List<SIP_Transaction>  m_pTransactions    = null;
 
         /// <summary>
         /// Default constructor.
         /// </summary>
         public SIP_Dialog()
         {
-            m_CreateTime = DateTime.Now;
-            m_pRouteSet  = new SIP_t_AddressParam[0];
+            m_CreateTime    = DateTime.Now;
+            m_pRouteSet     = new SIP_t_AddressParam[0];
+            m_pTransactions = new List<SIP_Transaction>();
         }
 
         /// <summary>
@@ -62,8 +62,6 @@ namespace LumiSoft.Net.SIP.Stack
             }
 
             m_pStack = stack;
-
-            m_pUsages = new List<SIP_Dialog_Usage>();
                         
             #region UAS
 
@@ -101,8 +99,6 @@ namespace LumiSoft.Net.SIP.Stack
             */
 
             if(transaction is SIP_ServerTransaction){
-                // TODO: Validate request or client transaction must do it ?
-
                 m_IsSecure = ((SIP_Uri)transaction.Request.RequestLine.Uri).IsSecure;
                 m_pRouteSet = (SIP_t_AddressParam[])Net_Utils.ReverseArray(transaction.Request.RecordRoute.GetAllValues());
                 m_pRemoteTarget = (SIP_Uri)transaction.Request.Contact.GetTopMostValue().Address.Uri;
@@ -197,6 +193,7 @@ namespace LumiSoft.Net.SIP.Stack
             #endregion            
 
             m_pFlow = transaction.Flow;
+            AddTransaction(transaction);
         }
 
         #region method Dispose
@@ -213,17 +210,17 @@ namespace LumiSoft.Net.SIP.Stack
 
                 SetState(SIP_DialogState.Disposed,true);
    
-                m_pStack        = null;
-                m_CallID        = null;
-                m_LocalTag      = null;
-                m_RemoteTag     = null;
-                m_pLocalUri     = null;
-                m_pRemoteUri    = null;
-                m_pLocalContact = null;
-                m_pRemoteTarget = null;
-                m_pRouteSet     = null;
-                m_pFlow         = null;
-                m_pLock         = null;           
+                this.RequestReceived = null;
+                m_pStack             = null;
+                m_CallID             = null;
+                m_LocalTag           = null;
+                m_RemoteTag          = null;
+                m_pLocalUri          = null;
+                m_pRemoteUri         = null;
+                m_pLocalContact      = null;
+                m_pRemoteTarget      = null;
+                m_pRouteSet          = null;
+                m_pFlow              = null;           
             }
         }
 
@@ -238,62 +235,12 @@ namespace LumiSoft.Net.SIP.Stack
         /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this method is accessed.</exception>
         public void Terminate()
         {
-            Terminate(null,true);
-        }
-
-        /// <summary>
-        /// Terminates dialog.
-        /// </summary>
-        /// <param name="reason">Termination reason. This value may be null.</param>
-        /// <param name="sendBye">If true BYE is sent to remote party.</param>
-        /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this method is accessed.</exception>
-        public virtual void Terminate(string reason,bool sendBye)
-        {
             lock(m_pLock){
                 if(this.State == SIP_DialogState.Disposed){
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
-                if(this.State == SIP_DialogState.Terminating || this.State == SIP_DialogState.Terminated){
-                    return;
-                }
 
-                /* RFC 3261 15.
-                    The caller's UA MAY send a BYE for either confirmed or early dialogs, and the callee's UA MAY send a BYE on
-                    confirmed dialogs, but MUST NOT send a BYE on early dialogs.
-                 
-                   RFC 3261 15.1.
-                    Once the BYE is constructed, the UAC core creates a new non-INVITE client transaction, and passes it the BYE request.
-                    The UAC MUST consider the session terminated (and therefore stop sending or listening for media) as soon as the BYE 
-                    request is passed to the client transaction. If the response for the BYE is a 481 (Call/Transaction Does Not Exist) 
-                    or a 408 (Request Timeout) or no response at all is received for the BYE (that is, a timeout is returned by the 
-                    client transaction), the UAC MUST consider the session and the dialog terminated.
-                */ 
-
-                this.SetState(SIP_DialogState.Terminating,true);
-
-                if(sendBye){
-                    // TODO: UAS early
-
-                    if(this.State == SIP_DialogState.Confirmed){
-                        SIP_Request bye = CreateRequest(SIP_Methods.BYE);
-                        if(!string.IsNullOrEmpty(reason)){
-                            SIP_t_ReasonValue r = new SIP_t_ReasonValue();
-                            r.Protocol = "SIP";
-                            r.Text = reason;
-                            bye.Reason.Add(r.ToStringValue());
-                        }
-
-                        // Send BYE, just wait BYE to complete, we don't care about response code.
-                        SIP_RequestSender sender = CreateRequestSender(bye);
-                        sender.Completed += delegate(object s,EventArgs a){
-                            this.SetState(SIP_DialogState.Terminated,true);
-                        };
-                        sender.Start();
-                    }
-                }
-                else{
-                    this.SetState(SIP_DialogState.Terminated,true);
-                }
+                this.SetState(SIP_DialogState.Terminated,true);
             }
         }
 
@@ -412,9 +359,8 @@ namespace LumiSoft.Net.SIP.Stack
             */
 
             lock(m_pLock){
-                // TODO: We should use Route from dialog not from stack.
-
                 SIP_Request request = m_pStack.CreateRequest(method,new SIP_t_NameAddress("",m_pRemoteUri),new SIP_t_NameAddress("",m_pLocalUri));
+                request.Route.RemoveAll();
                 if(m_pRouteSet.Length == 0){
                     request.RequestLine.Uri = m_pRemoteTarget;
                 }
@@ -436,9 +382,12 @@ namespace LumiSoft.Net.SIP.Stack
                 request.To.Tag = m_RemoteTag;
                 request.From.Tag = m_LocalTag;
                 request.CallID = m_CallID;
-                request.CSeq.SequenceNumber = ++m_LocalSeqNo;
+                // ACK won't increase sequence.
+                if(method != SIP_Methods.ACK){
+                    request.CSeq.SequenceNumber = ++m_LocalSeqNo;
+                }
                 request.Contact.Add(m_pLocalContact.ToString());
-                        
+    
                 return request;
             }
         }
@@ -464,6 +413,8 @@ namespace LumiSoft.Net.SIP.Stack
                 if(request == null){
                     throw new ArgumentNullException("request");
                 }
+
+                // TODO: Request sender must use dialog sequence numbering if authentication done.
                
                 SIP_RequestSender sender = m_pStack.CreateRequestSender(request,this.Flow);
 
@@ -534,6 +485,8 @@ namespace LumiSoft.Net.SIP.Stack
 
         #endregion
 
+        // TODO: Early timer.
+
 
         #region method ProcessRequest
 
@@ -548,18 +501,51 @@ namespace LumiSoft.Net.SIP.Stack
             if(e == null){
                 throw new ArgumentNullException("e");
             }
-            
-            if(e.Request.RequestLine.Method == SIP_Methods.BYE){
-                e.ServerTransaction.SendResponse(m_pStack.CreateResponse(SIP_ResponseCodes.x200_Ok,e.Request));
 
-                m_IsTerminatedByRemoteParty = true;
-                OnTerminatedByRemoteParty(e);
-                SetState(SIP_DialogState.Terminated,true);   
-             
+            /* RFC 3261 12.2.2.
+                If the remote sequence number is empty, it MUST be set to the value
+                of the sequence number in the CSeq header field value in the request.
+                If the remote sequence number was not empty, but the sequence number
+                of the request is lower than the remote sequence number, the request
+                is out of order and MUST be rejected with a 500 (Server Internal
+                Error) response.  If the remote sequence number was not empty, and
+                the sequence number of the request is greater than the remote
+                sequence number, the request is in order.  It is possible for the
+                CSeq sequence number to be higher than the remote sequence number by
+                more than one.  This is not an error condition, and a UAS SHOULD be
+                prepared to receive and process requests with CSeq values more than
+                one higher than the previous received request.  The UAS MUST then set
+                the remote sequence number to the value of the sequence number in the
+                CSeq header field value in the request.
+            */
+
+            if(m_RemoteSeqNo == 0){
+                m_RemoteSeqNo = e.Request.CSeq.SequenceNumber;
+            }
+            else if(e.Request.CSeq.SequenceNumber < m_RemoteSeqNo){
+                e.ServerTransaction.SendResponse(this.Stack.CreateResponse(SIP_ResponseCodes.x500_Server_Internal_Error + ": The mid-dialog request is out of order(late arriving request).",e.Request));
+
                 return true;
             }
+            else{
+                m_RemoteSeqNo = e.Request.CSeq.SequenceNumber;
+            }
 
-            return false;
+            /* RFC 3261 12.2.2.
+                When a UAS receives a target refresh request, it MUST replace the
+                dialog's remote target URI with the URI from the Contact header field
+                in that request, if present.
+
+                Per RFC we must do it after 2xx response. There are some drwabacks, like old contact not accessible any more
+                due to NAT, so only valid contact new contact. Because of it currently we always change contact.
+            */
+            if(IsTargetRefresh(e.Request.RequestLine.Method) && e.Request.Contact.Count != 0){
+                m_pRemoteTarget = (SIP_Uri)e.Request.Contact.GetTopMostValue().Address.Uri;
+            }
+
+            OnRequestReceived(e);
+                        
+            return e.IsHandled;
         }
 
         #endregion
@@ -579,6 +565,26 @@ namespace LumiSoft.Net.SIP.Stack
             }
 
             return false;            
+        }
+
+        #endregion
+
+        #region method AddTransaction
+
+        /// <summary>
+        /// Adds transaction to dialog transactions list.
+        /// </summary>
+        /// <param name="transaction"></param>
+        internal void AddTransaction(SIP_Transaction transaction)
+        {
+            if(transaction == null){
+                throw new ArgumentNullException("transaction");
+            }
+
+            m_pTransactions.Add(transaction);
+            transaction.Disposed += new EventHandler(delegate(object s,EventArgs e){
+                m_pTransactions.Remove(transaction);
+            });            
         }
 
         #endregion
@@ -839,22 +845,7 @@ namespace LumiSoft.Net.SIP.Stack
                 return m_pRemoteSupported;
             }
         }
-        
-        /// <summary>
-        /// Gets if dialog was terminated by remote-party.
-        /// </summary>
-        /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this property is accessed.</exception>
-        public bool IsTerminatedByRemoteParty
-        {
-            get{                
-                if(this.State == SIP_DialogState.Disposed){
-                    throw new ObjectDisposedException(this.GetType().Name);
-                }
-
-                return m_IsTerminatedByRemoteParty; 
-            }
-        }
-
+                
         /// <summary>
         /// Gets data flow used to send or receive last SIP message.
         /// </summary>
@@ -870,9 +861,24 @@ namespace LumiSoft.Net.SIP.Stack
             }
         }
 
+        /// <summary>
+        /// Gets dialog's active transactions.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this class is Disposed and this property is accessed.</exception>
+        public SIP_Transaction[] Transactions
+        {
+            get{ 
+                if(this.State == SIP_DialogState.Disposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return m_pTransactions.ToArray(); 
+            }
+        }
+
         #endregion
 
-        #region Events handling
+        #region Events implementation
 
         /// <summary>
         /// This event is raised when Dialog state has changed.
@@ -894,21 +900,20 @@ namespace LumiSoft.Net.SIP.Stack
         #endregion
 
         /// <summary>
-        /// This event is raised when remote-party terminates dialog with BYE request.
+        /// Is raised when dialog gets new request.
         /// </summary>
-        /// <remarks>This event is useful only if the application is interested in processing the headers in the BYE message.</remarks>
-        public event EventHandler<SIP_RequestReceivedEventArgs> TerminatedByRemoteParty = null;
+        public event EventHandler<SIP_RequestReceivedEventArgs> RequestReceived = null;
 
-        #region method OnTerminatedByRemoteParty
+        #region method OnRequestReceived
 
         /// <summary>
-        /// Raises <b>TerminatedByRemoteParty</b> event.
+        /// Raises <b>RequestReceived</b> event.
         /// </summary>
-        /// <param name="bye">BYE request.</param>
-        private void OnTerminatedByRemoteParty(SIP_RequestReceivedEventArgs bye)
+        /// <param name="e">Event args.</param>
+        private void OnRequestReceived(SIP_RequestReceivedEventArgs e)
         {
-            if(this.TerminatedByRemoteParty != null){
-                this.TerminatedByRemoteParty(this,bye);
+            if(this.RequestReceived != null){
+                this.RequestReceived(this,e);
             }
         }
 

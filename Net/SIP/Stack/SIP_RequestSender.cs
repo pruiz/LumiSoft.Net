@@ -34,6 +34,7 @@ namespace LumiSoft.Net.SIP.Stack
 
         #endregion
 
+        private object                  m_pLock        = new object();
         private SIP_RequestSenderState  m_State        = SIP_RequestSenderState.Initial;
         private bool                    m_IsStarted    = false;
         private SIP_Stack               m_pStack       = null;
@@ -42,8 +43,8 @@ namespace LumiSoft.Net.SIP.Stack
         private Queue<SIP_Hop>          m_pHops        = null;
         private SIP_ClientTransaction   m_pTransaction = null;
         private SIP_Flow                m_pFlow        = null;
-        private object                  m_pLock        = new object();
-
+        private object                  m_pTag         = null;
+        
         /// <summary>
         /// Default constructor.
         /// </summary>
@@ -308,7 +309,7 @@ namespace LumiSoft.Net.SIP.Stack
                             Furthermore, the transport value in the Via header field is set to
                             whatever transport was determined for the target server.
                         */
-                
+                                                                
                         // We never use strict, only loose route.
                         bool isStrictRoute = false;
 
@@ -323,13 +324,21 @@ namespace LumiSoft.Net.SIP.Stack
                             uri = (SIP_Uri)m_pRequest.RequestLine.Uri;
                         }
 
-                        // Queue hops.
-                        foreach(SIP_Hop hop in m_pStack.GetHops(uri,m_pRequest.ToByteData().Length,((SIP_Uri)m_pRequest.RequestLine.Uri).IsSecure)){
-                            m_pHops.Enqueue(hop);
+                        try{
+                            // Queue hops.
+                            foreach(SIP_Hop hop in m_pStack.GetHops(uri,m_pRequest.ToByteData().Length,((SIP_Uri)m_pRequest.RequestLine.Uri).IsSecure)){
+                                m_pHops.Enqueue(hop);
+                            }
+                        }
+                        catch(Exception x){
+                            OnTransportError(new SIP_TransportException("SIP hops resolving failed '" + x.Message + "'."));
+                            OnCompleted();
+
+                            return;
                         }
 
                         if(m_pHops.Count == 0){
-                            OnTransportError(new SIP_TransportException("No hops for '" + uri + "'."));
+                            OnTransportError(new SIP_TransportException("No target hops resolved for '" + uri + "'."));
                             OnCompleted();
                         }
                         else{
@@ -538,11 +547,17 @@ namespace LumiSoft.Net.SIP.Stack
             if(SIP_Utils.MethodCanEstablishDialog(request.RequestLine.Method) && contact == null){    
                 SIP_Uri from = (SIP_Uri)request.From.Address.Uri;
 
-                request.Contact.Add((flow.IsSecure ? "sips:" : "sip:" ) + from.User + "@" + m_pStack.TransportLayer.GetContactHost(flow).ToString());
+                request.Contact.Add((flow.IsSecure ? "sips:" : "sip:" ) + from.User + "@" + flow.LocalPublicEP.ToString());
+
+                // REMOVE ME: 22.10.2010
+                //request.Contact.Add((flow.IsSecure ? "sips:" : "sip:" ) + from.User + "@" + m_pStack.TransportLayer.GetContactHost(flow).ToString());
             }
             // If contact SIP URI and host = auto-allocate, allocate it as needed.
             else if(contact != null && contact.Address.Uri is SIP_Uri && ((SIP_Uri)contact.Address.Uri).Host == "auto-allocate"){
-                ((SIP_Uri)contact.Address.Uri).Host =  m_pStack.TransportLayer.GetContactHost(flow).ToString();
+                ((SIP_Uri)contact.Address.Uri).Host =  flow.LocalPublicEP.ToString();
+
+                // REMOVE ME: 22.10.2010
+                //((SIP_Uri)contact.Address.Uri).Host =  m_pStack.TransportLayer.GetContactHost(flow).ToString();
             }
 
             #endregion
@@ -606,6 +621,21 @@ namespace LumiSoft.Net.SIP.Stack
         }
 
         /// <summary>
+        /// Gets if request sender has complted sending request.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+        public bool IsCompleted
+        {
+            get{
+                if(m_State == SIP_RequestSenderState.Disposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                return m_State == SIP_RequestSenderState.Completed; 
+            }
+        }
+
+        /// <summary>
         /// Gets owner stack.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
@@ -663,6 +693,16 @@ namespace LumiSoft.Net.SIP.Stack
                 
                 return m_pCredentials; 
             }
+        }
+
+        /// <summary>
+        /// Gets or sets user data.
+        /// </summary>
+        public object Tag
+        {
+            get{ return m_pTag; }
+
+            set{ m_pTag = value; }
         }
 
         #endregion

@@ -111,6 +111,9 @@ namespace LumiSoft.Net.RTP
             if(packet == null){
                 throw new ArgumentNullException("packet");
             }
+            if(this.Session.StreamMode == RTP_StreamMode.Inactive || this.Session.StreamMode == RTP_StreamMode.Receive){
+                return;
+            }
 
             // RTP was designed around the concept of Application Level Framing (ALF), 
             // because of it we only allow to send packets and don't deal with breaking frames into packets.

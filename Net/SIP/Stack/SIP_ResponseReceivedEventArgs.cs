@@ -54,6 +54,25 @@ namespace LumiSoft.Net.SIP.Stack
             get{ return m_pStack.TransactionLayer.MatchDialog(m_pResponse); }
         }
 
+        /// <summary>
+        /// Gets or creates dialog.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Is raised when the specified request method can't establish dialog or
+        /// response has no To-Tag.</exception>
+        public SIP_Dialog GetOrCreateDialog
+        {
+            get{
+                if(!SIP_Utils.MethodCanEstablishDialog(m_pTransaction.Method)){
+                    throw new InvalidOperationException("Request method '" + m_pTransaction.Method + "' can't establish dialog.");
+                }
+                if(m_pResponse.To.Tag == null){
+                    throw new InvalidOperationException("Request To-Tag is missing.");
+                }
+ 
+                return m_pStack.TransactionLayer.GetOrCreateDialog(m_pTransaction,m_pResponse); 
+            }
+        }
+
         #endregion
 
     }

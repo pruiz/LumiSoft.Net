@@ -25,6 +25,7 @@ namespace LumiSoft.Net.SIP.Proxy
         /// </summary>
         private class TargetHandler : IDisposable
         {
+            private object                m_pLock               = new object();
             private bool                  m_IsDisposed          = false;
             private bool                  m_IsStarted           = false;
             private SIP_ProxyContext      m_pOwner              = null;
@@ -38,8 +39,7 @@ namespace LumiSoft.Net.SIP.Proxy
             private TimerEx               m_pTimerC             = null;
             private bool                  m_HasReceivedResponse = false;
             private bool                  m_IsCompleted         = false;
-            private object                m_pLock               = new object();
-                        
+                                    
             /// <summary>
             /// Default constructor.
             /// </summary>
@@ -903,7 +903,7 @@ namespace LumiSoft.Net.SIP.Proxy
 
             m_pProxy.Stack.Logger.AddText("ProxyContext(id='" + m_ID + "') created.");
         }
-                
+                                
         #region method Dispose
 
         /// <summary>

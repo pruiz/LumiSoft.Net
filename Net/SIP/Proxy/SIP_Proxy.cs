@@ -46,7 +46,7 @@ namespace LumiSoft.Net.SIP.Proxy
         private  SIP_B2BUA              m_pB2BUA         = null;
         private  string                 m_Opaque         = "";
         internal List<SIP_ProxyContext> m_pProxyContexts = null;
-        private List<SIP_ProxyHandler>  m_pHandlers      = null;
+        private  List<SIP_ProxyHandler> m_pHandlers      = null;
 
         /// <summary>
         /// Default constructor.
@@ -327,21 +327,33 @@ namespace LumiSoft.Net.SIP.Proxy
                 the request MUST be inspected as described in Section 22.3.  That
                 section also defines what the element must do if the inspection
                 fails.
-
             */
-
+                        
             // We need to auth all foreign calls.            
             if(!SIP_Utils.IsSipOrSipsUri(request.RequestLine.Uri.ToString()) || !this.OnIsLocalUri(((SIP_Uri)request.RequestLine.Uri).Host)){
-                string userName = null;
-
-                // We need to pass-through ACK.
-                if(request.RequestLine.Method == SIP_Methods.ACK){
+                // If To: field is registrar AOR and request-URI is local registration contact, skip authentication.
+                bool skipAuth = false;
+                if(request.To.Address.IsSipOrSipsUri){
+                    SIP_Registration registration = m_pRegistrar.GetRegistration(((SIP_Uri)request.To.Address.Uri).Address);
+                    if(registration != null){
+                        if(registration.GetBinding(request.RequestLine.Uri) != null){
+                            skipAuth = true;
+                        }
+                    }
                 }
-                else if(!AuthenticateRequest(e,out userName)){
-                    return;
-                }
 
-                requestContext.SetUser(userName);
+                if(!skipAuth){
+                    string userName = null;
+
+                    // We need to pass-through ACK.
+                    if(request.RequestLine.Method == SIP_Methods.ACK){
+                    }
+                    else if(!AuthenticateRequest(e,out userName)){
+                        return;
+                    }
+
+                    requestContext.SetUser(userName);
+                }
             }
 
             #endregion
@@ -570,22 +582,7 @@ namespace LumiSoft.Net.SIP.Proxy
 
             #region Statefull
 
-            if (statefull){ 
-                /* REMOVE ME:
-                // Create proxy context that will be responsible for forwarding request.
-                SIP_ProxyContext proxyContext = new SIP_ProxyContext(
-                    this,
-                    e.ServerTransaction,
-                    request,
-                    addRecordRoute,
-                    m_ForkingMode,
-                    (this.ProxyMode & SIP_ProxyMode.B2BUA) != 0,
-                    false,
-                    false,
-                    requestContext.Targets.ToArray()
-                );
-                m_pProxyContexts.Add(proxyContext);*/
-
+            if (statefull){
                 SIP_ProxyContext proxyContext = this.CreateProxyContext(requestContext,e.ServerTransaction,request,addRecordRoute);
                 proxyContext.Start();
             }
@@ -1090,7 +1087,7 @@ namespace LumiSoft.Net.SIP.Proxy
         #region mehtod OnIsLocalUri
 
         /// <summary>
-        /// Raises 'IsLocalUri' event.
+        /// Raises <b>IsLocalUri</b> event.
         /// </summary>
         /// <param name="uri">Request URI.</param>
         /// <returns>Returns true if server local URI, otherwise false.</returns>

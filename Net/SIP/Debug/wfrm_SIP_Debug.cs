@@ -147,10 +147,11 @@ namespace LumiSoft.Net.SIP.Debug
             m_pTabDialogs_List.Location = new Point(0,25);
             m_pTabDialogs_List.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top;
             m_pTabDialogs_List.View = View.Details;
-            m_pTabDialogs_List.Columns.Add("ID",120);
-            m_pTabDialogs_List.Columns.Add("Type",100);
+            m_pTabDialogs_List.Columns.Add("Type",80);
             m_pTabDialogs_List.Columns.Add("State",80);
-            m_pTabDialogs_List.Columns.Add("Create Time",80);
+            m_pTabDialogs_List.Columns.Add("Create Time",100);
+            m_pTabDialogs_List.Columns.Add("ID",120);
+            m_pTabDialogs_List.DoubleClick += new EventHandler(m_pTabDialogs_List_DoubleClick);
             m_pTab.TabPages["dialogs"].Controls.Add(m_pTabDialogs_List);
 
             #endregion
@@ -176,13 +177,14 @@ namespace LumiSoft.Net.SIP.Debug
             m_pTabFlows_List.Columns.Add("Local EP",130);
             m_pTabFlows_List.Columns.Add("Remote EP",130);
             m_pTabFlows_List.Columns.Add("Last Activity",80);
+            m_pTabFlows_List.Columns.Add("Public EP",130);
             m_pTab.TabPages["flows"].Controls.Add(m_pTabFlows_List);
 
             #endregion
                         
             this.Controls.Add(m_pTab);
         }
-                                                                
+                                                                                
         #endregion
 
 
@@ -309,13 +311,45 @@ namespace LumiSoft.Net.SIP.Debug
 
                 foreach(SIP_Dialog dialog in m_pStack.TransactionLayer.Dialogs){
                     try{
-                        ListViewItem it = new ListViewItem(dialog.ID);
+                        ListViewItem it = new ListViewItem((dialog is SIP_Dialog_Invite ? "INVITE" : ""));
+                        it.SubItems.Add(dialog.State.ToString());
+                        it.SubItems.Add(dialog.CreateTime.ToString());
+                        it.SubItems.Add(dialog.ID);
+                        it.Tag = dialog;
                         m_pTabDialogs_List.Items.Add(it);
                     }
                     catch{
                     }
                 }
             }
+        }
+
+        #endregion
+
+        #region method m_pTabDialogs_List_DoubleClick
+
+        /// <summary>
+        /// Is called when dialog list has double clicked.
+        /// </summary>
+        /// <param name="sender">Sender.</param>
+        /// <param name="e">Event data.</param>
+        private void m_pTabDialogs_List_DoubleClick(object sender,EventArgs e)
+        {
+            if(m_pTabDialogs_List.SelectedItems.Count == 0){
+                return;
+            }
+
+            Form frm = new Form();
+            frm.Size = new Size(400,500);
+            frm.StartPosition = FormStartPosition.CenterScreen;
+            frm.Text = "Dialog Properties";
+            
+            PropertyGrid propertyGrid = new PropertyGrid();
+            propertyGrid.Dock = DockStyle.Fill;
+            propertyGrid.SelectedObject = m_pTabDialogs_List.SelectedItems[0].Tag;
+            frm.Controls.Add(propertyGrid);
+
+            frm.Show();
         }
 
         #endregion
@@ -340,6 +374,7 @@ namespace LumiSoft.Net.SIP.Debug
                         it.SubItems.Add(flow.LocalEP.ToString());
                         it.SubItems.Add(flow.RemoteEP.ToString());
                         it.SubItems.Add(flow.LastActivity.ToString("HH:mm:ss"));
+                        it.SubItems.Add(flow.LocalPublicEP.ToString());
                         m_pTabFlows_List.Items.Add(it);
                     }
                     catch{
