@@ -13,12 +13,17 @@ namespace LumiSoft.Net
 		#region static method QuoteString
 
 		/// <summary>
-        /// Qoutes and escapes fishy(\") chars.
+        /// Qoutes string and escapes fishy('\',"') chars.
         /// </summary>
         /// <param name="text">Text to quote.</param>
         /// <returns></returns>
         public static string QuoteString(string text)
         {
+            // String is already quoted-string.
+            if(text != null && text.StartsWith("\"") && text.EndsWith("\"")){
+                return text;
+            }
+
             StringBuilder retVal = new StringBuilder();
 
             for(int i=0;i<text.Length;i++){
