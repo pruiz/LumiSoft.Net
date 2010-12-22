@@ -52,6 +52,9 @@ namespace LumiSoft.Net.UDP
             m_pSocket     = null;
             m_pBuffer     = null;
             m_pSocketArgs = null;
+
+            this.PacketReceived = null;
+            this.Error = null;
         }
 
         #endregion
@@ -137,7 +140,7 @@ namespace LumiSoft.Net.UDP
             try{ 
                 // Use active worker thread as long as ReceiveFromAsync completes synchronously.
                 // (With this approach we don't have thread context switches while ReceiveFromAsync completes synchronously)
-                while(!m_pSocket.ReceiveFromAsync(m_pSocketArgs)){
+                while(!m_IsDisposed && !m_pSocket.ReceiveFromAsync(m_pSocketArgs)){
                     if(m_pSocketArgs.SocketError == SocketError.Success){
                         try{
                             OnPacketReceived(m_pBuffer,m_pSocketArgs.BytesTransferred,(IPEndPoint)m_pSocketArgs.RemoteEndPoint);
