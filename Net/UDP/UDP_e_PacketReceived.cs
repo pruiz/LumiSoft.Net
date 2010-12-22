@@ -67,7 +67,7 @@ namespace LumiSoft.Net.UDP
         /// </summary>
         public int Count
         {
-            get{ return Count; }
+            get{ return m_Count; }
         }
 
         /// <summary>
