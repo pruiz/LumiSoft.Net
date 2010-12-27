@@ -60,6 +60,250 @@ namespace LumiSoft.Net.TCP
 
         #endregion
 
+        #region class TCP_Acceptor
+
+        /// <summary>
+        /// Implements single TCP connection acceptor.
+        /// </summary>
+        /// <remarks>For higher performance, mutiple acceptors per socket must be created.</remarks>
+        private class TCP_Acceptor : IDisposable
+        {
+            private bool                      m_IsDisposed  = false;
+            private bool                      m_IsRunning   = false;
+            private Socket                    m_pSocket     = null;
+            private SocketAsyncEventArgs      m_pSocketArgs = null;
+            private Dictionary<string,object> m_pTags       = null;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="socket">Socket.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>socket</b> is null reference.</exception>
+            public TCP_Acceptor(Socket socket)
+            {
+                if(socket == null){
+                    throw new ArgumentNullException("socket");
+                }
+
+                m_pSocket = socket;
+
+                m_pTags = new Dictionary<string,object>();
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resources being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_IsDisposed){
+                    return;
+                }
+                m_IsDisposed = true;
+
+                m_pSocket     = null;
+                m_pSocketArgs = null;
+                m_pTags       = null;
+
+                this.ConnectionAccepted = null;
+                this.Error = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts accpeting connections.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this calss is disposed and this method is accessed.</exception>
+            public void Start()
+            {
+                if(m_IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+                if(m_IsRunning){
+                    return;
+                }
+                m_IsRunning = true;
+
+                // Move processing to thread pool.
+                ThreadPool.QueueUserWorkItem(delegate(object state){
+                    try{
+                        #region IO completion ports
+
+                        if(Net_Utils.IsIoCompletionPortsSupported()){
+                            m_pSocketArgs = new SocketAsyncEventArgs();
+                            m_pSocketArgs.Completed += delegate(object s1,SocketAsyncEventArgs e1){
+                                if(m_IsDisposed){
+                                    return;
+                                }
+
+                                try{
+                                    if(m_pSocketArgs.SocketError == SocketError.Success){
+                                        OnConnectionAccepted(m_pSocketArgs.AcceptSocket);                       
+                                    }
+                                    else{
+                                        OnError(new Exception("Socket error '" + m_pSocketArgs.SocketError + "'."));
+                                    }
+
+                                    IOCompletionAccept();
+                                }
+                                catch(Exception x){
+                                    OnError(x);
+                                }
+                            };
+
+                            IOCompletionAccept();
+                        }
+
+                        #endregion
+
+                        #region Async sockets
+
+                        else{
+                            m_pSocket.BeginAccept(new AsyncCallback(this.AsyncSocketAccept),null);
+                        }
+
+                        #endregion
+                    }
+                    catch(Exception x){
+                        OnError(x);
+                    }
+                });
+            }
+
+            #endregion
+
+
+            #region method IOCompletionAccept
+
+            /// <summary>
+            /// Accpets connection synchornously(if connection(s) available now) or starts waiting TCP connection asynchronously if no connections at moment.
+            /// </summary>
+            private void IOCompletionAccept()
+            {
+                try{
+                    // We need to clear it, before reuse.
+                    m_pSocketArgs.AcceptSocket = null;
+
+                    // Use active worker thread as long as ReceiveFromAsync completes synchronously.
+                    // (With this approach we don't have thread context switches while ReceiveFromAsync completes synchronously)
+                    while(!m_IsDisposed && !m_pSocket.AcceptAsync(m_pSocketArgs)){
+                        if(m_pSocketArgs.SocketError == SocketError.Success){
+                            try{
+                                OnConnectionAccepted(m_pSocketArgs.AcceptSocket);
+
+                                // We need to clear it, before reuse.
+                                m_pSocketArgs.AcceptSocket = null;
+                            }
+                            catch(Exception x){
+                                OnError(x);
+                            }
+                        }
+                        else{
+                            OnError(new Exception("Socket error '" + m_pSocketArgs.SocketError + "'."));
+                        }
+                    }
+                }
+                catch(Exception x){
+                    OnError(x);
+                }
+            }
+
+            #endregion
+
+            #region method AsyncSocketAccept
+
+            /// <summary>
+            /// Is called BeginAccept has completed.
+            /// </summary>
+            /// <param name="ar">The result of the asynchronous operation.</param>
+            private void AsyncSocketAccept(IAsyncResult ar)
+            {
+                if(m_IsDisposed){
+                    return;
+                }
+
+                try{
+                    OnConnectionAccepted(m_pSocket.EndAccept(ar));
+                }
+                catch(Exception x){
+                    OnError(x);
+                }
+
+                try{
+                    m_pSocket.BeginAccept(new AsyncCallback(this.AsyncSocketAccept),null);
+                }
+                catch(Exception x){
+                    OnError(x);
+                }
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets user data items.
+            /// </summary>
+            public Dictionary<string,object> Tags
+            {
+                get{ return m_pTags; }
+            }
+
+            #endregion
+
+            #region Events handling
+
+            /// <summary>
+            /// Is raised when new TCP connection was accepted.
+            /// </summary>
+            public event EventHandler<EventArgs<Socket>> ConnectionAccepted = null;
+
+            #region method OnConnectionAccepted
+
+            /// <summary>
+            /// Raises <b>ConnectionAccepted</b> event.
+            /// </summary>
+            /// <param name="socket">Accepted socket.</param>
+            private void OnConnectionAccepted(Socket socket)
+            {
+                if(this.ConnectionAccepted != null){
+                    this.ConnectionAccepted(this,new EventArgs<Socket>(socket));
+                }
+            }
+
+            #endregion
+
+            /// <summary>
+            /// Is raised when unhandled error happens.
+            /// </summary>
+            public event EventHandler<ExceptionEventArgs> Error = null;
+
+            #region method OnError
+
+            /// <summary>
+            /// Raises <b>Error</b> event.
+            /// </summary>
+            /// <param name="x">Exception happened.</param>
+            private void OnError(Exception x)
+            {
+                if(this.Error != null){
+                    this.Error(this,new ExceptionEventArgs(x));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
         private bool                                     m_IsDisposed           = false;
         private bool                                     m_IsRunning            = false;
         private IPBindInfo[]                             m_pBindings            = new IPBindInfo[0];
@@ -69,6 +313,7 @@ namespace LumiSoft.Net.TCP
         private Logger                                   m_pLogger              = null;
         private DateTime                                 m_StartTime;
         private long                                     m_ConnectionsProcessed = 0;
+        private List<TCP_Acceptor>                       m_pConnectionAcceptors = null;
         private List<ListeningPoint>                     m_pListeningPoints     = null;
         private TCP_SessionCollection<TCP_ServerSession> m_pSessions            = null;
         private TimerEx                                  m_pTimer_IdleTimeout   = null;
@@ -78,6 +323,7 @@ namespace LumiSoft.Net.TCP
         /// </summary>
         public TCP_Server()
         {
+            m_pConnectionAcceptors = new List<TCP_Server<T>.TCP_Acceptor>();
             m_pListeningPoints = new List<TCP_Server<T>.ListeningPoint>();
             m_pSessions = new TCP_SessionCollection<TCP_ServerSession>();
         }
@@ -286,7 +532,6 @@ namespace LumiSoft.Net.TCP
                 m_pListeningPoints.Clear();
 
                 // Create new listening points and start accepting connections.
-                bool ioCompletion_asyncSockets = Net_Utils.IsIoCompletionPortsSupported();
                 foreach(IPBindInfo bind in m_pBindings){
                     try{
                         Socket socket = null;
@@ -302,45 +547,22 @@ namespace LumiSoft.Net.TCP
                         }
                         socket.Bind(new IPEndPoint(bind.IP,bind.Port));
                         socket.Listen(100);
-
+                                                
                         ListeningPoint listeningPoint = new ListeningPoint(socket,bind);
                         m_pListeningPoints.Add(listeningPoint);
-                        
-                        // Begin accept.
-                        //   We MUST use socket.AcceptAsync method, this consume all threading power in Windows paltform(IO completion ports).
-                        //   For other platforms we need to use BeginAccept.
 
-                        #region IO completion ports
-
-                        if(ioCompletion_asyncSockets){
-                            SocketAsyncEventArgs eArgs = new SocketAsyncEventArgs();
-                            eArgs.UserToken = listeningPoint;
-                            eArgs.Completed += delegate(object s,SocketAsyncEventArgs e){
-                                if(e.SocketError == SocketError.Success){
-                                    ProcessConnection(e.AcceptSocket,((ListeningPoint)eArgs.UserToken).BindInfo);
-                                }
-
-                                // Start accepting new connection.
-                                IOCompletionBeginAccept(e,socket,bind);
+                        // Create TCP connection acceptors.
+                        for(int i=0;i<10;i++){
+                            TCP_Acceptor acceptor = new TCP_Server<T>.TCP_Acceptor(socket);
+                            acceptor.ConnectionAccepted += delegate(object s1,EventArgs<Socket> e1){
+                                ProcessConnection(e1.Value,bind);
                             };
-
-                            // Move processing to thread-pool, because IOCompletionBeginAccept keeps using calling thread as loang as there is work todo.
-                            ThreadPool.QueueUserWorkItem(new WaitCallback(delegate(object state){
-                                // Start accepting new connection.
-                                IOCompletionBeginAccept(eArgs,socket,bind);
-                            }));
+                            acceptor.Error += delegate(object s1,ExceptionEventArgs e1){
+                                OnError(e1.Exception);
+                            };
+                            m_pConnectionAcceptors.Add(acceptor);
+                            acceptor.Start();
                         }
-
-                        #endregion
-
-                        #region Async sockets
-
-                        else{                                  
-                            // Begin accepting connection.
-                            socket.BeginAccept(new AsyncCallback(this.AsynSocketsAcceptCompleted),listeningPoint);
-                        }
-
-                        #endregion
                     }
                     catch(Exception x){
                         // The only exception what we should get there is if socket is in use.
@@ -351,74 +573,6 @@ namespace LumiSoft.Net.TCP
             catch(Exception x){
                 OnError(x);
             }
-        }
-
-        #endregion
-
-        #region method IOCompletionBeginAccept
-
-        /// <summary>
-        /// Starts accepting connection(s).
-        /// </summary>
-        /// <param name="socketArgs">AcceptAsync method data.</param>
-        /// <param name="listeningSocket">Local listening socket.</param>
-        /// <param name="bindInfo">Local listening socket bind info.</param>
-        /// <exception cref="ArgumentNullException">Is raised when <b>socketArgs</b>,<b>listeningSocket</b> or <b>bindInfo</b> is null reference.</exception>
-        private void IOCompletionBeginAccept(SocketAsyncEventArgs socketArgs,Socket listeningSocket,IPBindInfo bindInfo)
-        {
-            if(socketArgs == null){
-                throw new ArgumentNullException("socketArgs");
-            }
-            if(listeningSocket == null){
-                throw new ArgumentNullException("listeningSocket");
-            }
-            if(bindInfo == null){
-                throw new ArgumentNullException("bindInfo");
-            }
-
-            try{
-                // We need to clear it, before reuse.
-                socketArgs.AcceptSocket = null;
-
-                // Use active worker thread as long as AcceptAsync completes synchronously.
-                // (With this approeach we don't have thread context switches while AcceptAsync completes synchronously)
-                while(m_IsRunning && !listeningSocket.AcceptAsync(socketArgs)){
-                    // Operation completed synchronously.
-
-                    if(socketArgs.SocketError == SocketError.Success){
-                        ProcessConnection(socketArgs.AcceptSocket,bindInfo);
-                    }
-
-                    // We need to clear it, before reuse.
-                    socketArgs.AcceptSocket = null;
-                }
-            }
-            catch(ObjectDisposedException x){
-                string dummy = x.Message;
-                // Listening socket closed, so skip that error.
-            }
-        }
-
-        #endregion
-
-        #region method AsynSocketsAcceptCompleted
-
-        /// <summary>
-        /// This method is called when BeginAccept ha completed.
-        /// </summary>
-        /// <param name="ar">The result of the asynchronous operation.</param>
-        private void AsynSocketsAcceptCompleted(IAsyncResult ar)
-        {
-            ListeningPoint lPoint = (ListeningPoint)ar.AsyncState;
-            try{
-                ProcessConnection(lPoint.Socket.EndAccept(ar),lPoint.BindInfo);
-            }
-            catch{
-                // Skip accept errors.
-            }
-
-            // Begin accepting connection.
-            lPoint.Socket.BeginAccept(new AsyncCallback(this.AsynSocketsAcceptCompleted),lPoint);
         }
 
         #endregion
