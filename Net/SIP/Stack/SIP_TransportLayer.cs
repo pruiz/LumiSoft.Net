@@ -330,8 +330,7 @@ namespace LumiSoft.Net.SIP.Stack
             m_pStack = stack;
           
             m_pUdpServer = new UDP_Server();
-            m_pUdpServer.ProcessMode = UDP_ProcessMode.Parallel;
-            m_pUdpServer.PacketReceived += new PacketReceivedHandler(m_pUdpServer_PacketReceived);
+            m_pUdpServer.PacketReceived += new EventHandler<UDP_e_PacketReceived>(m_pUdpServer_PacketReceived);
             m_pUdpServer.Error += new ErrorEventHandler(m_pUdpServer_Error);
 
             m_pTcpServer = new TCP_Server<TCP_ServerSession>();
@@ -382,11 +381,12 @@ namespace LumiSoft.Net.SIP.Stack
         /// <summary>
         /// This method is called when new SIP UDP packet has received.
         /// </summary>
+        /// <param name="sender">Sender.</param>
         /// <param name="e">Event data.</param>
-        private void m_pUdpServer_PacketReceived(UDP_PacketEventArgs e)
+        private void m_pUdpServer_PacketReceived(object sender,UDP_e_PacketReceived e)
         {
             try{
-                SIP_Flow flow = m_pFlowManager.GetOrCreateFlow(true,e.LocalEndPoint,e.RemoteEndPoint,SIP_Transport.UDP);
+                SIP_Flow flow = m_pFlowManager.GetOrCreateFlow(true,(IPEndPoint)e.Socket.LocalEndPoint,e.RemoteEP,SIP_Transport.UDP);
                 flow.OnUdpPacketReceived(e);
             }
             catch(Exception x){
@@ -720,9 +720,6 @@ namespace LumiSoft.Net.SIP.Stack
                 // Skip all socket errors here
                 string dummy = s.Message;
             }
-            //catch(ArgumentException x){
-            //    m_pStack.OnError(x);
-            //}
             catch(Exception x){
                 m_pStack.OnError(x);
             }

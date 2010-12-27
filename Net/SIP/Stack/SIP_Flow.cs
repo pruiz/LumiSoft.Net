@@ -406,9 +406,9 @@ namespace LumiSoft.Net.SIP.Stack
         /// <summary>
         /// This method is called when flow gets new UDP packet.
         /// </summary>
-        /// <param name="e">UDP data.</param>
+        /// <param name="e">Event data..</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>e</b> is null reference.</exception>
-        internal void OnUdpPacketReceived(UDP_PacketEventArgs e)
+        internal void OnUdpPacketReceived(UDP_e_PacketReceived e)
         {
             if(e == null){
                 throw new ArgumentNullException("e");
@@ -416,7 +416,10 @@ namespace LumiSoft.Net.SIP.Stack
 
             m_LastActivity = DateTime.Now;
 
-            m_pStack.TransportLayer.OnMessageReceived(this,e.Data);
+            byte[] data = new byte[e.Count];
+            Array.Copy(e.Buffer,data,e.Count);
+
+            m_pStack.TransportLayer.OnMessageReceived(this,data);
         }
 
         #endregion
