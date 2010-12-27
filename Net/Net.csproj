@@ -477,8 +477,6 @@
     <Compile Include="TimerEx.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="UDP\UDP_PacketEventArgs.cs" />
-    <Compile Include="UDP\UDP_ProcessMode.cs" />
     <Compile Include="UDP\UDP_Server.cs" />
     <Compile Include="URI\AbsoluteUri.cs" />
     <Compile Include="DNS\DNS_rr_A.cs">
