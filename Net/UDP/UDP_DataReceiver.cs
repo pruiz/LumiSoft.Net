@@ -52,6 +52,7 @@ namespace LumiSoft.Net.UDP
             m_pSocket     = null;
             m_pBuffer     = null;
             m_pSocketArgs = null;
+            m_pEventArgs  = null;
 
             this.PacketReceived = null;
             this.Error = null;
@@ -169,7 +170,7 @@ namespace LumiSoft.Net.UDP
         /// <summary>
         /// Is called BeginReceiveFrom has completed.
         /// </summary>
-        /// <param name="ar">he result of the asynchronous operation.</param>
+        /// <param name="ar">The result of the asynchronous operation.</param>
         private void AsyncSocketReceive(IAsyncResult ar)
         {
             if(m_IsDisposed){
