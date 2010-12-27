@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 
+using LumiSoft.Net.UDP;
 using LumiSoft.Net.Media.Codec;
 using LumiSoft.Net.STUN.Client;
 
@@ -18,6 +19,7 @@ namespace LumiSoft.Net.RTP
     /// Though RTP session can send multiple streams of same payload.</remarks>
     public class RTP_Session : IDisposable
     {
+        private object                             m_pLock                      = new object();
         private bool                               m_IsDisposed                 = false;
         private bool                               m_IsStarted                  = false;
         private RTP_MultimediaSession              m_pSession                   = null;
@@ -33,8 +35,7 @@ namespace LumiSoft.Net.RTP
         private int                                m_PMembersCount              = 0;
         private Dictionary<uint,RTP_Source>        m_pSenders                   = null;
         private Dictionary<string,DateTime>        m_pConflictingEPs            = null;
-        private byte[]                             m_pRtpReceiveBuffer          = null;
-        private byte[]                             m_pRtcpReceiveBuffer         = null;
+        private List<UDP_DataReceiver>             m_pUdpDataReceivers          = null;
         private Socket                             m_pRtpSocket                 = null;
         private Socket                             m_pRtcpSocket                = null;
         private long                               m_RtpPacketsSent             = 0;
@@ -55,8 +56,7 @@ namespace LumiSoft.Net.RTP
         private long                               m_LocalPacketsLooped         = 0;
         private long                               m_RemotePacketsLooped        = 0;
         private int                                m_MTU                        = 1400;
-        private TimerEx                            m_pRtcpTimer                 = null;
-        private object                             m_pLock                      = new object();
+        private TimerEx                            m_pRtcpTimer                 = null;        
         private KeyValueCollection<int,Codec>      m_pPayloads                  = null;
 
         /// <summary>
@@ -82,21 +82,19 @@ namespace LumiSoft.Net.RTP
             m_pLocalEP  = localEP;
             m_pRtpClock = clock;
 
-            m_pRtpReceiveBuffer = new byte[32000];
-            m_pRtcpReceiveBuffer = new byte[32000];
-
             m_pLocalSources = new List<RTP_Source_Local>();
             m_pTargets = new List<RTP_Address>();
             m_pMembers = new Dictionary<uint,RTP_Source>();
             m_pSenders = new Dictionary<uint,RTP_Source>();
             m_pConflictingEPs = new Dictionary<string,DateTime>();
             m_pPayloads = new KeyValueCollection<int,Codec>();
-
+            
+            m_pUdpDataReceivers = new List<UDP_DataReceiver>();
             m_pRtpSocket = new Socket(localEP.IP.AddressFamily,SocketType.Dgram,ProtocolType.Udp);
             m_pRtpSocket.Bind(localEP.RtpEP);
             m_pRtcpSocket = new Socket(localEP.IP.AddressFamily,SocketType.Dgram,ProtocolType.Udp);
             m_pRtcpSocket.Bind(localEP.RtcpEP);
-
+                        
             m_pRtcpTimer = new TimerEx();
             m_pRtcpTimer.Elapsed += new System.Timers.ElapsedEventHandler(delegate(object sender,System.Timers.ElapsedEventArgs e){
                 SendRtcp();
@@ -116,6 +114,10 @@ namespace LumiSoft.Net.RTP
             }
             m_IsDisposed = true;
 
+            foreach(UDP_DataReceiver receiver in m_pUdpDataReceivers){
+                receiver.Dispose();
+            }
+            m_pUdpDataReceivers = null;
             if(m_pRtcpTimer != null){
                 m_pRtcpTimer.Dispose();
                 m_pRtcpTimer = null;
@@ -134,12 +136,11 @@ namespace LumiSoft.Net.RTP
             m_pMembers = null;
             m_pSenders = null;
             m_pConflictingEPs = null;
-            m_pRtpReceiveBuffer = null;
-            m_pRtcpReceiveBuffer = null;
             m_pRtpSocket.Close();
             m_pRtpSocket = null;
             m_pRtcpSocket.Close();
             m_pRtcpSocket = null;
+            m_pUdpDataReceivers = null;
 
             OnDisposed();
 
@@ -229,83 +230,22 @@ namespace LumiSoft.Net.RTP
             m_pRtcpSource = CreateLocalSource();
             m_pMembers.Add(m_pRtcpSource.SSRC,m_pRtcpSource);
 
-
-            #region IO completion ports
-
-            if(Net_Utils.IsIoCompletionPortsSupported()){
-                // Start receiving RTP packet.
-                SocketAsyncEventArgs rtpArgs = new SocketAsyncEventArgs();              
-                rtpArgs.Completed += new EventHandler<SocketAsyncEventArgs>(delegate(object s,SocketAsyncEventArgs e){
-                    if(m_IsDisposed){
-                        return;
-                    }
-
-                    if(e.SocketError == SocketError.Success){
-                        ProcessRtp(m_pRtpReceiveBuffer,e.BytesTransferred,(IPEndPoint)rtpArgs.RemoteEndPoint);
-                    }
-
-                    // Start receiving next packet.
-                    RtpIOCompletionReceive(e);
-                });
-                // Move processing off the active thread, because ReceiveFromAsync can complete synchronously.
-                ThreadPool.QueueUserWorkItem(new WaitCallback(delegate(object state){
-                    RtpIOCompletionReceive(rtpArgs);                    
-                }));
-
-                // Start receiving RTCP packet.
-                SocketAsyncEventArgs rtcpArgs = new SocketAsyncEventArgs();                
-                rtcpArgs.SetBuffer(m_pRtcpReceiveBuffer,0,m_pRtcpReceiveBuffer.Length);
-                rtcpArgs.Completed += new EventHandler<SocketAsyncEventArgs>(delegate(object s,SocketAsyncEventArgs e){
-                    if(m_IsDisposed){
-                        return;
-                    }
-
-                    if(e.SocketError == SocketError.Success){
-                        ProcessRtcp(m_pRtcpReceiveBuffer,e.BytesTransferred,(IPEndPoint)e.RemoteEndPoint);
-                    }
-
-                    // Start receiving next packet.
-                    RtcpIOCompletionReceive(e);
-                });
-                // Move processing off the active thread, because ReceiveFromAsync can complete synchronously.
-                ThreadPool.QueueUserWorkItem(new WaitCallback(delegate(object state){
-                    RtcpIOCompletionReceive(rtcpArgs);
-                }));
-            }
-
-            #endregion
-
-            #region Async sockets
-            
-            else{
-                // Start receiving RTP packet.
-                EndPoint rtpRemoteEP = new IPEndPoint(m_pRtpSocket.AddressFamily == AddressFamily.InterNetwork ? IPAddress.Any : IPAddress.IPv6Any,0);
-                m_pRtpSocket.BeginReceiveFrom(
-                    m_pRtpReceiveBuffer,
-                    0,
-                    m_pRtpReceiveBuffer.Length,
-                    SocketFlags.None,
-                    ref rtpRemoteEP,
-                    new AsyncCallback(this.RtpAsyncSocketReceiveCompleted),
-                    null
-                );
-
-                // Start receiving RTCP packet.
-                EndPoint rtcpRemoteEP = new IPEndPoint(m_pRtcpSocket.AddressFamily == AddressFamily.InterNetwork ? IPAddress.Any : IPAddress.IPv6Any,0);
-                m_pRtcpSocket.BeginReceiveFrom(
-                    m_pRtcpReceiveBuffer,
-                    0,
-                    m_pRtcpReceiveBuffer.Length,
-                    SocketFlags.None,
-                    ref rtcpRemoteEP,
-                    new AsyncCallback(this.RtcpAsyncSocketReceiveCompleted),
-                    null
-                );
-
-            }
-
-            #endregion
-           
+            // Create RTP data receiver.
+            UDP_DataReceiver rtpDataReceiver = new UDP_DataReceiver(m_pRtpSocket);
+            rtpDataReceiver.PacketReceived += delegate(object s1,UDP_e_PacketReceived e1){
+                ProcessRtp(e1.Buffer,e1.Count,e1.RemoteEP);
+            };
+            // rtpDataReceiver.Error // We don't care about receiving errors here.
+            m_pUdpDataReceivers.Add(rtpDataReceiver);
+            rtpDataReceiver.Start();
+            // Create RTCP data receiver.
+            UDP_DataReceiver rtcpDataReceiver = new UDP_DataReceiver(m_pRtcpSocket);
+            rtcpDataReceiver.PacketReceived += delegate(object s1,UDP_e_PacketReceived e1){
+                ProcessRtcp(e1.Buffer,e1.Count,e1.RemoteEP);
+            };
+            // rtcpDataReceiver.Error // We don't care about receiving errors here.
+            m_pUdpDataReceivers.Add(rtcpDataReceiver);
+            rtcpDataReceiver.Start();           
                    
             // Start RTCP reporting.
             Schedule(ComputeRtcpTransmissionInterval(m_pMembers.Count,m_pSenders.Count,m_Bandwidth * 0.25,false,m_RtcpAvgPacketSize,true));
@@ -1370,41 +1310,6 @@ namespace LumiSoft.Net.RTP
         #endregion
 
 
-        #region method RtpAsyncSocketReceiveCompleted
-
-        /// <summary>
-        /// Is called when RTP socket has received data.
-        /// </summary>
-        /// <param name="ar">The result of the asynchronous operation.</param>
-        private void RtpAsyncSocketReceiveCompleted(IAsyncResult ar)
-        {
-            try{
-                EndPoint remoteEP = new IPEndPoint(IPAddress.Any,0);
-                int count = m_pRtpSocket.EndReceiveFrom(ar,ref remoteEP);
-
-                ProcessRtp(m_pRtpReceiveBuffer,count,(IPEndPoint)remoteEP);
-            }
-            catch{
-                // Skip receiving socket errors.
-            }
-
-            // Start receiving next RTP packet.
-            EndPoint remEP = new IPEndPoint(IPAddress.Any,0);
-            m_pRtpSocket.BeginReceiveFrom(
-                m_pRtpReceiveBuffer,
-                0,
-                m_pRtpReceiveBuffer.Length,
-                SocketFlags.None,
-                ref remEP,
-                new AsyncCallback(this.RtpAsyncSocketReceiveCompleted),
-                null
-            );
-
-            // TODO: we may get 10054 error here if IP conflict
-        }
-
-        #endregion
-
         #region method RtpAsyncSocketSendCompleted
 
         /// <summary>
@@ -1419,102 +1324,6 @@ namespace LumiSoft.Net.RTP
             }
             catch{
                 m_RtpFailedTransmissions++;
-            }
-        }
-
-        #endregion
-
-        #region method RtcpAsyncSocketReceiveCompleted
-
-        /// <summary>
-        /// Is called when RTCP socket has received data.
-        /// </summary>
-        /// <param name="ar">The result of the asynchronous operation.</param>
-        private void RtcpAsyncSocketReceiveCompleted(IAsyncResult ar)
-        {
-            try{
-                EndPoint remoteEP = new IPEndPoint(IPAddress.Any,0);
-                int count = m_pRtcpSocket.EndReceiveFrom(ar,ref remoteEP);
-            
-                ProcessRtcp(m_pRtcpReceiveBuffer,count,(IPEndPoint)remoteEP);
-            }
-            catch{ 
-                // Skip receiving socket errors.
-            }
-
-            // Start receiving next RTCP packet.
-            EndPoint remEP = new IPEndPoint(IPAddress.Any,0);
-            m_pRtcpSocket.BeginReceiveFrom(
-                m_pRtcpReceiveBuffer,
-                0,
-                m_pRtcpReceiveBuffer.Length,
-                SocketFlags.None,
-                ref remEP,
-                new AsyncCallback(this.RtcpAsyncSocketReceiveCompleted),
-                null
-            );
-
-            // TODO: we may get 10054 error here if IP conflict
-        }
-
-        #endregion
-                
-        #region method RtpIOCompletionReceive
-
-        /// <summary>
-        /// Accepts or starts accepting incoming RTP data.
-        /// </summary>
-        /// <param name="socketArgs">ReceiveFromAsync method data.</param>
-        /// <exception cref="ArgumentNullException">Is raised when <b>socketArgs</b> is null reference.</exception>
-        private void RtpIOCompletionReceive(SocketAsyncEventArgs socketArgs)
-        {
-            if(socketArgs == null){
-                throw new ArgumentNullException("socketArgs");
-            }
-
-            try{
-                // Reset state for reuse.
-                socketArgs.SetBuffer(m_pRtpReceiveBuffer,0,m_pRtpReceiveBuffer.Length);
-                socketArgs.RemoteEndPoint = new IPEndPoint(m_pRtcpSocket.AddressFamily == AddressFamily.InterNetwork ? IPAddress.Any : IPAddress.IPv6Any,0);
-
-                // Use active worker thread as long as ReceiveFromAsync completes synchronously.
-                // (With this approeach we don't have thread context switches while ReceiveFromAsync completes synchronously)
-                while(!m_pRtpSocket.ReceiveFromAsync(socketArgs)){
-                    if(socketArgs.SocketError == SocketError.Success){
-                        ProcessRtp(m_pRtpReceiveBuffer,socketArgs.BytesTransferred,(IPEndPoint)socketArgs.RemoteEndPoint);
-                    }
-                }
-            }
-            catch(Exception x){
-                m_pSession.OnError(x);
-            }
-        }
-
-        #endregion
-
-        #region method RtcpIOCompletionReceive
-
-        /// <summary>
-        /// Accepts or starts accepting incoming RTCP data.
-        /// </summary>
-        /// <param name="socketArgs">ReceiveFromAsync method data.</param>
-        /// <exception cref="ArgumentNullException">Is raised when <b>socketArgs</b> is null reference.</exception>
-        private void RtcpIOCompletionReceive(SocketAsyncEventArgs socketArgs)
-        {
-            if(socketArgs == null){
-                throw new ArgumentNullException("socketArgs");
-            }
-
-            // Reset state for reuse.
-            socketArgs.SetBuffer(m_pRtcpReceiveBuffer,0,m_pRtcpReceiveBuffer.Length);
-            socketArgs.RemoteEndPoint = new IPEndPoint(m_pRtcpSocket.AddressFamily == AddressFamily.InterNetwork ? IPAddress.Any : IPAddress.IPv6Any,0);
-            
-            // Use active worker thread as long as ReceiveFromAsync completes synchronously.
-            // (With this approeach we don't have thread context switches while ReceiveFromAsync completes synchronously)
-            while(!m_pRtcpSocket.ReceiveFromAsync(socketArgs)){
-                if(socketArgs.SocketError == SocketError.Success){
-                    ProcessRtcp(m_pRtcpReceiveBuffer,socketArgs.BytesTransferred,(IPEndPoint)socketArgs.RemoteEndPoint);
-                }
             }
         }
 
