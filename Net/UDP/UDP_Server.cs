@@ -7,92 +7,25 @@ using System.Threading;
 
 namespace LumiSoft.Net.UDP
 {
-    #region Delegates Declarations
-
-    /// <summary>
-    /// Represents the method that will handle the <b>UdpServer.PacketReceived</b> event.
-    /// </summary>
-    /// <param name="e">Event data.</param>
-    public delegate void PacketReceivedHandler(UDP_PacketEventArgs e);
-
-    #endregion
-
     /// <summary>
     /// This class implements generic UDP server.
     /// </summary>
-    public class UDP_Server
-    {
-        #region class UdpPacket
-
-        /// <summary>
-        /// This class represents UDP packet.
-        /// </summary>
-        private class UdpPacket
-        {
-            private Socket     m_pSocket   = null;
-            private IPEndPoint m_pRemoteEP = null;
-            private byte[]     m_pData     = null;
-
-            /// <summary>
-            /// Default constructor.
-            /// </summary>
-            /// <param name="socket">Socket which received packet.</param>
-            /// <param name="remoteEP">Remote end point from where packet was received.</param>
-            /// <param name="data">UDP packet data.</param>
-            public UdpPacket(Socket socket,IPEndPoint remoteEP,byte[] data)
-            {
-                m_pSocket   = socket;
-                m_pRemoteEP = remoteEP;
-                m_pData     = data;
-            }
-
-
-            #region Properties Implementation
-
-            /// <summary>
-            /// Gets socket which received packet.
-            /// </summary>
-            public Socket Socket
-            {
-                get{ return m_pSocket; }
-            }
-
-            /// <summary>
-            /// Gets remote end point from where packet was received.
-            /// </summary>
-            public IPEndPoint RemoteEndPoint
-            {
-                get{ return m_pRemoteEP; }
-            }
-
-            /// <summary>
-            /// Gets UDP packet data.
-            /// </summary>
-            public byte[] Data
-            {
-                get{ return m_pData; }
-            }
-
-            #endregion
-        }
-
-        #endregion
-      
-        private UDP_ProcessMode          m_ProcessMode      = UDP_ProcessMode.Sequential;
-        private int                      m_MTU              = 1400;
-        private int                      m_MaxQueueSize     = 200;
-        private IPEndPoint[]             m_pBindings        = null;
+    public class UDP_Server : IDisposable
+    {      
+        private bool                     m_IsDisposed         = false;
+        private bool                     m_IsRunning          = false;
+        private int                      m_MTU                = 1400;
+        private IPEndPoint[]             m_pBindings          = null;
         private DateTime                 m_StartTime;
-        private List<Socket>             m_pSockets         = null;
-        private CircleCollection<Socket> m_pSendSocketsIPv4 = null;
-        private CircleCollection<Socket> m_pSendSocketsIPv6 = null;
-        private Queue<UdpPacket>         m_pQueuedPackets   = null;
-        private long                     m_BytesReceived    = 0;
-        private long                     m_PacketsReceived  = 0;
-        private long                     m_BytesSent        = 0;
-        private long                     m_PacketsSent      = 0;
-        private bool                     m_IsRunning        = false;
-        private bool                     m_IsDisposed       = false;
+        private List<Socket>             m_pSockets           = null;
+        private CircleCollection<Socket> m_pSendSocketsIPv4   = null;
+        private CircleCollection<Socket> m_pSendSocketsIPv6   = null;
+        private int                      m_ReceiversPerSocket = 10;
+        private List<UDP_DataReceiver>   m_pDataReceivers     = null;
+        private long                     m_BytesReceived      = 0;
+        private long                     m_PacketsReceived    = 0;
+        private long                     m_BytesSent          = 0;
+        private long                     m_PacketsSent        = 0;
 
         /// <summary>
         /// Default constructor.
@@ -134,7 +67,7 @@ namespace LumiSoft.Net.UDP
             m_IsRunning = true;
 
             m_StartTime = DateTime.Now;
-            m_pQueuedPackets = new Queue<UdpPacket>();
+            m_pDataReceivers = new List<UDP_DataReceiver>();
 
             // Run only if we have some listening point.
             if(m_pBindings != null){
@@ -168,7 +101,26 @@ namespace LumiSoft.Net.UDP
                 m_pSockets = new List<Socket>();
                 foreach(IPEndPoint ep in listeningEPs){                    
                     try{
-                        m_pSockets.Add(Net_Utils.CreateSocket(ep,ProtocolType.Udp));
+                        Socket socket = Net_Utils.CreateSocket(ep,ProtocolType.Udp);
+                        m_pSockets.Add(socket);
+
+                        // Create UDP data receivers.
+                        for(int i=0;i<m_ReceiversPerSocket;i++){
+                            UDP_DataReceiver receiver = new UDP_DataReceiver(socket);
+                            receiver.PacketReceived += delegate(object s,UDP_e_PacketReceived e){
+                                try{
+                                    ProcessUdpPacket(e);
+                                }
+                                catch(Exception x){
+                                    OnError(x);
+                                }
+                            };
+                            receiver.Error += delegate(object s,ExceptionEventArgs e){
+                                OnError(e.Exception);
+                            };
+                            m_pDataReceivers.Add(receiver);
+                            receiver.Start();
+                        }
                     }
                     catch(Exception x){
                         OnError(x);
@@ -189,11 +141,6 @@ namespace LumiSoft.Net.UDP
                         m_pSendSocketsIPv6.Add(socket);
                     }                    
                 }
-            
-                Thread tr = new Thread(new ThreadStart(this.ProcessIncomingUdp));
-                tr.Start();
-                Thread tr2 = new Thread(new ThreadStart(this.ProcessQueuedPackets));
-                tr2.Start();
             }
         }
 
@@ -210,9 +157,11 @@ namespace LumiSoft.Net.UDP
                 return;
             }
             m_IsRunning = false;
-                        
-            m_pQueuedPackets = null;
-            // Close sockets.
+
+            foreach(UDP_DataReceiver receiver in m_pDataReceivers){
+                receiver.Dispose();
+            }
+            m_pDataReceivers = null; 
             foreach(Socket socket in m_pSockets){
                 socket.Close();
             }
@@ -442,116 +391,20 @@ namespace LumiSoft.Net.UDP
         #endregion
 
 
-        #region method ProcessIncomingUdp
+        #region method ProcessUdpPacket
 
         /// <summary>
-        /// Processes incoming UDP data and queues it for processing.
+        /// Processes specified incoming UDP packet.
         /// </summary>
-        private void ProcessIncomingUdp()
+        /// <param name="e">Packet event data.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>e</b> is null reference.</exception>
+        private void ProcessUdpPacket(UDP_e_PacketReceived e)
         {
-            // Create Round-Robin for listening points.
-            CircleCollection<Socket> listeningEPs = new CircleCollection<Socket>();
-            foreach(Socket socket in m_pSockets){
-                listeningEPs.Add(socket);
+            if(e == null){
+                throw new ArgumentNullException("e");
             }
 
-            byte[] buffer = new byte[m_MTU];            
-            while(m_IsRunning){
-                try{
-                    // Maximum allowed UDP queued packts exceeded.
-                    if(m_pQueuedPackets.Count >= m_MaxQueueSize){
-                        Thread.Sleep(1);
-                    }
-                    else{
-                        // Roun-Robin sockets.
-                        bool receivedData = false;
-                        for(int i=0;i<listeningEPs.Count;i++){
-                            Socket socket = listeningEPs.Next();
-                            // Read data only when there is some, otherwise we block thread.
-                            if(socket.Poll(0,SelectMode.SelectRead)){
-                                // Receive data.
-                                EndPoint remoteEP = new IPEndPoint(IPAddress.Any,0);
-                                int received = socket.ReceiveFrom(buffer,ref remoteEP);
-                                m_BytesReceived += received;
-                                m_PacketsReceived++;
-
-                                // Queue received packet.
-                                byte[] data = new byte[received];
-                                Array.Copy(buffer,data,received);
-                                lock(m_pQueuedPackets){
-                                    m_pQueuedPackets.Enqueue(new UdpPacket(socket,(IPEndPoint)remoteEP,data));
-                                }
-
-                                // We received data, so exit round-robin loop.
-                                receivedData = true;
-                                break;
-                            }
-                        }
-                        // We didn't get any data from any listening point, we must sleep or we use 100% CPU.
-                        if(!receivedData){
-                            Thread.Sleep(1);
-                        }
-                    }
-                }
-                catch(Exception x){
-                    OnError(x);
-                }
-            }
-        }
-
-        #endregion
-
-        #region method ProcessQueuedPackets
-
-        /// <summary>
-        /// This method processes queued UDP packets.
-        /// </summary>
-        private void ProcessQueuedPackets()
-        {
-            while(m_IsRunning){
-                try{
-                    // There are no packets to process.
-                    if(m_pQueuedPackets.Count == 0){
-                        Thread.Sleep(1);
-                    }
-                    else{
-                        UdpPacket udpPacket = null;
-                        lock(m_pQueuedPackets){
-                            udpPacket = m_pQueuedPackets.Dequeue();
-                        }
-
-                        // Sequential, call PacketReceived event on same thread.
-                        if(m_ProcessMode == UDP_ProcessMode.Sequential){
-                            OnUdpPacketReceived(udpPacket);                        
-                        }
-                        // Parallel, call PacketReceived event on Thread pool thread.
-                        else{
-                            ThreadPool.QueueUserWorkItem(new WaitCallback(this.ProcessPacketOnTrPool),udpPacket);
-                        }             
-                    }
-                }
-                catch(Exception x){
-                    OnError(x);
-                }
-            }
-        }
-
-        #endregion
-
-        #region method ProcessPacketOnTrPool
-
-        /// <summary>
-        /// Processes UDP packet on thread pool thread.
-        /// </summary>
-        /// <param name="state">User data.</param>
-        private void ProcessPacketOnTrPool(object state)
-        {
-            try{
-                OnUdpPacketReceived((UdpPacket)state);
-            }
-            catch(Exception x){
-                OnError(x);
-            }
+            OnUdpPacketReceived(e);
         }
 
         #endregion
@@ -583,33 +436,6 @@ namespace LumiSoft.Net.UDP
         }
 
         /// <summary>
-        /// Gets or sets UDP packets process mode.
-        /// </summary>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when server is running and this property value is tried to set.</exception>
-        public UDP_ProcessMode ProcessMode
-        {
-            get{ 
-                if(m_IsDisposed){
-                    throw new ObjectDisposedException("UdpServer");
-                }
-
-                return m_ProcessMode; 
-            }
-
-            set{
-                if(m_IsDisposed){
-                    throw new ObjectDisposedException("UdpServer");
-                }
-                if(m_IsRunning){
-                    throw new InvalidOperationException("ProcessMode value can be changed only if UDP server is not running.");
-                }
-
-                m_ProcessMode = value;
-            }
-        }
-
-        /// <summary>
         /// Gets or sets maximum network transmission unit.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
@@ -633,21 +459,6 @@ namespace LumiSoft.Net.UDP
                 }
 
                 m_MTU = value;
-            }
-        }
-
-        /// <summary>
-        /// Gets maximum UDP packets to queue.
-        /// </summary>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
-        public int MaxQueueSize
-        {
-            get{
-                if(m_IsDisposed){
-                    throw new ObjectDisposedException("UdpServer");
-                }
-
-                return m_MaxQueueSize; 
             }
         }
 
@@ -799,23 +610,29 @@ namespace LumiSoft.Net.UDP
         /// <summary>
         /// This event is raised when new UDP packet received.
         /// </summary>
-        public event PacketReceivedHandler PacketReceived = null;
+        public event EventHandler<UDP_e_PacketReceived> PacketReceived = null;
+
+        #region method OnUdpPacketReceived
 
         /// <summary>
         /// Raises PacketReceived event.
         /// </summary>
-        /// <param name="packet">UDP packet.</param>
-        private void OnUdpPacketReceived(UdpPacket packet)
+        /// <param name="e">Event data.</param>
+        private void OnUdpPacketReceived(UDP_e_PacketReceived e)
         {            
             if(this.PacketReceived != null){
-                this.PacketReceived(new UDP_PacketEventArgs(this,packet.Socket,packet.RemoteEndPoint,packet.Data));
+                this.PacketReceived(this,e);
             }
         }
+
+        #endregion
 
         /// <summary>
         /// This event is raised when unexpected error happens.
         /// </summary>
         public event ErrorEventHandler Error = null;
+
+        #region method OnError
 
         /// <summary>
         /// Raises Error event.
@@ -827,6 +644,8 @@ namespace LumiSoft.Net.UDP
                 this.Error(this,new Error_EventArgs(x,new System.Diagnostics.StackTrace()));
             }
         }
+
+        #endregion
 
         #endregion
 
