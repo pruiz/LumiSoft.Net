@@ -126,6 +126,21 @@ namespace LumiSoft.Net
 
         #endregion
 
+        #region method ToArray
+
+        /// <summary>
+        /// Copies all elements to new array, all elements will be in order they added. This method is thread-safe.
+        /// </summary>
+        /// <returns>Returns elements in a new array.</returns>
+        public V[] ToArray()
+        {
+            lock(m_pList){
+                return m_pList.ToArray();
+            }
+        }
+
+        #endregion
+
 
         #region interface IEnumerator
 
