@@ -8,6 +8,7 @@ using System.Text;
 using System.Net.NetworkInformation;
 using System.Threading;
 
+using LumiSoft.Net;
 using LumiSoft.Net.UDP;
 
 namespace LumiSoft.Net.DNS.Client
@@ -45,6 +46,7 @@ namespace LumiSoft.Net.DNS.Client
         private Socket                                m_pIPv4Socket   = null;
         private Socket                                m_pIPv6Socket   = null;
         private List<UDP_DataReceiver>                m_pReceivers    = null;
+        private Random                                m_pRandom       = null;
 
 		/// <summary>
 		/// Static constructor.
@@ -90,6 +92,7 @@ namespace LumiSoft.Net.DNS.Client
             }
 
             m_pReceivers = new List<UDP_DataReceiver>();
+            m_pRandom = new Random();
 
             // Create UDP data receivers.
             for(int i=0;i<5;i++){
@@ -133,6 +136,7 @@ namespace LumiSoft.Net.DNS.Client
 
             m_pTransactions = null;
             m_pReceivers = null;
+            m_pRandom = null;
         }
 
         #endregion
@@ -147,23 +151,27 @@ namespace LumiSoft.Net.DNS.Client
         /// <param name="queryText">Query text. It depends on queryType.</param>
         /// <param name="timeout">Transaction timeout in milliseconds. DNS default value is 2000, value 0 means no timeout - this is not suggested.</param>
         /// <returns>Returns DNS client transaction.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
         /// <exception cref="ArgumentNullException">Is raised when <b>queryText</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         /// <remarks>Creates asynchronous(non-blocking) DNS transaction. Call <see cref="DNS_ClientTransaction.Start"/> to start transaction.
         /// It is allowd to create multiple conccurent transactions.</remarks>
         public DNS_ClientTransaction CreateTransaction(DNS_QType queryType,string queryText,int timeout)
-        {            
-            if(queryType == DNS_QType.PTR){
-                IPAddress ip = null;
-                if(!IPAddress.TryParse(queryText,out ip)){
-                    throw new ArgumentException("Argument 'queryText' value must be IP address if queryType == DNS_QType.PTR.","queryText");
-                }
+        {   
+            if(m_IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
             }
             if(queryText == null){
                 throw new ArgumentNullException("queryText");
             }
             if(queryText == string.Empty){
                 throw new ArgumentException("Argument 'queryText' value may not be \"\".","queryText");
+            }
+            if(queryType == DNS_QType.PTR){
+                IPAddress ip = null;
+                if(!IPAddress.TryParse(queryText,out ip)){
+                    throw new ArgumentException("Argument 'queryText' value must be IP address if queryType == DNS_QType.PTR.","queryText");
+                }
             }
 
             if(queryType == DNS_QType.PTR){
@@ -200,9 +208,9 @@ namespace LumiSoft.Net.DNS.Client
 				}
 			}
 
-            DNS_ClientTransaction retVal = new DNS_ClientTransaction(this,new Random().Next(0xFFFF),queryType,queryText,timeout);
+            DNS_ClientTransaction retVal = new DNS_ClientTransaction(this,m_pRandom.Next(0xFFFF),queryType,queryText,timeout);
             retVal.StateChanged += delegate(object s1,EventArgs<DNS_ClientTransaction> e1){
-                if(retVal.State == DNS_ClientTransactionState.Completed){
+                if(retVal.State == DNS_ClientTransactionState.Disposed){
                     m_pTransactions.Remove(e1.Value.ID);
                 }
             };
@@ -221,6 +229,8 @@ namespace LumiSoft.Net.DNS.Client
 		/// <param name="queryText">Query text. It depends on queryType.</param>
 		/// <param name="queryType">Query type.</param>
 		/// <returns>Returns DSN server response.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>queryText</b> is null.</exception>
 		public DnsServerResponse Query(string queryText,DNS_QType queryType)
 		{
             return Query(queryText,queryType,2000);
@@ -233,8 +243,17 @@ namespace LumiSoft.Net.DNS.Client
 		/// <param name="queryType">Query type.</param>
         /// <param name="timeout">Query timeout in milli seconds.</param>
 		/// <returns>Returns DSN server response.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>queryText</b> is null.</exception>
 		public DnsServerResponse Query(string queryText,DNS_QType queryType,int timeout)
 		{
+            if(m_IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(queryText == null){
+                throw new ArgumentNullException("queryText");
+            }
+
             DnsServerResponse retVal = null;
             ManualResetEvent  wait   = new ManualResetEvent(false);
 
@@ -262,50 +281,1174 @@ namespace LumiSoft.Net.DNS.Client
         #region method GetHostAddresses
 
         /// <summary>
-        /// Gets specified host IP addresses(A and AAAA).
+        /// Gets host IPv4 and IPv6 addresses.
         /// </summary>
-        /// <param name="host">Host name.</param>
-        /// <returns>Returns specified host IP addresses.</returns>
-        /// <exception cref="ArgumentNullException">Is raised when <b>host</b> is null reference.</exception>
-        public IPAddress[] GetHostAddresses(string host)
+        /// <param name="hostNameOrIP">Host name or IP address.</param>
+        /// <returns>Returns host IPv4 and IPv6 addresses.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>hostNameOrIP</b> is null reference.</exception>
+        /// <exception cref="DNS_ClientException">Is raised when DNS server returns error.</exception>
+        /// <exception cref="IOException">Is raised when IO reletaed error happens.</exception>
+        public IPAddress[] GetHostAddresses(string hostNameOrIP)
         {
-            if(host == null){
-                throw new ArgumentNullException("host");
+            if(m_IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(hostNameOrIP == null){
+                throw new ArgumentNullException("hostNameOrIP");
             }
 
-            List<IPAddress> retVal = new List<IPAddress>();
+            ManualResetEvent wait = new ManualResetEvent(false);
+            Dns_Client.GetHostAddressesAsyncOP op = new Dns_Client.GetHostAddressesAsyncOP(hostNameOrIP);
+            op.CompletedAsync += delegate(object s1,EventArgs<Dns_Client.GetHostAddressesAsyncOP> e1){
+                wait.Set();
+            };
+            if(!this.GetHostAddressesAsync(op)){
+                wait.Set();
+            }
+            wait.WaitOne();
 
-            // This is probably NetBios name
-			if(host.IndexOf(".") == -1){
-				return System.Net.Dns.GetHostEntry(host).AddressList;
-			}
+            if(op.Error != null){
+                throw op.Error;
+            }
             else{
-                DnsServerResponse response = Query(host,DNS_QType.A);
-                if(response.ResponseCode != DNS_RCode.NO_ERROR){
-                    throw new DNS_ClientException(response.ResponseCode);
+                return op.Addresses;
+            }
+        }
+
+        #endregion
+
+        #region method GetHostAddressesAsync
+
+        #region class GetHostAddressesAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="Dns_Client.GetHostAddressesAsync"/> asynchronous operation.
+        /// </summary>
+        public class GetHostAddressesAsyncOP : IDisposable,IAsyncOP
+        {
+            private object          m_pLock          = new object();
+            private AsyncOP_State   m_State          = AsyncOP_State.WaitingForStart;
+            private Exception       m_pException     = null;
+            private string          m_HostNameOrIP   = null;
+            private List<IPAddress> m_pIPv4Addresses = null;
+            private List<IPAddress> m_pIPv6Addresses = null;
+            private int             m_Counter        = 0;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="hostNameOrIP">Host name or IP address.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>hostNameOrIP</b> is null reference.</exception>
+            public GetHostAddressesAsyncOP(string hostNameOrIP)
+            {
+                if(hostNameOrIP == null){
+                    throw new ArgumentNullException("hostNameOrIP");
                 }
 
-                foreach(DNS_rr_A record in response.GetARecords()){
-                    retVal.Add(record.IP);
+                m_HostNameOrIP = hostNameOrIP;
+
+                m_pIPv4Addresses = new List<IPAddress>();
+                m_pIPv6Addresses = new List<IPAddress>();
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resource being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+
+                m_pException     = null;
+                m_HostNameOrIP   = null;
+                m_pIPv4Addresses = null;
+                m_pIPv6Addresses = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="dnsClient">DNS client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>dnsClient</b> is null reference.</exception>
+            internal bool Start(Dns_Client dnsClient)
+            {                
+                if(dnsClient == null){
+                    throw new ArgumentNullException("dnsClient");
                 }
 
-                response = Query(host,DNS_QType.AAAA);
-                if(response.ResponseCode != DNS_RCode.NO_ERROR){
-                    throw new DNS_ClientException(response.ResponseCode);
+                SetState(AsyncOP_State.Active);
+
+                if(Net_Utils.IsIPAddress(m_HostNameOrIP)){
+                    m_pIPv4Addresses.Add(IPAddress.Parse(m_HostNameOrIP));
+
+                    SetState(AsyncOP_State.Completed);
+
+                    return false;
+                }
+                // This is probably NetBios name.
+			    if(m_HostNameOrIP.IndexOf(".") == -1){
+                    try{
+                        // This callback is called when BeginGetHostAddresses method has completed.
+                        AsyncCallback callback = delegate(IAsyncResult ar){
+                            try{
+                                foreach(IPAddress ip in  System.Net.Dns.EndGetHostAddresses(ar)){
+                                    if(ip.AddressFamily == AddressFamily.InterNetwork){
+                                        m_pIPv4Addresses.Add(ip);
+                                    }
+                                    else{
+                                        m_pIPv6Addresses.Add(ip);
+                                    }
+                                }
+                            }
+                            catch(Exception x){
+                                m_pException = x;
+                            }
+
+                            SetState(AsyncOP_State.Completed);
+
+                            // We may not call CompletedAsync event for synchronous completion.
+                            if(!ar.CompletedSynchronously){
+                                OnCompletedAsync();
+                            }
+                        };
+                        // Start resolving host ip addresses.
+                        return !System.Net.Dns.BeginGetHostAddresses(m_HostNameOrIP,callback,null).CompletedSynchronously; 
+                    }
+                    catch(Exception x){
+                        m_pException = x;
+                    }
+			    }
+                else{
+                    #region A records transaction
+
+                    DNS_ClientTransaction transaction_A = dnsClient.CreateTransaction(DNS_QType.A,m_HostNameOrIP,2000);
+                    transaction_A.StateChanged += delegate(object s1,EventArgs<DNS_ClientTransaction> e1){
+                        if(e1.Value.State == DNS_ClientTransactionState.Completed){
+                            lock(m_pLock){
+                                if(e1.Value.Response.ResponseCode != DNS_RCode.NO_ERROR){
+                                    m_pException = new DNS_ClientException(e1.Value.Response.ResponseCode);
+                                }
+                                else{
+                                    foreach(DNS_rr_A record in e1.Value.Response.GetARecords()){
+                                        m_pIPv4Addresses.Add(record.IP);
+                                    }
+                                }
+
+                                m_Counter++;
+
+                                // Both A and AAAA transactions are completed, we are done.
+                                if(m_Counter == 2){
+                                    SetState(AsyncOP_State.Completed);
+                                    OnCompletedAsync();
+                                }
+                            }
+                        }
+                    };
+                    transaction_A.Timeout += delegate(object s1,EventArgs e1){
+                        lock(m_pLock){
+                            m_pException = new IOException("DNS transaction timeout, no response from DNS server.");
+                            m_Counter++;
+
+                            // Both A and AAAA transactions are completed, we are done.
+                            if(m_Counter == 2){
+                                SetState(AsyncOP_State.Completed);
+                                OnCompletedAsync();
+                            }
+                        }
+                    };
+                    transaction_A.Start();
+
+                    #endregion
+
+                    #region AAAA records transaction
+
+                    DNS_ClientTransaction transaction_AAAA = dnsClient.CreateTransaction(DNS_QType.AAAA,m_HostNameOrIP,2000);
+                    transaction_A.StateChanged += delegate(object s1,EventArgs<DNS_ClientTransaction> e1){
+                        if(e1.Value.State == DNS_ClientTransactionState.Completed){
+                            lock(m_pLock){
+                                if(e1.Value.Response.ResponseCode != DNS_RCode.NO_ERROR){
+                                    m_pException = new DNS_ClientException(e1.Value.Response.ResponseCode);
+                                }
+                                else{
+                                    foreach(DNS_rr_AAAA record in e1.Value.Response.GetAAAARecords()){
+                                        m_pIPv6Addresses.Add(record.IP);
+                                    }
+                                }
+
+                                m_Counter++;
+
+                                // Both A and AAAA transactions are completed, we are done.
+                                if(m_Counter == 2){
+                                    SetState(AsyncOP_State.Completed);
+                                    OnCompletedAsync();
+                                }
+                            }
+                        }
+                    };
+                    transaction_AAAA.Timeout += delegate(object s1,EventArgs e1){
+                        lock(m_pLock){
+                            m_pException = new IOException("DNS transaction timeout, no response from DNS server.");
+                            m_Counter++;
+
+                            // Both A and AAAA transactions are completed, we are done.
+                            if(m_Counter == 2){
+                                SetState(AsyncOP_State.Completed);
+                                OnCompletedAsync();
+                            }
+                        }
+                    };
+
+                    #endregion
                 }
 
-                foreach(DNS_rr_AAAA record in response.GetAAAARecords()){
-                    retVal.Add(record.IP);
+                return true;
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                m_State = state;
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
                 }
             }
 
-            return retVal.ToArray();
+            /// <summary>
+            /// Gets argument <b>hostNameOrIP</b> value.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            public string HostNameOrIP
+            {
+                get{
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+
+                    return m_HostNameOrIP; 
+                }
+            }
+
+            /// <summary>
+            /// Gets host IP addresses.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public IPAddress[] Addresses
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Addresses' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+                    if(m_pException != null){
+                        throw m_pException;
+                    }
+
+                    // We list IPv4 addresses before IPv6.
+                    List<IPAddress> retVal = new List<IPAddress>();
+                    retVal.AddRange(m_pIPv4Addresses);
+                    retVal.AddRange(m_pIPv6Addresses);
+
+                    return retVal.ToArray(); 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<GetHostAddressesAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<GetHostAddressesAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Starts resolving host IPv4 and IPv6 addresses.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="GetHostAddressesAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        public bool GetHostAddressesAsync(GetHostAddressesAsyncOP op)
+        {
+            if(m_IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+
+            return op.Start(this);
+        }
+
+        #endregion
+
+        #region method GetHostsAddresses
+
+        /// <summary>
+        /// Resolving multiple host IPv4 and IPv6 addresses.
+        /// </summary>
+        /// <param name="hostNames">Host names to resolve.</param>
+        /// <returns>Returns host entries.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>hostNames</b> is null reference.</exception>
+        /// <exception cref="DNS_ClientException">Is raised when DNS server returns error.</exception>
+        /// <exception cref="IOException">Is raised when IO reletaed error happens.</exception>
+        public HostEntry[] GetHostsAddresses(string[] hostNames)
+        {
+            if(m_IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(hostNames == null){
+                throw new ArgumentNullException("hostNames");
+            }
+
+            ManualResetEvent wait = new ManualResetEvent(false);
+            Dns_Client.GetHostsAddressesAsyncOP op = new Dns_Client.GetHostsAddressesAsyncOP(hostNames);
+            op.CompletedAsync += delegate(object s1,EventArgs<Dns_Client.GetHostsAddressesAsyncOP> e1){
+                wait.Set();
+            };
+            if(!this.GetHostsAddressesAsync(op)){
+                wait.Set();
+            }
+            wait.WaitOne();
+
+            if(op.Error != null){
+                throw op.Error;
+            }
+            else{
+                return op.HostEntries;
+            }
+        }
+
+        #endregion
+
+        #region method GetHostsAddressesAsync
+
+        #region class GetHostsAddressesAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="Dns_Client.GetHostsAddressesAsync"/> asynchronous operation.
+        /// </summary>
+        public class GetHostsAddressesAsyncOP : IDisposable,IAsyncOP
+        {
+            private object                                  m_pLock          = new object();
+            private AsyncOP_State                           m_State          = AsyncOP_State.WaitingForStart;
+            private Exception                               m_pException     = null;
+            private string[]                                m_pHostNames     = null;
+            private Dictionary<int,GetHostAddressesAsyncOP> m_pIpLookupQueue = null;
+            private HostEntry[]                             m_pHostEntries   = null;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="hostNames">Host names to resolve.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>hostNames</b> is null reference.</exception>
+            public GetHostsAddressesAsyncOP(string[] hostNames)
+            {
+                if(hostNames == null){
+                    throw new ArgumentNullException("hostNames");
+                }
+
+                m_pHostNames = hostNames;
+
+                m_pIpLookupQueue = new Dictionary<int,GetHostAddressesAsyncOP>();
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resource being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+
+                m_pException     = null;
+                m_pHostNames     = null;
+                m_pIpLookupQueue = null;
+                m_pHostEntries   = null;
+                
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="dnsClient">DNS client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>dnsClient</b> is null reference.</exception>
+            internal bool Start(Dns_Client dnsClient)
+            {   
+                if(dnsClient == null){
+                    throw new ArgumentNullException("dnsClient");
+                }
+
+                SetState(AsyncOP_State.Active);
+
+                m_pHostEntries = new HostEntry[m_pHostNames.Length];
+
+                // Create look up operations for hosts. The "opList" copy array is needed because
+                // when we start asyn OP, m_pIpLookupQueue may be altered when OP completes.
+                Dictionary<int,GetHostAddressesAsyncOP> opList = new Dictionary<int,GetHostAddressesAsyncOP>();
+                for(int i=0;i<m_pHostNames.Length;i++){
+                    GetHostAddressesAsyncOP op = new GetHostAddressesAsyncOP(m_pHostNames[i]);
+                    m_pIpLookupQueue.Add(i,op);
+                    opList.Add(i,op);
+                }
+
+                // Start operations.
+                bool async = false;
+                foreach(KeyValuePair<int,GetHostAddressesAsyncOP> entry in opList){
+                    // NOTE: We may not access "entry" in CompletedAsync, because next for loop reassigns this value.
+                    int index = entry.Key;
+
+                    // This event is raised when GetHostAddressesAsync completes asynchronously.
+                    entry.Value.CompletedAsync += delegate(object s1,EventArgs<GetHostAddressesAsyncOP> e1){                        
+                        GetHostAddressesCompleted(true,e1.Value,index);
+                    };                    
+                    // GetHostAddressesAsync completes synchronously.
+                    if(!dnsClient.GetHostAddressesAsync(entry.Value)){
+                        GetHostAddressesCompleted(false,entry.Value,index);
+                    }
+                    else{
+                        async = true;
+                    }
+                }
+
+                return async;
+            }
+
+            #endregion
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                m_State = state;
+            }
+
+            #endregion
+
+            #region method GetHostAddressesCompleted
+
+            /// <summary>
+            /// This method is called when GetHostAddresses operation has completed.
+            /// </summary>
+            /// <param name="async">If true, this method is called from asynchronous callback.</param>
+            /// <param name="op">Asynchronous operation.</param>
+            /// <param name="index">Index in 'm_pHostEntries' where to store lookup result.</param>
+            private void GetHostAddressesCompleted(bool async,GetHostAddressesAsyncOP op,int index)
+            {
+                lock(m_pLock){
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                    }
+                    else{
+                        m_pHostEntries[index] = new HostEntry(op.HostNameOrIP,op.Addresses,null);
+                    }
+
+                    m_pIpLookupQueue.Remove(index);
+                    if(m_pIpLookupQueue.Count == 0){
+                        SetState(AsyncOP_State.Completed);
+                        if(async){
+                            OnCompletedAsync();
+                        }
+                    }
+                }
+
+                op.Dispose();
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+                        
+            /// <summary>
+            /// Gets argument <b>hostNames</b> value.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            public string[] HostNames
+            {
+                get{
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+
+                    return m_pHostNames; 
+                }
+            }
+
+            /// <summary>
+            /// Gets host entries.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public HostEntry[] HostEntries
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'HostEntries' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+                    if(m_pException != null){
+                        throw m_pException;
+                    }                    
+
+                    return m_pHostEntries; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<GetHostsAddressesAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<GetHostsAddressesAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+        
+        /// <summary>
+        /// Starts resolving multiple host IPv4 and IPv6 addresses.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="GetHostsAddressesAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        public bool GetHostsAddressesAsync(GetHostsAddressesAsyncOP op)
+        {
+            if(m_IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+
+            return op.Start(this);
+        }
+
+        #endregion
+
+        #region method GetEmailHosts
+
+        /// <summary>
+        /// Gets email hosts.
+        /// </summary>
+        /// <param name="domain">Email domain. For example: 'domain.com'.</param>
+        /// <returns>Returns email hosts in priority order.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>domain</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="DNS_ClientException">Is raised when DNS server returns error.</exception>
+        /// <exception cref="IOException">Is raised when IO reletaed error happens.</exception>
+        public HostEntry[] GetEmailHosts(string domain)
+        {
+            if(m_IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(domain == null){
+                throw new ArgumentNullException("domain");
+            }
+            if(domain == string.Empty){
+                throw new ArgumentException("Argument 'domain' value must be specified.","domain");
+            }
+
+            ManualResetEvent wait = new ManualResetEvent(false);
+            Dns_Client.GetEmailHostsAsyncOP op = new Dns_Client.GetEmailHostsAsyncOP(domain);
+            op.CompletedAsync += delegate(object s1,EventArgs<Dns_Client.GetEmailHostsAsyncOP> e1){
+                wait.Set();
+            };
+            if(!this.GetEmailHostsAsync(op)){
+                wait.Set();
+            }
+            wait.WaitOne();
+
+            if(op.Error != null){
+                throw op.Error;
+            }
+            else{
+                return op.Hosts;
+            }
+        }
+
+        #endregion
+
+        #region method GetEmailHostsAsync
+
+        #region class GetEmailHostsAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="Dns_Client.GetEmailHostsAsync"/> asynchronous operation.
+        /// </summary>
+        public class GetEmailHostsAsyncOP : IDisposable,IAsyncOP
+        {
+            private AsyncOP_State m_State      = AsyncOP_State.WaitingForStart;
+            private Exception     m_pException = null;
+            private string        m_Domain     = null;
+            private HostEntry[]   m_pHosts     = null;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="domain">Email domain. For example: 'domain.com'.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>domain</b> is null reference.</exception>
+            /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+            public GetEmailHostsAsyncOP(string domain)
+            {
+                if(domain == null){
+                    throw new ArgumentNullException("domain");
+                }
+                if(domain == string.Empty){
+                    throw new ArgumentException("Argument 'domain' value must be specified.","domain");
+                }
+
+                m_Domain = domain;
+
+                // We have email address, parse domain.
+                if(domain.IndexOf("@") > -1){
+                    m_Domain = domain.Split(new char[]{'@'},2)[1];
+                }
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resource being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+
+                m_pException = null;
+                m_Domain     = null;
+                m_pHosts     = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="dnsClient">DNS client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>dnsClient</b> is null reference.</exception>
+            internal bool Start(Dns_Client dnsClient)
+            {
+                if(dnsClient == null){
+                    throw new ArgumentNullException("dnsClient");
+                }
+
+                /* RFC 5321 5.
+                    The lookup first attempts to locate an MX record associated with the
+                    name.  If a CNAME record is found, the resulting name is processed as
+                    if it were the initial name.
+                 
+			        If no MX records are found, but an A RR is found, the A RR is treated as if it 
+                    was associated with an implicit MX RR, with a preference of 0, pointing to that host.
+			    */
+
+                try{
+                    LookupMX(dnsClient,m_Domain,false);
+
+                    return true;
+                }
+                catch(Exception x){
+                    m_pException = x;
+
+                    SetState(AsyncOP_State.Completed);
+
+                    return false;
+                }
+            }
+
+            #endregion
+
+
+            #region method LookupMX
+
+            /// <summary>
+            /// Starts looking up MX records for specified domain.
+            /// </summary>
+            /// <param name="dnsClient">DNS client.</param>
+            /// <param name="domain">Domain name.</param>
+            /// <param name="domainIsCName">If true domain name is CNAME(alias).</param>
+            /// <exception cref="ArgumentNullException">Is riased when <b>dnsClient</b> or <b>domain</b> is null reference.</exception>
+            private void LookupMX(Dns_Client dnsClient,string domain,bool domainIsCName)
+            {
+                if(dnsClient == null){
+                    throw new ArgumentNullException("dnsClient");
+                }
+                if(domain == null){
+                    throw new ArgumentNullException("domain");
+                }
+
+                // Try to get MX records.
+                DNS_ClientTransaction transaction_MX = dnsClient.CreateTransaction(DNS_QType.MX,domain,2000);
+                transaction_MX.StateChanged += delegate(object s1,EventArgs<DNS_ClientTransaction> e1){
+                    try{
+                        if(e1.Value.State == DNS_ClientTransactionState.Completed){
+                            // No errors.
+                            if(e1.Value.Response.ResponseCode == DNS_RCode.NO_ERROR){
+                                DNS_rr_MX[] mxRecords = e1.Value.Response.GetMXRecords();
+
+                                // Use MX records.
+                                if(mxRecords.Length > 0){
+                                    m_pHosts = new HostEntry[mxRecords.Length];
+
+                                    // Create name to index map, so we can map asynchronous A/AAAA lookup results back to MX priority index.
+                                    Dictionary<string,int> name_to_index_map = new Dictionary<string,int>();
+                                    List<string>           lookupQueue       = new List<string>();
+
+                                    // Process MX records.
+                                    for(int i=0;i<m_pHosts.Length;i++){
+                                        DNS_rr_MX mx = mxRecords[i];
+                                    
+                                        IPAddress[] ips = Get_A_or_AAAA_FromResponse(mx.Host,e1.Value.Response);
+                                        // No A or AAAA records in addtional answers section for MX, we need todo new query for that.
+                                        if(ips.Length == 0){
+                                            name_to_index_map.Add(mx.Host,i);
+                                            lookupQueue.Add(mx.Host);
+                                        }
+                                        else{
+                                            m_pHosts[i] = new HostEntry(mx.Host,ips,null);
+                                        }                                        
+                                    }
+
+                                    // We have MX records which A or AAAA records not provided in DNS response, lookup them.
+                                    if(lookupQueue.Count > 0){
+                                        GetHostsAddressesAsyncOP op = new GetHostsAddressesAsyncOP(lookupQueue.ToArray());
+                                        // This event is raised when lookup completes asynchronously.
+                                        op.CompletedAsync += delegate(object s2,EventArgs<GetHostsAddressesAsyncOP> e2){
+                                            LookupCompleted(op,name_to_index_map);
+                                        };
+                                        // Lookup completed synchronously.
+                                        if(!dnsClient.GetHostsAddressesAsync(op)){
+                                            LookupCompleted(op,name_to_index_map);
+                                        }
+                                    }
+                                    // All MX records resolved.
+                                    else{
+                                        SetState(AsyncOP_State.Completed);
+                                        OnCompletedAsync();
+                                    }
+                                }
+                                // Use CNAME as initial domain name.
+                                else if(e1.Value.Response.GetCNAMERecords().Length > 0){
+                                    if(domainIsCName){
+                                        m_pException = new Exception("CNAME to CNAME loop dedected.");
+
+                                        SetState(AsyncOP_State.Completed);
+                                        OnCompletedAsync();
+                                    }
+                                    else{
+                                        LookupMX(dnsClient,e1.Value.Response.GetCNAMERecords()[0].Alias,true);
+                                    }
+                                }
+                                // Use domain name as MX.
+                                else{
+                                    m_pHosts = new HostEntry[1];
+
+                                    // Create name to index map, so we can map asynchronous A/AAAA lookup results back to MX priority index.
+                                    Dictionary<string,int> name_to_index_map = new Dictionary<string,int>();
+                                    name_to_index_map.Add(domain,0);
+
+                                    GetHostsAddressesAsyncOP op = new GetHostsAddressesAsyncOP(new string[]{domain});
+                                    // This event is raised when lookup completes asynchronously.
+                                    op.CompletedAsync += delegate(object s2,EventArgs<GetHostsAddressesAsyncOP> e2){
+                                        LookupCompleted(op,name_to_index_map);
+                                    };
+                                    // Lookup completed synchronously.
+                                    if(!dnsClient.GetHostsAddressesAsync(op)){
+                                        LookupCompleted(op,name_to_index_map);
+                                    }
+                                }
+                            }
+                            // DNS server returned error, just return error.
+                            else{
+                                m_pException = new DNS_ClientException(e1.Value.Response.ResponseCode);
+
+                                SetState(AsyncOP_State.Completed);
+                                OnCompletedAsync();
+                            }
+                        }
+                        transaction_MX.Timeout += delegate(object s2,EventArgs e2){
+                            m_pException = new IOException("DNS transaction timeout, no response from DNS server.");
+
+                            SetState(AsyncOP_State.Completed);
+                            OnCompletedAsync();
+                        };
+                    }
+                    catch(Exception x){
+                        m_pException = x;
+
+                        SetState(AsyncOP_State.Completed);
+                        OnCompletedAsync();
+                    }
+                };
+                transaction_MX.Start();
+            }
+
+            #endregion
+
+            #region method Get_A_or_AAAA_FromResponse
+
+            /// <summary>
+            /// Gets A and AAAA records from DNS server additional responses section.
+            /// </summary>
+            /// <param name="name">Host name.</param>
+            /// <param name="response">DNS server response.</param>
+            /// <returns>Returns A and AAAA records from DNS server additional responses section.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>name</b> or <b>response</b> is null reference.</exception>
+            private IPAddress[] Get_A_or_AAAA_FromResponse(string name,DnsServerResponse response)
+            {
+                if(name == null){
+                    throw new ArgumentNullException("name");
+                }
+                if(response == null){
+                    throw new ArgumentNullException("response");
+                }
+
+                List<IPAddress> aList = new List<IPAddress>();
+                List<IPAddress> aaaaList = new List<IPAddress>();
+
+                foreach(DNS_rr rr in response.AdditionalAnswers){
+                    if(string.Equals(name,rr.Name,StringComparison.InvariantCultureIgnoreCase)){
+                        if(rr is DNS_rr_A){
+                            aList.Add(((DNS_rr_A)rr).IP);
+                        }
+                        else if(rr is DNS_rr_AAAA){
+                            aaaaList.Add(((DNS_rr_AAAA)rr).IP);
+                        }
+                    }
+                }
+
+                // We list IPv4 first and then IPv6 addresses.
+                aList.AddRange(aaaaList);
+
+                return aList.ToArray();
+            }
+
+            #endregion
+
+            #region method LookupCompleted
+
+            /// <summary>
+            /// This method is called when A/AAAA lookup has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            /// <param name="name_to_index">Dns name to index lookup table.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>op</b> or <b>name_to_index</b> is null reference value.</exception>
+            private void LookupCompleted(GetHostsAddressesAsyncOP op,Dictionary<string,int> name_to_index)
+            {
+                if(op == null){
+                    throw new ArgumentNullException("op");
+                }
+
+                if(op.Error != null){
+                    m_pException = op.Error;
+                }
+                else{
+                    foreach(HostEntry host in op.HostEntries){
+                        m_pHosts[name_to_index[host.HostName]] = host;
+                    }
+                }
+
+                op.Dispose();
+
+                SetState(AsyncOP_State.Completed);
+                OnCompletedAsync();
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                m_State = state;
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            /// <summary>
+            /// Gets email domain.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            public string EmailDomain
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+
+                    return m_Domain; 
+                }
+            }
+
+            /// <summary>
+            /// Gets email hosts. Hosts are in priority order.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public HostEntry[] Hosts
+            {
+                get{
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+                    if(m_pException != null){
+                        throw m_pException;
+                    }
+
+                    return m_pHosts; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<GetEmailHostsAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<GetEmailHostsAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Starts getting email hosts.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="GetEmailHostsAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        public bool GetEmailHostsAsync(GetEmailHostsAsyncOP op)
+        {         
+            if(m_IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+   
+            return op.Start(this);
         }
 
         #endregion
 
 
-        #region static method Resolve
+        #region [obsolete] static method Resolve
 
         /// <summary>
         /// Resolves host names to IP addresses.
@@ -313,6 +1456,7 @@ namespace LumiSoft.Net.DNS.Client
         /// <param name="hosts">Host names to resolve.</param>
         /// <returns>Returns specified hosts IP addresses.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>hosts</b> is null.</exception>
+        [Obsolete("Use Dns_Client.GetHostAddresses instead.")]
         public static IPAddress[] Resolve(string[] hosts)
         {
             if(hosts == null){
@@ -338,6 +1482,7 @@ namespace LumiSoft.Net.DNS.Client
 		/// <param name="host">Host name or IP address.</param>
 		/// <returns>Return specified host IP addresses.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>host</b> is null.</exception>
+        [Obsolete("Use Dns_Client.GetHostAddresses instead.")]
 		public static IPAddress[] Resolve(string host)
 		{
             if(host == null){
