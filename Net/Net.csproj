@@ -108,8 +108,11 @@
     </Compile>
     <Compile Include="AsyncOP.cs" />
     <None Include="Media\Codec\Audio\ILBC.cs" />
+    <Compile Include="AsyncOP_State.cs" />
     <Compile Include="DNS\Client\DNS_ClientTransaction.cs" />
     <Compile Include="DNS\Client\DNS_ClientTransactionState.cs" />
+    <Compile Include="HostEntry.cs" />
+    <Compile Include="IAsyncOP.cs" />
     <Compile Include="Media\_WaveIn.cs" />
     <Compile Include="UDP\UDP_DataReceiver.cs" />
     <Compile Include="UDP\UDP_e_PacketReceived.cs" />
