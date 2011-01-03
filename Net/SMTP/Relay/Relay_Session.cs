@@ -264,36 +264,31 @@ namespace LumiSoft.Net.SMTP.Relay
 
                 LogText("Starting to relay message '" + m_pRelayItem.MessageID + "' from '" + m_pRelayItem.From + "' to '" + m_pRelayItem.To + "'.");
 
-                // Get all possible target hosts for active recipient.
-                List<string> targetHosts = new List<string>();                
+                // Resolve email target hosts.               
                 if(m_RelayMode == Relay_Mode.Dns){
-                    foreach(string host in GetDomainHosts(m_pRelayItem.To)){
-                        try{
-                            foreach(IPAddress ip in Dns_Client.Resolve(host)){
-                                m_pTargets.Add(new Relay_Target(host,new IPEndPoint(ip,25)));                                
-                            }
-                        }
-                        catch{
-                            // Failed to resolve host name.
-                            
-                            LogText("Failed to resolve host '" + host + "' name.");
-                        }
+                    Dns_Client.GetEmailHostsAsyncOP op = new Dns_Client.GetEmailHostsAsyncOP(m_pRelayItem.To);
+                    op.CompletedAsync += delegate(object s1,EventArgs<Dns_Client.GetEmailHostsAsyncOP> e1){
+                        EmailHostsResolveCompleted(m_pRelayItem.To,op);
+                    };
+                    if(!m_pServer.DnsClient.GetEmailHostsAsync(op)){
+                        EmailHostsResolveCompleted(m_pRelayItem.To,op);
                     }
                 }
+                // Resolve smart hosts IP addresses.
                 else if(m_RelayMode == Relay_Mode.SmartHost){
-                    foreach(Relay_SmartHost smartHost in m_pSmartHosts){
-                        try{
-                            m_pTargets.Add(new Relay_Target(smartHost.Host,new IPEndPoint(Dns_Client.Resolve(smartHost.Host)[0],smartHost.Port),smartHost.SslMode,smartHost.UserName,smartHost.Password));                            
-                        }
-                        catch{
-                            // Failed to resolve smart host name.
-                            
-                            LogText("Failed to resolve smart host '" + smartHost.Host + "' name.");
-                        }
+                    string[] smartHosts = new string[m_pSmartHosts.Length];
+                    for(int i=0;i<m_pSmartHosts.Length;i++){
+                        smartHosts[i] = m_pSmartHosts[i].Host;
                     }
-                }
-                                
-                BeginConnect();
+
+                    Dns_Client.GetHostsAddressesAsyncOP op = new Dns_Client.GetHostsAddressesAsyncOP(smartHosts);
+                    op.CompletedAsync += delegate(object s1,EventArgs<Dns_Client.GetHostsAddressesAsyncOP> e1){
+                        SmartHostsResolveCompleted(op);
+                    };
+                    if(!m_pServer.DnsClient.GetHostsAddressesAsync(op)){
+                        SmartHostsResolveCompleted(op);
+                    }
+                } 
             }
             catch(Exception x){
                 Dispose(x);
@@ -340,8 +335,80 @@ namespace LumiSoft.Net.SMTP.Relay
         }
 
         #endregion
-        
-        
+
+
+        #region method EmailHostsResolveCompleted
+
+        /// <summary>
+        /// Is called when email domain target servers resolve operation has completed.
+        /// </summary>
+        /// <param name="to">RCPT TO: address.</param>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>to</b> or <b>op</b> is null reference.</exception>
+        private void EmailHostsResolveCompleted(string to,Dns_Client.GetEmailHostsAsyncOP op)
+        {
+            if(to == null){
+                throw new ArgumentNullException("to");
+            }
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            
+            if(op.Error != null){
+                LogText("Failed to resolve email domain for email address '" + to + "' with error: " + op.Error.Message + ".");
+
+                Dispose(op.Error);
+            }
+            else{
+                foreach(HostEntry host in op.Hosts){
+                    foreach(IPAddress ip in host.Addresses){
+                        m_pTargets.Add(new Relay_Target(host.HostName,new IPEndPoint(ip,25)));
+                    }
+                }
+
+                BeginConnect();
+            }
+
+            op.Dispose();
+        }
+
+        #endregion
+
+        #region method SmartHostsResolveCompleted
+
+        /// <summary>
+        /// Is called when smart hosts ip addresses resolve operation has completed.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        private void SmartHostsResolveCompleted(Dns_Client.GetHostsAddressesAsyncOP op)
+        {
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+
+            if(op.Error != null){
+                LogText("Failed to resolve relay smart host(s) ip addresses with error: " + op.Error.Message + ".");
+
+                Dispose(op.Error);
+            }
+            else{
+                for(int i=0;i<op.HostEntries.Length;i++){
+                    Relay_SmartHost smartHost = m_pSmartHosts[i];
+
+                    foreach(IPAddress ip in op.HostEntries[i].Addresses){
+                        m_pTargets.Add(new Relay_Target(smartHost.Host,new IPEndPoint(ip,smartHost.Port),smartHost.SslMode,smartHost.UserName,smartHost.Password));
+                    }
+                }                
+
+                BeginConnect();
+            }
+
+            op.Dispose();
+        }
+
+        #endregion
+
         #region method BeginConnect
 
         /// <summary>
@@ -672,7 +739,7 @@ namespace LumiSoft.Net.SMTP.Relay
         }
 
         #endregion
-
+// REMOVE ME:
         #region method GetDomainHosts
 
         /// <summary>
