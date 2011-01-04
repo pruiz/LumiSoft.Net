@@ -128,12 +128,17 @@ namespace LumiSoft.Net.Mail
                 else if(r.StartsWith("(")){
                     r.ReadParenthesized();
                 }
-                // We have date-time.
+                // We have date-time or unknown-data.
                 else if(r.StartsWith(";")){
                     // Eat ';'
                     r.Char(false);
 
-                    retVal.m_Time = MIME_Utils.ParseRfc2822DateTime(r.ToEnd());
+                    try{
+                        retVal.m_Time = MIME_Utils.ParseRfc2822DateTime(r.QuotedReadToDelimiter(new char[]{';'}));
+                    }
+                    catch{
+                        // We hane some unknown data, skip it.
+                    }
                 }
                 else{
                     // We have some unexpected char like: .,= ... . Just eat it.
