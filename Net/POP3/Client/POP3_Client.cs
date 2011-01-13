@@ -98,13 +98,16 @@ namespace LumiSoft.Net.POP3.Client
             catch{
             }
 
+
+            m_GreetingText       = "";
+            m_ApopHashKey        = "";
+            m_pExtCapabilities   = new List<string>();
+            m_IsUidlSupported    = false;
             if(m_pMessages != null){
                 m_pMessages.Dispose();
                 m_pMessages = null;
-            }            
-            m_ApopHashKey = "";
-            m_pExtCapabilities.Clear();
-            m_IsUidlSupported = false;
+            } 
+            m_pAuthdUserIdentity = null;
 		}
 
 		#endregion
