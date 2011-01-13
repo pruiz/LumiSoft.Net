@@ -405,6 +405,12 @@ namespace LumiSoft.Net.IMAP.Client
             }
             catch{
             }
+
+            // Reset state varibles.
+            m_pAuthenticatedUser = null;
+            m_GreetingText       = "";
+            m_CommandIndex       = 1;
+            m_pSelectedFolder    = null;
 		}
 
 		#endregion
