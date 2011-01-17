@@ -2569,10 +2569,10 @@ namespace LumiSoft.Net.IO
         #region method WritePeriodTerminated
 
         /// <summary>
-        /// Reads all data from the source <b>stream</b> and writes it to stream. Period handling and period terminator is added as required.
+        /// Writes period handled and terminated data to this stream.
         /// </summary>
-        /// <param name="stream">Source stream which data to write to stream.</param>
-        /// <returns>Returns number of bytes written to source stream.</returns>
+        /// <param name="stream">Source stream. Reading starts from stream current location.</param>
+        /// <returns>Returns number of bytes written to stream.</returns>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
         /// <exception cref="ArgumentNullException">Is raised when <b>stream</b> is null.</exception>
         /// <exception cref="LineSizeExceededException">Is raised when <b>stream</b> has too big line.</exception>        
@@ -2585,47 +2585,364 @@ namespace LumiSoft.Net.IO
                 throw new ArgumentNullException("stream");
             }
 
-            // We need to read lines, do period handling and write them to stream.
-            bool            lineEndsCRLF = false;
-            long            totalWritten = 0;
-            byte[]          buffer       = new byte[m_BufferSize];
-            ReadLineAsyncOP readLineOP   = new ReadLineAsyncOP(buffer,SizeExceededAction.ThrowException);
-            SmartStream     reader       = new SmartStream(stream,false);
-            while(true){
-                reader.ReadLine(readLineOP,false);
-                if(readLineOP.Error != null){
-                    throw readLineOP.Error;
-                }
-                // We reached end of stream, no more data.
-                if(readLineOP.BytesInBuffer == 0){
-                    break;
-                }
-                                
-                // Period handling. If line starts with period(.), additional period is added.
-                if(readLineOP.LineBytesInBuffer > 0 && buffer[0] == '.'){          
-                    // Add additional period.
-                    Write(new byte[]{(byte)'.'},0,1);
-                    totalWritten++;
+            ManualResetEvent wait = new ManualResetEvent(false);
+            WritePeriodTerminatedAsyncOP op = new WritePeriodTerminatedAsyncOP(stream);
+            op.CompletedAsync += delegate(object s1,EventArgs<WritePeriodTerminatedAsyncOP> e1){
+                wait.Set();
+            };
+            if(!this.WritePeriodTerminatedAsync(op)){
+                wait.Set();
+            }
+            wait.WaitOne();
+
+            if(op.Error != null){
+                throw op.Error;
+            }
+            else{
+                return op.BytesWritten;
+            }
+        }
+
+        #endregion
+        
+        #region method WritePeriodTerminatedAsync
+
+        #region class WritePeriodTerminatedAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="SmartStream.WritePeriodTerminatedAsync"/> asynchronous operation.
+        /// </summary>
+        public class WritePeriodTerminatedAsyncOP : IDisposable,IAsyncOP
+        {
+            private object          m_pLock         = new object();
+            private AsyncOP_State   m_State         = AsyncOP_State.WaitingForStart;
+            private Exception       m_pException    = null;
+            private SmartStream     m_pStream       = null;
+            private SmartStream     m_pOwner        = null;
+            private ReadLineAsyncOP m_pReadLineOP   = null;
+            private int             m_BytesWritten  = 0;
+            private bool            m_EndsCRLF      = false;
+            private bool            m_RiseCompleted = false;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="stream">Source stream. Reading starts from stream current location.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>stream</b> is null reference.</exception>
+            public WritePeriodTerminatedAsyncOP(Stream stream)
+            {
+                if(stream == null){
+                    throw new ArgumentNullException("stream");
                 }
 
+                m_pStream = new SmartStream(stream,false);
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resources being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
                 
-                // Write line to source stream.
-                Write(buffer,0,readLineOP.BytesInBuffer);
-                totalWritten += readLineOP.BytesInBuffer;
-                lineEndsCRLF = (readLineOP.Buffer[readLineOP.BytesInBuffer - 1] == '\n');
+                m_pException  = null;
+                m_pStream     = null;
+                m_pOwner      = null;
+                m_pReadLineOP = null;
+
+                this.CompletedAsync = null;
             }
 
-            // Provided data didn't end with CRLF, add it automatically.
-            if(!lineEndsCRLF){
-                WriteLine("");
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner SmartStream.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            internal bool Start(SmartStream owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+
+                m_pOwner = owner;
+
+                SetState(AsyncOP_State.Active);
+
+                try{
+                    // Read line.
+                    m_pReadLineOP = new ReadLineAsyncOP(new byte[32000],SizeExceededAction.ThrowException);
+                    m_pReadLineOP.Completed += delegate(object s,EventArgs<ReadLineAsyncOP> e){
+                        ReadLineCompleted(m_pReadLineOP);
+                    };
+                    if(m_pStream.ReadLine(m_pReadLineOP,true)){
+                        ReadLineCompleted(m_pReadLineOP);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    SetState(AsyncOP_State.Completed);
+                    m_pReadLineOP.Dispose();
+                }
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
             }
 
-            // Write period terminator.
-            WriteLine(".");
+            #endregion
 
-            Flush();
 
-            return totalWritten;
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method ReadLineCompleted
+
+            /// <summary>
+            /// Is called when source stream read line reading has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            private void ReadLineCompleted(ReadLineAsyncOP op)
+            {
+                try{
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                        SetState(AsyncOP_State.Completed);
+                    }
+                    else{
+                        // We have readed all source stream data, we are done.
+                        if(op.BytesInBuffer == 0){
+                            // Line ends CRLF.
+                            if(m_EndsCRLF){
+                                m_BytesWritten += 3;
+                                m_pOwner.BeginWrite(new byte[]{(byte)'.',(byte)'\r',(byte)'\n'},0,3,this.SendTerminatorCompleted,null);
+                            }
+                            // Line doesn't end CRLF, we need to add it.
+                            else{
+                                m_BytesWritten += 5;
+                                m_pOwner.BeginWrite(new byte[]{(byte)'\r',(byte)'\n',(byte)'.',(byte)'\r',(byte)'\n'},0,3,this.SendTerminatorCompleted,null);
+                            }
+
+                            op.Dispose();
+                        }
+                        // Write readed line.
+                        else{
+                            m_BytesWritten += op.BytesInBuffer;
+
+                            // Check if line ends CRLF.
+                            if(op.BytesInBuffer >= 2 && op.Buffer[op.BytesInBuffer - 2] == '\r' && op.Buffer[op.BytesInBuffer - 1] == '\n'){
+                                m_EndsCRLF = true;
+                            }
+                            else{
+                                m_EndsCRLF = false;
+                            }
+
+                            // Period handling. If line starts with period(.), additional period is added.
+                            if(op.Buffer[0] == '.'){
+                                byte[] buffer = new byte[op.BytesInBuffer + 1];
+                                buffer[0] = (byte)'.';
+                                Array.Copy(op.Buffer,0,buffer,1,op.BytesInBuffer);
+
+                                m_pOwner.BeginWrite(buffer,0,buffer.Length,this.SendLineCompleted,null);
+                            }
+                            // Normal line.
+                            else{
+                                m_pOwner.BeginWrite(op.Buffer,0,op.BytesInBuffer,this.SendLineCompleted,null);
+                            }
+                        }
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    SetState(AsyncOP_State.Completed);
+                    op.Dispose();
+                }
+            }
+
+            #endregion
+
+            #region method SendLineCompleted
+
+            /// <summary>
+            /// Is called when line sending has completed.
+            /// </summary>
+            /// <param name="ar">Asynchronous result.</param>
+            private void SendLineCompleted(IAsyncResult ar)
+            {
+                try{
+                    m_pOwner.EndWrite(ar);
+
+                    // Read next line.
+                    // We already have attahed m_pReadLineOP.Completed in start method, so skip it here.
+                    // m_pReadLineOP.Completed += delegate(object s,EventArgs<ReadLineAsyncOP> e){                        
+                    if(m_pStream.ReadLine(m_pReadLineOP,true)){
+                        ReadLineCompleted(m_pReadLineOP);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    SetState(AsyncOP_State.Completed);
+                }
+            }
+
+            #endregion
+
+            #region method SendTerminatorCompleted
+
+            /// <summary>
+            /// Is called when ".CRLF" or "CRLF.CRLF" terminator sending has completed.
+            /// </summary>
+            /// <param name="ar">Asynchronous result.</param>
+            private void SendTerminatorCompleted(IAsyncResult ar)
+            {
+                try{
+                    m_pOwner.EndWrite(ar);                    
+                }
+                catch(Exception x){
+                    m_pException = x;
+                }
+
+                SetState(AsyncOP_State.Completed);
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            /// <summary>
+            /// Gets number of bytes written.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public int BytesWritten
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Socket' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+                    if(m_pException != null){
+                        throw m_pException;
+                    }
+
+                    return m_BytesWritten; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<WritePeriodTerminatedAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<WritePeriodTerminatedAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Starts writing period handled and terminated data to this stream.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="WritePeriodTerminatedAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        public bool WritePeriodTerminatedAsync(WritePeriodTerminatedAsyncOP op)
+        {
+            if(this.m_IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+
+            return op.Start(this);
         }
 
         #endregion
@@ -2827,6 +3144,40 @@ namespace LumiSoft.Net.IO
 
                 return countToCopy;
             }
+        }
+
+        #endregion
+
+        #region override method BeginWrite
+
+        /// <summary>
+        /// Begins an asynchronous write operation.
+        /// </summary>
+        /// <param name="buffer">The buffer to write data from.</param>
+        /// <param name="offset">The byte offset in buffer from which to begin writing.</param>
+        /// <param name="count">The maximum number of bytes to write.</param>
+        /// <param name="callback">An optional asynchronous callback, to be called when the write is complete.</param>
+        /// <param name="state">A user-provided object that distinguishes this particular asynchronous write request from other requests.</param>
+        /// <returns>An IAsyncResult that represents the asynchronous write, which could still be pending.</returns>
+        public override IAsyncResult BeginWrite(byte[] buffer,int offset,int count,AsyncCallback callback,object state)
+        {
+            m_LastActivity  = DateTime.Now;
+            m_BytesWritten += count;
+
+            return m_pStream.BeginWrite(buffer, offset, count, callback, state);
+        }
+
+        #endregion
+
+        #region override method EndWrite
+
+        /// <summary>
+        /// Ends an asynchronous write operation.
+        /// </summary>
+        /// <param name="asyncResult">A reference to the outstanding asynchronous I/O request.</param>
+        public override void EndWrite(IAsyncResult asyncResult)
+        {
+            m_pStream.EndWrite(asyncResult);
         }
 
         #endregion
