@@ -114,6 +114,7 @@
     <Compile Include="HostEntry.cs" />
     <Compile Include="IAsyncOP.cs" />
     <Compile Include="Media\_WaveIn.cs" />
+    <Compile Include="SMTP\SMTP_t_ReplyLine.cs" />
     <Compile Include="UDP\UDP_DataReceiver.cs" />
     <Compile Include="UDP\UDP_e_PacketReceived.cs" />
     <Compile Include="UPnP\UPnP_Exception.cs" />
