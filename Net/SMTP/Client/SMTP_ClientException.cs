@@ -9,8 +9,7 @@ namespace LumiSoft.Net.SMTP.Client
     /// </summary>
     public class SMTP_ClientException : Exception
     {
-        private int    m_StatusCode   = 500;
-        private string m_ResponseText = "";
+        private SMTP_t_ReplyLine[] m_pReplyLines  = null;
 
         /// <summary>
         /// Default constructor.
@@ -23,15 +22,21 @@ namespace LumiSoft.Net.SMTP.Client
                 throw new ArgumentNullException("responseLine");
             }
 
-            string[] code_text = responseLine.Split(new char[]{' ','-'},2);
-            try{
-                m_StatusCode = Convert.ToInt32(code_text[0]);
+            m_pReplyLines = new SMTP_t_ReplyLine[]{SMTP_t_ReplyLine.Parse(responseLine)};
+        }
+
+        /// <summary>
+        /// Default constructor.
+        /// </summary>
+        /// <param name="replyLines">SMTP server error reply lines.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>replyLines</b> is null reference.</exception>
+        public SMTP_ClientException(SMTP_t_ReplyLine[] replyLines) : base(replyLines[0].ToString())
+        {
+            if(replyLines == null){
+                throw new ArgumentNullException("replyLines");
             }
-            catch{
-            }
-            if(code_text.Length == 2){
-                m_ResponseText =  code_text[1];                
-            }
+
+            m_pReplyLines = replyLines;            
         }
 
 
@@ -40,17 +45,27 @@ namespace LumiSoft.Net.SMTP.Client
         /// <summary>
         /// Gets SMTP status code.
         /// </summary>
+        [Obsolete("Use property 'ReplyLines' insead.")]
         public int StatusCode
         {
-            get{ return m_StatusCode; }
+            get{ return m_pReplyLines[0].ReplyCode; }
         }
 
         /// <summary>
         /// Gets SMTP server response text after status code.
         /// </summary>
+        [Obsolete("Use property 'ReplyLines' insead.")]
         public string ResponseText
         {
-            get{ return m_ResponseText; }
+            get{ return m_pReplyLines[0].Text; }
+        }
+
+        /// <summary>
+        /// Gets SMTP server error reply lines.
+        /// </summary>
+        public SMTP_t_ReplyLine[] ReplyLines
+        {
+            get{ return m_pReplyLines; }
         }
 
         /// <summary>
@@ -59,7 +74,7 @@ namespace LumiSoft.Net.SMTP.Client
         public bool IsPermanentError
         {
             get{
-                if(m_StatusCode >= 500 && m_StatusCode <= 599){
+                if(m_pReplyLines[0].ReplyCode >= 500 && m_pReplyLines[0].ReplyCode <= 599){
                     return true;
                 }
                 else{
