@@ -49,16 +49,7 @@ namespace LumiSoft.Net.Mime.vCard
                 Any COMMA or SEMICOLON in a text type value must be backslash escaped.
             */
 
-            // FIX ME: this must be done with structured fields
-            //value = value.Replace("\r\n","\n").Replace("\n","\\n");
-            //value = TextUtils.EscapeString(value,new char[]{',',';'});
-
-            bool needEncode = false;
-            if(!Net_Utils.IsAscii(value)){
-                needEncode = true;
-            }
-
-            if(needEncode){
+            if(NeedEncode(value)){
                 // Remove encoding and charset parameters
                 string newParmString = "";
                 string[] parameters = m_Parameters.ToLower().Split(';');
@@ -98,6 +89,33 @@ namespace LumiSoft.Net.Mime.vCard
             else{
                 return m_Name + ":" + FoldData(m_Value);
             }
+        }
+
+        #endregion
+
+
+        #region method NeedEncode
+
+        /// <summary>
+        /// CHecks if specified value must be encoded.
+        /// </summary>
+        /// <param name="value">String value.</param>
+        /// <returns>Returns true if value must be encoded, otherwise false.</returns>
+        private bool NeedEncode(string value)
+        {
+            // We have 8-bit chars.
+            if(!Net_Utils.IsAscii(value)){
+                return true;
+            }
+
+            // Allow only prontable chars and whitespaces.
+            foreach(char c in value){
+                if(!(char.IsLetterOrDigit(c) || char.IsWhiteSpace(c))){
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         #endregion
@@ -158,7 +176,7 @@ namespace LumiSoft.Net.Mime.vCard
         }
 
         #endregion
-
+        
 
         #region Properties Implementation
 
