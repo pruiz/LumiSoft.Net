@@ -3,9 +3,13 @@ using System.IO;
 using System.Collections.Generic;
 using System.Text;
 using System.Net;
+using System.Net.Security;
 using System.Security.Principal;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using System.Threading;
 
+using LumiSoft.Net.IO;
 using LumiSoft.Net.TCP;
 using LumiSoft.Net.AUTH;
 using LumiSoft.Net.DNS;
@@ -17,7 +21,7 @@ using LumiSoft.Net.Mime;
 namespace LumiSoft.Net.SMTP.Client
 {
     /// <summary>
-    /// This class implements SMTP client. Defined in RFC 2821.
+    /// This class implements SMTP client. Defined in RFC 5321.
     /// </summary>
 	/// <example>
     /// Simple way:
@@ -28,7 +32,7 @@ namespace LumiSoft.Net.SMTP.Client
 	/// */
     /// 
     /// // You can send any valid SMTP message here, from disk,memory, ... or
-    /// // you can use LumiSoft.Net.Mime mime classes to compose valid SMTP mail message.
+    /// // you can use LumiSoft.Net.Mail classes to compose valid SMTP mail message.
     /// 
     /// // SMTP_Client.QuickSendSmartHost(...
     /// or
@@ -42,13 +46,10 @@ namespace LumiSoft.Net.SMTP.Client
 	///  using LumiSoft.Net.SMTP.Client; 
 	/// */
 	/// 
-	/// using(SMTP_Client smtp = new SMTP_Client()){
-    ///     // If you have registered DNS host name, set it here before connecting.
-    ///     // That name will be reported to SMTP server.
-    ///     // smtp.LocalHostName = "mail.domain.com";
-    ///     
-    ///     // You can use SMTP_Client.GetDomainHosts(... to get target receipient SMTP hosts for Connect method.
+	/// using(SMTP_Client smtp = new SMTP_Client()){      
+    ///     // You can use Dns_Client.GetEmailHosts(... to get target recipient SMTP hosts for Connect method.
 	///		smtp.Connect("hostName",WellKnownPorts.SMTP); 
+    ///		smtp.EhloHelo("mail.domain.com");
     ///     // Authenticate if target server requires.
     ///     // smtp.Authenticate("user","password");
     ///     smtp.MailFrom("sender@domain.com");
@@ -57,8 +58,10 @@ namespace LumiSoft.Net.SMTP.Client
     /// 
     ///     // Send message to server.
     ///     // You can send any valid SMTP message here, from disk,memory, ... or
-    ///     // you can use LumiSoft.Net.Mime mieclasses to compose valid SMTP mail message.
+    ///     // you can use LumiSoft.Net.Mail classes to compose valid SMTP mail message.
     ///     // smtp.SendMessage(.... .
+    ///     
+    ///     smtp.Disconnect();
 	///	}
 	/// </code>
 	/// </example>
@@ -72,8 +75,7 @@ namespace LumiSoft.Net.SMTP.Client
         private string          m_MailFrom           = null;
         private List<string>    m_pRecipients        = null;
         private GenericIdentity m_pAuthdUserIdentity = null;
-        private bool            m_BdatEnabled        = true;
-
+        
         /// <summary>
         /// Default constructor.
         /// </summary>
@@ -93,10 +95,10 @@ namespace LumiSoft.Net.SMTP.Client
 
 		#endregion
 
-
+                
         #region override method Disconnect
 
-		/// <summary>
+        /// <summary>
 		/// Closes connection to SMTP server.
 		/// </summary>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
@@ -113,6 +115,9 @@ namespace LumiSoft.Net.SMTP.Client
 			try{
                 // Send QUIT command to server.                
                 WriteLine("QUIT");
+
+                // Read QUIT response.
+                ReadLine();
 			}
 			catch{
 			}
@@ -135,86 +140,19 @@ namespace LumiSoft.Net.SMTP.Client
 
 		#endregion
 
-        #region method BeginNoop
+        #region method EhloHelo
 
         /// <summary>
-        /// Internal helper method for asynchronous Noop method.
+        /// Sends EHLO/HELO command to SMTP server.
         /// </summary>
-        private delegate void NoopDelegate();
-
-        /// <summary>
-        /// Starts sending NOOP command to server. This method can be used for keeping connection alive(not timing out).
-        /// </summary>
-        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
-        /// <param name="state">User data.</param>
-        /// <returns>An IAsyncResult that references the asynchronous operation.</returns>
+        /// <param name="hostName">Local host DNS name.</param>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
         /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
-        public IAsyncResult BeginNoop(AsyncCallback callback,object state)
-        {
-            if(this.IsDisposed){
-                throw new ObjectDisposedException(this.GetType().Name);
-            }
-            if(!this.IsConnected){
-				throw new InvalidOperationException("You must connect first.");
-			}
-
-            NoopDelegate asyncMethod = new NoopDelegate(this.Noop);
-            AsyncResultState asyncState = new AsyncResultState(this,asyncMethod,callback,state);
-            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(new AsyncCallback(asyncState.CompletedCallback),null));
-
-            return asyncState;
-        }
-
-        #endregion
-
-        #region method EndNoop
-
-        /// <summary>
-        /// Ends a pending asynchronous Noop request.
-        /// </summary>
-        /// <param name="asyncResult">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
-        /// <exception cref="ArgumentNullException">Is raised when <b>asyncResult</b> is null.</exception>
-        /// <exception cref="ArgumentException">Is raised when invalid <b>asyncResult</b> passed to this method.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>hostName</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
-        public void EndNoop(IAsyncResult asyncResult)
-        {
-            if(this.IsDisposed){
-                throw new ObjectDisposedException(this.GetType().Name);
-            }
-            if(asyncResult == null){
-                throw new ArgumentNullException("asyncResult");
-            }
-
-            AsyncResultState castedAsyncResult = asyncResult as AsyncResultState;
-            if(castedAsyncResult == null || castedAsyncResult.AsyncObject != this){
-                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginNoop method.");
-            }
-            if(castedAsyncResult.IsEndCalled){
-                throw new InvalidOperationException("BeginNoop was previously called for the asynchronous connection.");
-            }
-             
-            castedAsyncResult.IsEndCalled = true;
-            if(castedAsyncResult.AsyncDelegate is NoopDelegate){
-                ((NoopDelegate)castedAsyncResult.AsyncDelegate).EndInvoke(castedAsyncResult.AsyncResult);
-            }
-            else{
-                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginNoop method.");
-            }
-        }
-
-        #endregion
-
-        #region method Noop
-
-        /// <summary>
-        /// Send NOOP command to server. This method can be used for keeping connection alive(not timing out).
-        /// </summary>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
-        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
-        public void Noop()
+        /// <remarks>NOTE: EHLO command will reset all SMTP session state data.</remarks>
+        public void EhloHelo(string hostName)
         {
             if(this.IsDisposed){
                 throw new ObjectDisposedException(this.GetType().Name);
@@ -222,221 +160,865 @@ namespace LumiSoft.Net.SMTP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("You must connect first.");
             }
-
-            /* RFC 2821 4.1.1.9 NOOP.
-                This command does not affect any parameters or previously entered
-                commands.  It specifies no action other than that the receiver send
-                an OK reply.
-
-                Syntax:
-                    "NOOP" [ SP String ] CRLF
-            */
-
-            WriteLine("NOOP"); 
-
-			string line = ReadLine();
-			if(!line.StartsWith("250")){
-				throw new SMTP_ClientException(line);
-			}
-        }
-
-        #endregion
-
-        #region method BeginStartTLS
-
-        /// <summary>
-        /// Internal helper method for asynchronous StartTLS method.
-        /// </summary>
-        private delegate void StartTLSDelegate();
-
-        /// <summary>
-        /// Starts switching to SSL.
-        /// </summary>
-        /// <returns>An IAsyncResult that references the asynchronous operation.</returns>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected or is already secure connection.</exception>
-        public IAsyncResult BeginStartTLS(AsyncCallback callback,object state)
-        {
-            if(this.IsDisposed){
-                throw new ObjectDisposedException(this.GetType().Name);
+            if(hostName == null){
+                throw new ArgumentNullException("hostName");
             }
-            if(!this.IsConnected){
-				throw new InvalidOperationException("You must connect first.");
-			}
-            if(this.IsSecureConnection){
-                throw new InvalidOperationException("Connection is already secure.");
+            if(hostName == string.Empty){
+                throw new ArgumentException("Argument 'hostName' value must be specified.","hostName");
             }
 
-            StartTLSDelegate asyncMethod = new StartTLSDelegate(this.StartTLS);
-            AsyncResultState asyncState = new AsyncResultState(this,asyncMethod,callback,state);
-            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(new AsyncCallback(asyncState.CompletedCallback),null));
-
-            return asyncState;
-        }
-
-        #endregion
-
-        #region method EndStartTLS
-
-        /// <summary>
-        /// Ends a pending asynchronous StartTLS request.
-        /// </summary>
-        /// <param name="asyncResult">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
-        /// <exception cref="ArgumentNullException">Is raised when <b>asyncResult</b> is null.</exception>
-        /// <exception cref="ArgumentException">Is raised when invalid <b>asyncResult</b> passed to this method.</exception>
-        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
-        public void EndStartTLS(IAsyncResult asyncResult)
-        {
-            if(this.IsDisposed){
-                throw new ObjectDisposedException(this.GetType().Name);
+            ManualResetEvent wait = new ManualResetEvent(false);
+            EhloHeloAsyncOP op = new EhloHeloAsyncOP(hostName);
+            op.CompletedAsync += delegate(object s1,EventArgs<EhloHeloAsyncOP> e1){
+                wait.Set();
+            };
+            if(!this.EhloHeloAsync(op)){
+                wait.Set();
             }
-            if(asyncResult == null){
-                throw new ArgumentNullException("asyncResult");
-            }
+            wait.WaitOne();
 
-            AsyncResultState castedAsyncResult = asyncResult as AsyncResultState;
-            if(castedAsyncResult == null || castedAsyncResult.AsyncObject != this){
-                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginReset method.");
-            }
-            if(castedAsyncResult.IsEndCalled){
-                throw new InvalidOperationException("BeginReset was previously called for the asynchronous connection.");
-            }
-             
-            castedAsyncResult.IsEndCalled = true;
-            if(castedAsyncResult.AsyncDelegate is StartTLSDelegate){
-                ((StartTLSDelegate)castedAsyncResult.AsyncDelegate).EndInvoke(castedAsyncResult.AsyncResult);
-            }
-            else{
-                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginReset method.");
+            if(op.Error != null){
+                throw op.Error;
             }
         }
 
         #endregion
 
-        #region method StartTLS
+        #region method EhloHeloAsync
+
+        #region class EhloHeloAsyncOP
 
         /// <summary>
-        /// Switches SMTP connection to SSL.
+        /// This class represents <see cref="SMTP_Client.EhloHeloAsync"/> asynchronous operation.
         /// </summary>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected or is already secure connection.</exception>
-        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
-        public void StartTLS()
+        public class EhloHeloAsyncOP : IDisposable,IAsyncOP
         {
-            /* RFC 2487 STARTTLS 5. STARTTLS Command.
-                STARTTLS with no parameters.
-                                          
-                After the client gives the STARTTLS command, the server responds with
-                one of the following reply codes:
+            private object             m_pLock         = new object();
+            private AsyncOP_State      m_State         = AsyncOP_State.WaitingForStart;
+            private Exception          m_pException    = null;
+            private string             m_HostName      = null;
+            private SMTP_Client        m_pSmtpClient   = null;
+            private SMTP_t_ReplyLine[] m_pReplyLines   = null;
+            private bool               m_RiseCompleted = false;
 
-                220 Ready to start TLS
-                501 Syntax error (no parameters allowed)
-                454 TLS not available due to temporary reason
-             
-               5.2 Result of the STARTTLS Command
-                Upon completion of the TLS handshake, the SMTP protocol is reset to
-                the initial state (the state in SMTP after a server issues a 220
-                service ready greeting). The server MUST discard any knowledge
-                obtained from the client, such as the argument to the EHLO command,
-                which was not obtained from the TLS negotiation itself. The client
-                MUST discard any knowledge obtained from the server, such as the list
-                of SMTP service extensions, which was not obtained from the TLS
-                negotiation itself. The client SHOULD send an EHLO command as the
-                first command after a successful TLS negotiation.
-            */
-
-            if(this.IsDisposed){
-                throw new ObjectDisposedException(this.GetType().Name);
-            }
-            if(!this.IsConnected){
-				throw new InvalidOperationException("You must connect first.");
-			}
-            if(this.IsSecureConnection){
-                throw new InvalidOperationException("Connection is already secure.");
-            }
-                        
-            WriteLine("STARTTLS");
-
-            string line = ReadLine();
-			if(!line.ToUpper().StartsWith("220")){
-				throw new SMTP_ClientException(line);
-			}
-
-            this.SwitchToSecure();
-
-            #region EHLO/HELO
-
-            // If local host name not specified, get local computer name.
-            string localHostName = m_LocalHostName;
-            if(string.IsNullOrEmpty(localHostName)){
-                localHostName = System.Net.Dns.GetHostName();
-            }
-
-            // Do EHLO/HELO.
-            WriteLine("EHLO " + localHostName);
-
-            // Read server response.
-            line = ReadLine();
-            if(line.StartsWith("250")){
-                m_IsEsmtpSupported = true;
-
-                /* RFC 2821 4.1.1.1 EHLO
-					Examples:
-                        C: EHLO domain<CRLF>
-				    	S: 250-domain freeText<CRLF>
-				        S: 250-EHLO_keyword<CRLF>
-						S: 250 EHLO_keyword<CRLF>
-				 
-						250<SP> specifies that last EHLO response line.
-			    */
-
-                // We may have 250- or 250 SP as domain separator.
-                // 250-
-                if(line.StartsWith("250-")){
-                    m_RemoteHostName = line.Substring(4).Split(new char[]{' '},2)[0];
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="hostName">Local host DNS name.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>hostName</b> is null reference.</exception>
+            /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+            public EhloHeloAsyncOP(string hostName)
+            {
+                if(hostName == null){
+                    throw new ArgumentNullException("hostName");
                 }
-                // 250 SP
-                else{
-                    m_RemoteHostName = line.Split(new char[]{' '},3)[1];
+                if(hostName == string.Empty){
+                    throw new ArgumentException("Argument 'hostName' value must be specified.","hostName");
                 }
 
-                m_pEsmtpFeatures = new List<string>();
-                // Read multiline response, EHLO keywords.
-                while(line.StartsWith("250-")){
-                    line = ReadLine();
-
-                    if(line.StartsWith("250")){
-                        m_pEsmtpFeatures.Add(line.Substring(4));
-                    }
-                }
+                m_HostName = hostName;
             }
-            // Probably EHLO not supported, try HELO.
-            else{
-                m_IsEsmtpSupported = false;
-                m_pEsmtpFeatures   = new List<string>();
 
-                WriteLine("HELO " + localHostName);
+            #region method Dispose
 
-                line = ReadLine();
-                if(line.StartsWith("250")){
-                    /* Rfc 2821 4.1.1.1 EHLO/HELO
-			            Syntax: "HELO" SP Domain CRLF
-                    
-                        Examples:
-                            C: HELO domain<CRLF>
-                            S: 250 domain freeText<CRLF>
-			        */
-
-                    m_RemoteHostName = line.Split(new char[]{' '},3)[1];
+            /// <summary>
+            /// Cleans up any resource being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
                 }
-                // Server rejects us for some reason.
-                else{
-                    throw new SMTP_ClientException(line);
+                SetState(AsyncOP_State.Disposed);
+                
+                m_pException  = null;
+                m_HostName    = null;
+                m_pSmtpClient = null;
+                m_pReplyLines = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner SMTP client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            internal bool Start(SMTP_Client owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+
+                m_pSmtpClient = owner;
+
+                SetState(AsyncOP_State.Active);
+
+                try{
+                    // NOTE: At frist we try EHLO command, if it fails we fallback to HELO.
+
+                    /* RFC 5321 4.1.1.1.
+                        ehlo        = "EHLO" SP ( Domain / address-literal ) CRLF  
+                     
+                        ehlo-ok-rsp = ( "250" SP Domain [ SP ehlo-greet ] CRLF )
+                                    / ( "250-" Domain [ SP ehlo-greet ] CRLF
+                                     *( "250-" ehlo-line CRLF )
+                                        "250" SP ehlo-line CRLF )
+                    */
+
+                    byte[] buffer = Encoding.UTF8.GetBytes("EHLO " + m_HostName + "\r\n");
+
+                    // Log
+                    m_pSmtpClient.LogAddWrite(buffer.Length,"EHLO " + m_HostName);
+
+                    // Start command sending.
+                    m_pSmtpClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.EhloCommandSendingCompleted,null);                    
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
                 }
             }
 
             #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method EhloCommandSendingCompleted
+
+            /// <summary>
+            /// Is called when EHLO command sending has finished.
+            /// </summary>
+            /// <param name="ar">Asynchronous result.</param>
+            private void EhloCommandSendingCompleted(IAsyncResult ar)
+            {
+                try{
+                    m_pSmtpClient.TcpStream.EndWrite(ar);
+
+                    // Read SMTP server response.
+                    ReadResponseAsyncOP readResponseOP = new ReadResponseAsyncOP();
+                    readResponseOP.CompletedAsync += delegate(object s,EventArgs<ReadResponseAsyncOP> e){
+                        EhloReadResponseCompleted(readResponseOP);
+                    };
+                    if(!m_pSmtpClient.ReadResponseAsync(readResponseOP)){
+                        EhloReadResponseCompleted(readResponseOP);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+            }
+
+            #endregion
+
+            #region method EhloReadResponseCompleted
+
+            /// <summary>
+            /// Is called when SMTP server EHLO command response reading has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+            private void EhloReadResponseCompleted(ReadResponseAsyncOP op)
+            {
+                if(op == null){
+                    throw new ArgumentNullException("op");
+                }
+
+                try{
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                        m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                        SetState(AsyncOP_State.Completed);
+                    }
+                    else{
+                        m_pReplyLines = op.ReplyLines;
+
+                        // EHLO succeeded.
+                        if(m_pReplyLines[0].ReplyCode == 250){
+                            /* RFC 5321 4.1.1.1.
+                                ehlo        = "EHLO" SP ( Domain / address-literal ) CRLF  
+                     
+                                ehlo-ok-rsp = ( "250" SP Domain [ SP ehlo-greet ] CRLF )
+                                            / ( "250-" Domain [ SP ehlo-greet ] CRLF
+                                             *( "250-" ehlo-line CRLF )
+                                                "250" SP ehlo-line CRLF )
+                            */
+
+                            m_pSmtpClient.m_RemoteHostName = m_pReplyLines[0].Text.Split(new char[]{' '},2)[0];
+                            m_pSmtpClient.m_IsEsmtpSupported = true;
+                            List<string> esmtpFeatures = new List<string>();
+                            foreach(SMTP_t_ReplyLine line in m_pReplyLines){
+                                esmtpFeatures.Add(line.Text);
+                            }
+                            m_pSmtpClient.m_pEsmtpFeatures = esmtpFeatures;
+
+                            SetState(AsyncOP_State.Completed);
+                        }
+                        // EHLO failed, try HELO(EHLO may be disabled or not supported)
+                        else{
+                            /* RFC 5321 4.1.1.1.
+                                helo        = "HELO" SP Domain CRLF
+                                helo-ok-rsp = "250" SP Domain [ SP helo-greet ] CRLF
+                            */
+
+                            // Log.
+                            m_pSmtpClient.LogAddText("EHLO failed, will try HELO.");
+                            
+                            byte[] buffer = Encoding.UTF8.GetBytes("HELO " + m_HostName + "\r\n");
+
+                            // Log
+                            m_pSmtpClient.LogAddWrite(buffer.Length,"HELO " + m_HostName);
+
+                            // Start command sending.
+                            m_pSmtpClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.HeloCommandSendingCompleted,null);
+                        }
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                op.Dispose();
+            }
+
+            #endregion
+
+            #region method HeloCommandSendingCompleted
+
+            /// <summary>
+            /// Is called when HELO command sending has finished.
+            /// </summary>
+            /// <param name="ar">Asynchronous result.</param>
+            private void HeloCommandSendingCompleted(IAsyncResult ar)
+            {
+                try{
+                    m_pSmtpClient.TcpStream.EndWrite(ar);
+
+                    // Read HELO command response.
+                    ReadResponseAsyncOP readResponseOP = new ReadResponseAsyncOP();
+                    readResponseOP.CompletedAsync += delegate(object s,EventArgs<ReadResponseAsyncOP> e){
+                        HeloReadResponseCompleted(readResponseOP);
+                    };
+                    if(!m_pSmtpClient.ReadResponseAsync(readResponseOP)){
+                        HeloReadResponseCompleted(readResponseOP);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+            }
+
+            #endregion
+
+            #region method HeloReadResponseCompleted
+
+            /// <summary>
+            /// Is called when SMTP server HELO command response reading has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+            private void HeloReadResponseCompleted(ReadResponseAsyncOP op)
+            {
+                if(op == null){
+                    throw new ArgumentNullException("op");
+                }
+
+                try{
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                        m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    }
+                    else{
+                        m_pReplyLines = op.ReplyLines;
+
+                        // HELO succeeded.
+                        if(m_pReplyLines[0].ReplyCode == 250){
+                            /* RFC 5321 4.1.1.1.
+                                helo        = "HELO" SP Domain CRLF
+                                helo-ok-rsp = "250" SP Domain [ SP helo-greet ] CRLF
+                            */
+
+                            m_pSmtpClient.m_RemoteHostName = m_pReplyLines[0].Text.Split(new char[]{' '},2)[0];
+                            m_pSmtpClient.m_IsEsmtpSupported = true;
+                            List<string> esmtpFeatures = new List<string>();
+                            foreach(SMTP_t_ReplyLine line in m_pReplyLines){
+                                esmtpFeatures.Add(line.Text);
+                            }
+                            m_pSmtpClient.m_pEsmtpFeatures = esmtpFeatures;
+                        }
+                        // HELO failed.
+                        else{
+                            m_pException = new SMTP_ClientException(op.ReplyLines);
+                            m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                        }
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                }
+
+                op.Dispose();
+
+                SetState(AsyncOP_State.Completed);
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            /// <summary>
+            /// Gets SMTP server reply-lines.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public SMTP_t_ReplyLine[] ReplyLines
+            {
+                get{
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'ReplyLines' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+                    if(m_pException != null){
+                        throw m_pException;
+                    }
+
+                    return m_pReplyLines;
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<EhloHeloAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<EhloHeloAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Starts sending EHLO/HELO command to SMTP server.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="EhloHeloAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        /// <remarks>NOTE: EHLO command will reset all SMTP session state data.</remarks>
+        public bool EhloHeloAsync(EhloHeloAsyncOP op)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("You must connect first.");
+            }
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+
+            return op.Start(this);
+        }
+
+        #endregion
+                
+        #region method StartTLS
+
+        /// <summary>
+        /// Sends STARTTLS command to SMTP server.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected or is already secure connection.</exception>
+        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
+        /// <remarks>After sucessfult STARTTLS all SMTP session data(EHLO,MAIL FROM, ....) will be reset.
+        /// If unknwon(not SMTP error) error happens during STARTTLS negotiation, SMTP client should disconnect.</remarks>
+        public void StartTLS()
+        {
+            StartTLS(null);
+        }
+
+        /// <summary>
+        /// Sends STARTTLS command to SMTP server.
+        /// </summary>
+        /// <param name="certCallback">SSL server certificate validation callback. Value null means any certificate is accepted.</param>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected or is already secure connection.</exception>
+        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
+        /// <remarks>After sucessfult STARTTLS all SMTP session data(EHLO,MAIL FROM, ....) will be reset.
+        /// If unknwon(not SMTP error) error happens during STARTTLS negotiation, SMTP client should disconnect.</remarks>
+        public void StartTLS(RemoteCertificateValidationCallback certCallback)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+				throw new InvalidOperationException("You must connect first.");
+			}
+            if(this.IsSecureConnection){
+                throw new InvalidOperationException("Connection is already secure.");
+            }
+
+            ManualResetEvent wait = new ManualResetEvent(false);
+            StartTlsAsyncOP op = new StartTlsAsyncOP(certCallback);
+            op.CompletedAsync += delegate(object s1,EventArgs<StartTlsAsyncOP> e1){
+                wait.Set();
+            };
+            if(!this.StartTlsAsync(op)){
+                wait.Set();
+            }
+            wait.WaitOne();
+
+            if(op.Error != null){
+                throw op.Error;
+            }
+        }
+
+        #endregion
+
+        #region method StartTlsAsync
+
+        #region class StartTlsAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="SMTP_Client.StartTlsAsync"/> asynchronous operation.
+        /// </summary>
+        public class StartTlsAsyncOP
+        {
+            private object                              m_pLock         = new object();
+            private AsyncOP_State                       m_State         = AsyncOP_State.WaitingForStart;
+            private Exception                           m_pException    = null;
+            private RemoteCertificateValidationCallback m_pCertCallback = null;
+            private SMTP_Client                         m_pSmtpClient   = null;
+            private bool                                m_RiseCompleted = false;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="certCallback">SSL server certificate validation callback. Value null means any certificate is accepted.</param>
+            public StartTlsAsyncOP(RemoteCertificateValidationCallback certCallback)
+            {
+                m_pCertCallback = certCallback;
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resource being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+                
+                m_pException    = null;
+                m_pCertCallback = null;
+                m_pSmtpClient   = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner SMTP client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            internal bool Start(SMTP_Client owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+
+                m_pSmtpClient = owner;
+
+                SetState(AsyncOP_State.Active);
+
+                try{
+                    /* RFC 3207 4.
+                        The format for the STARTTLS command is:
+
+                        STARTTLS
+
+                        with no parameters.
+
+                        After the client gives the STARTTLS command, the server responds with
+                        one of the following reply codes:
+
+                        220 Ready to start TLS
+                        501 Syntax error (no parameters allowed)
+                        454 TLS not available due to temporary reason
+                    */
+
+                    byte[] buffer = Encoding.UTF8.GetBytes("STARTTLS\r\n");
+
+                    // Log
+                    m_pSmtpClient.LogAddWrite(buffer.Length,"STARTTLS");
+
+                    // Start command sending.
+                    m_pSmtpClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.StartTlsCommandSendingCompleted,null);                    
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method StartTlsCommandSendingCompleted
+
+            /// <summary>
+            /// Is called when STARTTLS command sending has finished.
+            /// </summary>
+            /// <param name="ar">Asynchronous result.</param>
+            private void StartTlsCommandSendingCompleted(IAsyncResult ar)
+            {
+                try{
+                    m_pSmtpClient.TcpStream.EndWrite(ar);
+
+                    // Read SMTP server response.
+                    ReadResponseAsyncOP readResponseOP = new ReadResponseAsyncOP();
+                    readResponseOP.CompletedAsync += delegate(object s,EventArgs<ReadResponseAsyncOP> e){
+                        StartTlsReadResponseCompleted(readResponseOP);
+                    };
+                    if(!m_pSmtpClient.ReadResponseAsync(readResponseOP)){
+                        StartTlsReadResponseCompleted(readResponseOP);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);
+                }
+            }
+
+            #endregion
+
+            #region method StartTlsReadResponseCompleted
+
+            /// <summary>
+            /// Is called when STARTTLS command response reading has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+            private void StartTlsReadResponseCompleted(ReadResponseAsyncOP op)
+            {
+                if(op == null){
+                    throw new ArgumentNullException("op");
+                }
+
+                try{
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                    }
+                    else{
+                        // STARTTLS accepted.
+                        if(op.ReplyLines[0].ReplyCode == 220){
+                            /* RFC 3207 4.
+                                The format for the STARTTLS command is:
+
+                                STARTTLS
+
+                                with no parameters.
+
+                                After the client gives the STARTTLS command, the server responds with
+                                one of the following reply codes:
+
+                                220 Ready to start TLS
+                                501 Syntax error (no parameters allowed)
+                                454 TLS not available due to temporary reason
+                            */
+
+                            // Log
+                            m_pSmtpClient.LogAddText("Starting TLS handshake.");
+
+                            SwitchToSecureAsyncOP switchSecureOP = new SwitchToSecureAsyncOP(m_pCertCallback);
+                            switchSecureOP.CompletedAsync += delegate(object s,EventArgs<SwitchToSecureAsyncOP> e){
+                                SwitchToSecureCompleted(switchSecureOP);
+                            };
+                            if(!m_pSmtpClient.SwitchToSecureAsync(switchSecureOP)){
+                                SwitchToSecureCompleted(switchSecureOP);
+                            }                       
+                        }
+                        // STARTTLS failed.
+                        else{
+                            m_pException = new SMTP_ClientException(op.ReplyLines);
+                        }
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;                    
+                }
+
+                op.Dispose();
+
+                if(m_pException != null){
+                    m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+            }
+
+            #endregion
+
+            #region method SwitchToSecureCompleted
+
+            /// <summary>
+            /// Is called when TLS handshake has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+            private void SwitchToSecureCompleted(SwitchToSecureAsyncOP op)
+            {
+                if(op == null){
+                    throw new ArgumentNullException("op");
+                }
+
+                try{
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                        m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    }
+                    else{
+                        // Log
+                        m_pSmtpClient.LogAddText("TLS handshake completed sucessfully.");
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                }
+
+                op.Dispose();
+
+                SetState(AsyncOP_State.Completed);
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<StartTlsAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<StartTlsAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Starts sending STARTTLS command to SMTP server.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="StartTlsAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected or connection is already secure.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        /// <remarks>After sucessfult STARTTLS all SMTP session data(EHLO,MAIL FROM, ....) will be reset.
+        /// If unknwon(not SMTP error) error happens during STARTTLS negotiation, SMTP client should disconnect.</remarks>
+        public bool StartTlsAsync(StartTlsAsyncOP op)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("You must connect first.");
+            }
+            if(this.IsSecureConnection){
+                throw new InvalidOperationException("Connection is already secure.");
+            }
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+
+            return op.Start(this);
         }
 
         #endregion
@@ -700,126 +1282,36 @@ namespace LumiSoft.Net.SMTP.Client
         }
 
         #endregion
-
-        #region method BeginMailFrom
-
-        /// <summary>
-        /// Internal helper method for asynchronous MailFrom method.
-        /// </summary>
-        private delegate void MailFromDelegate(string from,long messageSize,SMTP_DSN_Ret ret,string envid);
-
-        /// <summary>
-        /// Starts sending MAIL FROM: command to SMTP server.
-        /// </summary>
-        /// <param name="from">Sender email address reported to SMTP server.</param>
-        /// <param name="messageSize">Sendable message size in bytes, -1 if message size unknown.</param>
-        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
-        /// <param name="state">User data.</param>
-        /// <returns>An IAsyncResult that references the asynchronous disconnect.</returns>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
-        public IAsyncResult BeginMailFrom(string from,long messageSize,AsyncCallback callback,object state)
-        {
-            return BeginMailFrom(from,messageSize,SMTP_DSN_Ret.NotSpecified,null,callback,state);
-        }
-
-        /// <summary>
-        /// Starts sending MAIL FROM: command to SMTP server.
-        /// </summary>
-        /// <param name="from">Sender email address reported to SMTP server.</param>
-        /// <param name="messageSize">Sendable message size in bytes, -1 if message size unknown.</param>
-        /// <param name="ret">Delivery satus notification(DSN) ret value. For more info see RFC 3461.</param>
-        /// <param name="envid">Envelope ID. Value null means not specified. For more info see RFC 3461.</param>
-        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
-        /// <param name="state">User data.</param>
-        /// <returns>An IAsyncResult that references the asynchronous disconnect.</returns>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
-        /// <remarks>Before using <b>ret</b> or <b>envid</b> arguments, check that remote server supports SMTP DSN extention.</remarks>
-        public IAsyncResult BeginMailFrom(string from,long messageSize,SMTP_DSN_Ret ret,string envid,AsyncCallback callback,object state)
-        {
-            if(this.IsDisposed){
-                throw new ObjectDisposedException(this.GetType().Name);
-            }
-            if(!this.IsConnected){
-				throw new InvalidOperationException("You must connect first.");
-			}
-
-            MailFromDelegate asyncMethod = new MailFromDelegate(this.MailFrom);
-            AsyncResultState asyncState = new AsyncResultState(this,asyncMethod,callback,state);
-            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(from,messageSize,ret,envid,new AsyncCallback(asyncState.CompletedCallback),null));
-
-            return asyncState;
-        }
-
-        #endregion
-
-        #region method EndMailFrom
-
-        /// <summary>
-        /// Ends a pending asynchronous MailFrom request.
-        /// </summary>
-        /// <param name="asyncResult">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
-        /// <exception cref="ArgumentNullException">Is raised when <b>asyncResult</b> is null.</exception>
-        /// <exception cref="ArgumentException">Is raised when invalid <b>asyncResult</b> passed to this method.</exception>
-        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
-        public void EndMailFrom(IAsyncResult asyncResult)
-        {
-            if(this.IsDisposed){
-                throw new ObjectDisposedException(this.GetType().Name);
-            }
-            if(asyncResult == null){
-                throw new ArgumentNullException("asyncResult");
-            }
-
-            AsyncResultState castedAsyncResult = asyncResult as AsyncResultState;
-            if(castedAsyncResult == null || castedAsyncResult.AsyncObject != this){
-                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginReset method.");
-            }
-            if(castedAsyncResult.IsEndCalled){
-                throw new InvalidOperationException("BeginReset was previously called for the asynchronous connection.");
-            }
-             
-            castedAsyncResult.IsEndCalled = true;
-            if(castedAsyncResult.AsyncDelegate is MailFromDelegate){
-                ((MailFromDelegate)castedAsyncResult.AsyncDelegate).EndInvoke(castedAsyncResult.AsyncResult);
-            }
-            else{
-                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginReset method.");
-            }
-        }
-
-        #endregion
-
+                
         #region method MailFrom
 
         /// <summary>
-        /// Sends MAIL FROM: command to SMTP server.
+        /// Sends MAIL command to SMTP server.
         /// </summary>
-        /// <param name="from">Sender email address reported to SMTP server.</param>
-        /// <param name="messageSize">Sendable message size in bytes, -1 if message size unknown.</param>
+        /// <param name="from">Sender email address. Value null means no sender info.</param>
+        /// <param name="messageSize">Message size in bytes. Value -1 means that message size unknown.</param>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
         /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
+        /// <remarks>Before using <b>ret</b> or <b>envid</b> arguments, check that remote server supports(SMTP_Client.EsmtpFeatures) SMTP DSN extention.</remarks>
         public void MailFrom(string from,long messageSize)
         {
             MailFrom(from,messageSize,SMTP_DSN_Ret.NotSpecified,null);
         }
 
         /// <summary>
-        /// Sends MAIL FROM: command to SMTP server.
+        /// Sends MAIL command to SMTP server.
         /// </summary>
-        /// <param name="from">Sender email address reported to SMTP server.</param>
-        /// <param name="messageSize">Sendable message size in bytes, -1 if message size unknown.</param>
+        /// <param name="from">Sender email address. Value null means no sender info.</param>
+        /// <param name="messageSize">Message size in bytes. Value -1 means that message size unknown.</param>
         /// <param name="ret">Delivery satus notification(DSN) RET value. For more info see RFC 3461.</param>
         /// <param name="envid">Delivery satus notification(DSN) ENVID value. Value null means not specified. For more info see RFC 3461.</param>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
         /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
-        /// <remarks>Before using <b>ret</b> or <b>envid</b> arguments, check that remote server supports SMTP DSN extention.</remarks>
+        /// <remarks>Before using <b>ret</b> or <b>envid</b> arguments, check that remote server supports(SMTP_Client.EsmtpFeatures) SMTP DSN extention.</remarks>
         public void MailFrom(string from,long messageSize,SMTP_DSN_Ret ret,string envid)
         {
             if(this.IsDisposed){
@@ -828,142 +1320,353 @@ namespace LumiSoft.Net.SMTP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("You must connect first.");
             }
-            if(!SMTP_Utils.IsValidAddress(from)){
-                throw new ArgumentException("Argument from has invalid value.");
+            
+            ManualResetEvent wait = new ManualResetEvent(false);
+            MailFromAsyncOP op = new MailFromAsyncOP(from,messageSize,ret,envid);
+            op.CompletedAsync += delegate(object s1,EventArgs<MailFromAsyncOP> e1){
+                wait.Set();
+            };
+            if(!this.MailFromAsync(op)){
+                wait.Set();
             }
+            wait.WaitOne();
 
-            /* RFC 2821 4.1.1.2 MAIL
-			    Examples:
-			 		MAIL FROM:<ivar@lumisoft.ee>
-			  
-			   RFC 1870 adds optional SIZE keyword support.
-			    SIZE keyword may only be used if it's reported in EHLO command response.
-			 	 Examples:
-			 		MAIL FROM:<ivx@lumisoft.ee> SIZE=1000
-             
-               RFC 3461 adds RET and ENVID paramters.
-			*/
-
-            bool isSizeSupported = false;
-            foreach(string feature in m_pEsmtpFeatures){
-                if(feature.ToLower() == "size"){
-                    isSizeSupported = true;
-                    break;
-                }
+            if(op.Error != null){
+                throw op.Error;
             }
-
-            StringBuilder cmd = new StringBuilder();
-            cmd.Append("MAIL FROM:<" + from + ">");
-            if(isSizeSupported && messageSize > 0){
-                cmd.Append(" SIZE=" + messageSize.ToString());
-            }
-            if(ret == SMTP_DSN_Ret.FullMessage){
-                cmd.Append(" RET=FULL");
-            }
-            else if(ret == SMTP_DSN_Ret.Headers){
-                cmd.Append(" RET=HDRS");
-            }
-            if(!string.IsNullOrEmpty(envid)){
-                cmd.Append(" ENVID=" + envid);
-            }
-            WriteLine(cmd.ToString());
-
-            // Read first line of reply, check if it's ok.
-			string line = ReadLine();
-			if(!line.StartsWith("250")){
-				throw new SMTP_ClientException(line);
-			}
-
-            m_MailFrom = from;
         }
 
         #endregion
 
-        #region method BeginRcptTo
+        #region method MailFromAsync
+
+        #region class MailFromAsyncOP
 
         /// <summary>
-        /// Internal helper method for asynchronous RcptTo method.
+        /// This class represents <see cref="SMTP_Client.MailFromAsync"/> asynchronous operation.
         /// </summary>
-        private delegate void RcptToDelegate(string to,SMTP_DSN_Notify notify,string orcpt);
-
-        /// <summary>
-        /// Starts sending RCPT TO: command to SMTP server.
-        /// </summary>
-        /// <param name="to">Recipient email address.</param>
-        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
-        /// <param name="state">User data.</param>
-        /// <returns>An IAsyncResult that references the asynchronous disconnect.</returns>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
-        public IAsyncResult BeginRcptTo(string to,AsyncCallback callback,object state)
+        public class MailFromAsyncOP : IDisposable,IAsyncOP
         {
-            return BeginRcptTo(to,SMTP_DSN_Notify.NotSpecified,null,callback,state);
+            private object        m_pLock         = new object();
+            private AsyncOP_State m_State         = AsyncOP_State.WaitingForStart;
+            private Exception     m_pException    = null;
+            private string        m_MailFrom      = null;
+            private long          m_MessageSize   = -1;
+            private SMTP_DSN_Ret  m_DsnRet        = SMTP_DSN_Ret.NotSpecified;
+            private string        m_EnvID         = null;
+            private SMTP_Client   m_pSmtpClient   = null;
+            private bool          m_RiseCompleted = false;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="from">Sender email address. Value null means no sender info.</param>
+            /// <param name="messageSize">Message size in bytes. Value -1 means that message size unknown.</param>
+            public MailFromAsyncOP(string from,long messageSize) : this(from,messageSize,SMTP_DSN_Ret.NotSpecified,null)
+            {
+            }
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="from">Sender email address. Value null means no sender info.</param>
+            /// <param name="messageSize">Message size in bytes. Value -1 means that message size unknown.</param>
+            /// <param name="ret">Delivery satus notification(DSN) RET value. For more info see RFC 3461.</param>
+            /// <param name="envid">Delivery satus notification(DSN) ENVID value. Value null means not specified. For more info see RFC 3461.</param>
+            /// <remarks>Before using <b>ret</b> or <b>envid</b> arguments, check that remote server supports(SMTP_Client.EsmtpFeatures) SMTP DSN extention.</remarks>
+            public MailFromAsyncOP(string from,long messageSize,SMTP_DSN_Ret ret,string envid)
+            {
+                m_MailFrom    = from;
+                m_MessageSize = messageSize;
+                m_DsnRet      = ret;
+                m_EnvID       = envid;
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resources being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+                
+                m_pException  = null;
+                m_MailFrom    = null;
+                m_EnvID       = null;
+                m_pSmtpClient = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner SMTP client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            internal bool Start(SMTP_Client owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+
+                m_pSmtpClient = owner;
+
+                SetState(AsyncOP_State.Active);
+
+                try{
+                    /* RFC 5321 4.1.1.2. MAIL
+			            mail         = "MAIL FROM:" Reverse-path [SP Mail-parameters] CRLF
+                        Reverse-path = Path / "<>"
+                        Path         = "<" [ A-d-l ":" ] Mailbox ">"
+
+			  
+			           RFC 1870 adds optional SIZE keyword support.
+			                SIZE keyword may only be used if it's reported in EHLO command response.
+			 	        Examples:
+			 		        MAIL FROM:<ivx@lumisoft.ee> SIZE=1000
+             
+                       RFC 3461 adds RET and ENVID paramters.
+			        */
+
+                    bool isSizeSupported = false;
+                    foreach(string feature in m_pSmtpClient.EsmtpFeatures){
+                        if(feature.ToLower().StartsWith("size ")){
+                            isSizeSupported = true;
+
+                            break;
+                        }
+                    }
+
+                    // Build command.
+                    StringBuilder cmd = new StringBuilder();
+                    cmd.Append("MAIL FROM:<" + m_MailFrom + ">");
+                    if(isSizeSupported && m_MessageSize > 0){
+                        cmd.Append(" SIZE=" + m_MessageSize.ToString());
+                    }
+                    if(m_DsnRet == SMTP_DSN_Ret.FullMessage){
+                        cmd.Append(" RET=FULL");
+                    }
+                    else if(m_DsnRet == SMTP_DSN_Ret.Headers){
+                        cmd.Append(" RET=HDRS");
+                    }
+                    if(!string.IsNullOrEmpty(m_EnvID)){
+                        cmd.Append(" ENVID=" + m_EnvID);
+                    }
+
+                    byte[] buffer = Encoding.UTF8.GetBytes(cmd.ToString() + "\r\n");
+
+                    // Log
+                    m_pSmtpClient.LogAddWrite(buffer.Length,cmd.ToString());
+
+                    // Start command sending.
+                    m_pSmtpClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.MailCommandSendingCompleted,null);                    
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method MailCommandSendingCompleted
+
+            /// <summary>
+            /// Is called when MAIL command sending has finished.
+            /// </summary>
+            /// <param name="ar">Asynchronous result.</param>
+            private void MailCommandSendingCompleted(IAsyncResult ar)
+            {
+                try{
+                    m_pSmtpClient.TcpStream.EndWrite(ar);
+
+                    // Read SMTP server response.
+                    ReadResponseAsyncOP readResponseOP = new ReadResponseAsyncOP();
+                    readResponseOP.CompletedAsync += delegate(object s,EventArgs<ReadResponseAsyncOP> e){
+                        MailReadResponseCompleted(readResponseOP);
+                    };
+                    if(!m_pSmtpClient.ReadResponseAsync(readResponseOP)){
+                        MailReadResponseCompleted(readResponseOP);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);
+                }
+            }
+
+            #endregion
+
+            #region method MailReadResponseCompleted
+
+            /// <summary>
+            /// Is called when SMTP server MAIL command response reading has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+            private void MailReadResponseCompleted(ReadResponseAsyncOP op)
+            {
+                if(op == null){
+                    throw new ArgumentNullException("op");
+                }
+
+                try{
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                        m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    }
+                    else{
+                        // MAIL succeeded.
+                        if(op.ReplyLines[0].ReplyCode == 250){
+                            m_pSmtpClient.m_MailFrom = m_MailFrom;
+                        }
+                        // MAIL failed.
+                        else{
+                            m_pException = new SMTP_ClientException(op.ReplyLines);
+                            m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                        }
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                }
+
+                op.Dispose();
+
+                SetState(AsyncOP_State.Completed);
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<MailFromAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<MailFromAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
         }
 
+        #endregion
+
         /// <summary>
-        /// Starts sending RCPT TO: command to SMTP server.
+        /// Starts sending MAIL command to SMTP server.
         /// </summary>
-        /// <param name="to">Recipient email address.</param>
-        /// <param name="notify">Delivery satus notification(DSN) NOTIFY value. For more info see RFC 3461.</param>
-        /// <param name="orcpt">Delivery satus notification(DSN) ORCPT value. Value null means not specified. For more info see RFC 3461.</param>
-        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
-        /// <param name="state">User data.</param>
-        /// <returns>An IAsyncResult that references the asynchronous disconnect.</returns>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="MailFromAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
         /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
-        /// <remarks>Before using <b>notify</b> or <b>orcpt</b> arguments, check that remote server supports SMTP DSN extention.</remarks>
-        public IAsyncResult BeginRcptTo(string to,SMTP_DSN_Notify notify,string orcpt,AsyncCallback callback,object state)
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        /// <remarks>Before using <b>ret</b> or <b>envid</b> arguments, check that remote server supports(SMTP_Client.EsmtpFeatures) SMTP DSN extention.</remarks>
+        public bool MailFromAsync(MailFromAsyncOP op)
         {
             if(this.IsDisposed){
                 throw new ObjectDisposedException(this.GetType().Name);
             }
             if(!this.IsConnected){
-				throw new InvalidOperationException("You must connect first.");
-			}
-
-            RcptToDelegate asyncMethod = new RcptToDelegate(this.RcptTo);
-            AsyncResultState asyncState = new AsyncResultState(this,asyncMethod,callback,state);
-            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(to,notify,orcpt,new AsyncCallback(asyncState.CompletedCallback),null));
-
-            return asyncState;
-        }
-
-        #endregion
-
-        #region method EndRcptTo
-
-        /// <summary>
-        /// Ends a pending asynchronous RcptTo request.
-        /// </summary>
-        /// <param name="asyncResult">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
-        /// <exception cref="ArgumentNullException">Is raised when <b>asyncResult</b> is null.</exception>
-        /// <exception cref="ArgumentException">Is raised when invalid <b>asyncResult</b> passed to this method.</exception>
-        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
-        public void EndRcptTo(IAsyncResult asyncResult)
-        {
-            if(this.IsDisposed){
-                throw new ObjectDisposedException(this.GetType().Name);
+                throw new InvalidOperationException("You must connect first.");
             }
-            if(asyncResult == null){
-                throw new ArgumentNullException("asyncResult");
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
             }
 
-            AsyncResultState castedAsyncResult = asyncResult as AsyncResultState;
-            if(castedAsyncResult == null || castedAsyncResult.AsyncObject != this){
-                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginReset method.");
-            }
-            if(castedAsyncResult.IsEndCalled){
-                throw new InvalidOperationException("BeginReset was previously called for the asynchronous connection.");
-            }
-             
-            castedAsyncResult.IsEndCalled = true;
-            if(castedAsyncResult.AsyncDelegate is RcptToDelegate){
-                ((RcptToDelegate)castedAsyncResult.AsyncDelegate).EndInvoke(castedAsyncResult.AsyncResult);
-            }
-            else{
-                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginReset method.");
-            }
+            return op.Start(this);
         }
 
         #endregion
@@ -978,6 +1681,7 @@ namespace LumiSoft.Net.SMTP.Client
         /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
+        /// <remarks>Before using <b>notify</b> or <b>orcpt</b> arguments, check that remote server supports(SMTP_Client.EsmtpFeatures) SMTP DSN extention.</remarks>
         public void RcptTo(string to)
         {
             RcptTo(to,SMTP_DSN_Notify.NotSpecified,null);
@@ -993,7 +1697,7 @@ namespace LumiSoft.Net.SMTP.Client
         /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
-        /// <remarks>Before using <b>notify</b> or <b>orcpt</b> arguments, check that remote server supports SMTP DSN extention.</remarks>
+        /// <remarks>Before using <b>notify</b> or <b>orcpt</b> arguments, check that remote server supports(SMTP_Client.EsmtpFeatures) SMTP DSN extention.</remarks>
         public void RcptTo(string to,SMTP_DSN_Notify notify,string orcpt)
         {
             if(this.IsDisposed){
@@ -1002,151 +1706,353 @@ namespace LumiSoft.Net.SMTP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("You must connect first.");
             }
-            if(!SMTP_Utils.IsValidAddress(to)){
-                throw new ArgumentException("Argument from has invalid value.");
+            
+            ManualResetEvent wait = new ManualResetEvent(false);
+            RcptToAsyncOP op = new RcptToAsyncOP(to,notify,orcpt);
+            op.CompletedAsync += delegate(object s1,EventArgs<RcptToAsyncOP> e1){
+                wait.Set();
+            };
+            if(!this.RcptToAsync(op)){
+                wait.Set();
+            }
+            wait.WaitOne();
+
+            if(op.Error != null){
+                throw op.Error;
+            }
+        }
+
+        #endregion
+
+        #region method RcptToAsync
+
+        #region class RcptToAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="SMTP_Client.RcptToAsync"/> asynchronous operation.
+        /// </summary>
+        public class RcptToAsyncOP
+        {
+            private object          m_pLock         = new object();
+            private AsyncOP_State   m_State         = AsyncOP_State.WaitingForStart;
+            private Exception       m_pException    = null;
+            private string          m_To            = null;
+            private SMTP_DSN_Notify m_DsnNotify     = SMTP_DSN_Notify.NotSpecified;
+            private string          m_ORcpt         = null;
+            private SMTP_Client     m_pSmtpClient   = null;
+            private bool            m_RiseCompleted = false;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="to">Recipient email address.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>to</b> is null reference.</exception>
+            /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+            public RcptToAsyncOP(string to) : this(to,SMTP_DSN_Notify.NotSpecified,null)
+            {
             }
 
-            /* RFC 2821 4.1.1.2 RCPT.
-                Syntax:
-                    "RCPT TO:" ("<Postmaster@" domain ">" / "<Postmaster>" / Forward-Path) [SP Rcpt-parameters] CRLF
-
-			    Examples:
-			 		RCPT TO:<ivar@lumisoft.ee>
-             
-                RFC 3461 adds NOTIFY and ORCPT parameters.
-			*/
-
-            StringBuilder cmd = new StringBuilder();
-            cmd.Append("RCPT TO:<" + to + ">");            
-            if(notify == SMTP_DSN_Notify.NotSpecified){
-            }
-            else if(notify == SMTP_DSN_Notify.Never){
-                cmd.Append(" NOTIFY=NEVER");
-            }
-            else{
-                bool first = true;                
-                if((notify & SMTP_DSN_Notify.Delay) != 0){
-                    cmd.Append(" NOTIFY=DELAY");
-                    first = false;
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="to">Recipient email address.</param>
+            /// <param name="notify">Delivery satus notification(DSN) NOTIFY value. For more info see RFC 3461.</param>
+            /// <param name="orcpt">Delivery satus notification(DSN) ORCPT value. Value null means not specified. For more info see RFC 3461.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>to</b> is null reference.</exception>
+            /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+            public RcptToAsyncOP(string to,SMTP_DSN_Notify notify,string orcpt)
+            {
+                if(to == null){
+                    throw new ArgumentNullException("to");
                 }
-                if((notify & SMTP_DSN_Notify.Failure) != 0){
-                    if(first){
-                        cmd.Append(" NOTIFY=FAILURE");   
+                if(to == string.Empty){
+                    throw new ArgumentException("Argument 'to' value must be specified.","to");
+                }
+
+                m_To        = to;
+                m_DsnNotify = notify;
+                m_ORcpt     = orcpt;
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resources being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+                
+                m_pException  = null;
+                m_To          = null;
+                m_ORcpt       = null;
+                m_pSmtpClient = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner SMTP client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            internal bool Start(SMTP_Client owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+
+                m_pSmtpClient = owner;
+
+                SetState(AsyncOP_State.Active);
+
+                try{
+                    /* RFC 5321 4.1.1.3. RCPT.
+                        rcpt = "RCPT TO:" ( "<Postmaster@" Domain ">" / "<Postmaster>" / Forward-path ) [SP Rcpt-parameters] CRLF
+
+			            Examples:
+			 		        RCPT TO:<ivar@lumisoft.ee>
+             
+                        RFC 3461 adds NOTIFY and ORCPT parameters.
+			        */
+
+                    // Build command.
+                    StringBuilder cmd = new StringBuilder();
+                    cmd.Append("RCPT TO:<" + m_To + ">");            
+                    if(m_DsnNotify == SMTP_DSN_Notify.NotSpecified){
+                    }
+                    else if(m_DsnNotify == SMTP_DSN_Notify.Never){
+                        cmd.Append(" NOTIFY=NEVER");
                     }
                     else{
-                        cmd.Append(",FAILURE");
+                        bool first = true;                
+                        if((m_DsnNotify & SMTP_DSN_Notify.Delay) != 0){
+                            cmd.Append(" NOTIFY=DELAY");
+                            first = false;
+                        }
+                        if((m_DsnNotify & SMTP_DSN_Notify.Failure) != 0){
+                            if(first){
+                                cmd.Append(" NOTIFY=FAILURE");   
+                            }
+                            else{
+                                cmd.Append(",FAILURE");
+                            }
+                            first = false;
+                        }
+                        if((m_DsnNotify & SMTP_DSN_Notify.Success) != 0){
+                            if(first){
+                                cmd.Append(" NOTIFY=SUCCESS");   
+                            }
+                            else{
+                                cmd.Append(",SUCCESS");
+                            }
+                            first = false;
+                        }
                     }
-                    first = false;
+                    if(!string.IsNullOrEmpty(m_ORcpt)){
+                        cmd.Append(" ORCPT=" + m_ORcpt);
+                    }
+
+                    byte[] buffer = Encoding.UTF8.GetBytes(cmd.ToString() + "\r\n");
+
+                    // Log
+                    m_pSmtpClient.LogAddWrite(buffer.Length,cmd.ToString());
+
+                    // Start command sending.
+                    m_pSmtpClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.RcptCommandSendingCompleted,null);                    
                 }
-                if((notify & SMTP_DSN_Notify.Success) != 0){
-                    if(first){
-                        cmd.Append(" NOTIFY=SUCCESS");   
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method MailCommandSendingCompleted
+
+            /// <summary>
+            /// Is called when RCPT command sending has finished.
+            /// </summary>
+            /// <param name="ar">Asynchronous result.</param>
+            private void RcptCommandSendingCompleted(IAsyncResult ar)
+            {
+                try{
+                    m_pSmtpClient.TcpStream.EndWrite(ar);
+
+                    // Read SMTP server response.
+                    ReadResponseAsyncOP readResponseOP = new ReadResponseAsyncOP();
+                    readResponseOP.CompletedAsync += delegate(object s,EventArgs<ReadResponseAsyncOP> e){
+                        RcptReadResponseCompleted(readResponseOP);
+                    };
+                    if(!m_pSmtpClient.ReadResponseAsync(readResponseOP)){
+                        RcptReadResponseCompleted(readResponseOP);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);
+                }
+            }
+
+            #endregion
+
+            #region method RcptReadResponseCompleted
+
+            /// <summary>
+            /// Is called when SMTP server RCPT command response reading has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+            private void RcptReadResponseCompleted(ReadResponseAsyncOP op)
+            {
+                if(op == null){
+                    throw new ArgumentNullException("op");
+                }
+
+                try{
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                        m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
                     }
                     else{
-                        cmd.Append(",SUCCESS");
+                        // RCPT succeeded.
+                        if(op.ReplyLines[0].ReplyCode == 250){
+                            if(!m_pSmtpClient.m_pRecipients.Contains(m_To)){
+                                m_pSmtpClient.m_pRecipients.Add(m_To);
+                            }
+                        }
+                        // RCPT failed.
+                        else{
+                            m_pException = new SMTP_ClientException(op.ReplyLines);
+                            m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                        }
                     }
-                    first = false;
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + x.Message,x);
+                }
+
+                op.Dispose();
+
+                SetState(AsyncOP_State.Completed);
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
                 }
             }
-            if(!string.IsNullOrEmpty(orcpt)){
-                cmd.Append(" ORCPT=" + orcpt);
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<RcptToAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<RcptToAsyncOP>(this));
+                }
             }
 
-            WriteLine(cmd.ToString());
+            #endregion
 
-            // Read first line of reply, check if it's ok.
-			string line = ReadLine();
-			if(!line.StartsWith("250")){
-				throw new SMTP_ClientException(line);
-			}
-
-            if(!m_pRecipients.Contains(to)){
-                m_pRecipients.Add(to);
-            }
+            #endregion
         }
 
         #endregion
 
-        #region method BeginReset
-
         /// <summary>
-        /// Internal helper method for asynchronous Reset method.
+        /// Starts sending RCPT command to SMTP server.
         /// </summary>
-        private delegate void ResetDelegate();
-
-        /// <summary>
-        /// Starts resetting SMTP session, all state data will be deleted.
-        /// </summary>
-        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
-        /// <param name="state">User data.</param>
-        /// <returns>An IAsyncResult that references the asynchronous disconnect.</returns>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="RcptToAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
         /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
-        public IAsyncResult BeginReset(AsyncCallback callback,object state)
-        {
-            if(this.IsDisposed){
-                throw new ObjectDisposedException(this.GetType().Name);
-            }
-            if(!this.IsConnected){
-				throw new InvalidOperationException("You must connect first.");
-			}
-
-            ResetDelegate asyncMethod = new ResetDelegate(this.Reset);
-            AsyncResultState asyncState = new AsyncResultState(this,asyncMethod,callback,state);
-            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(new AsyncCallback(asyncState.CompletedCallback),null));
-
-            return asyncState;
-        }
-
-        #endregion
-
-        #region method EndReset
-
-        /// <summary>
-        /// Ends a pending asynchronous reset request.
-        /// </summary>
-        /// <param name="asyncResult">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
-        /// <exception cref="ArgumentNullException">Is raised when <b>asyncResult</b> is null.</exception>
-        /// <exception cref="ArgumentException">Is raised when invalid <b>asyncResult</b> passed to this method.</exception>
-        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
-        public void EndReset(IAsyncResult asyncResult)
-        {
-            if(this.IsDisposed){
-                throw new ObjectDisposedException(this.GetType().Name);
-            }
-            if(asyncResult == null){
-                throw new ArgumentNullException("asyncResult");
-            }
-
-            AsyncResultState castedAsyncResult = asyncResult as AsyncResultState;
-            if(castedAsyncResult == null || castedAsyncResult.AsyncObject != this){
-                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginReset method.");
-            }
-            if(castedAsyncResult.IsEndCalled){
-                throw new InvalidOperationException("BeginReset was previously called for the asynchronous connection.");
-            }
-             
-            castedAsyncResult.IsEndCalled = true;
-            if(castedAsyncResult.AsyncDelegate is ResetDelegate){
-                ((ResetDelegate)castedAsyncResult.AsyncDelegate).EndInvoke(castedAsyncResult.AsyncResult);
-            }
-            else{
-                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginReset method.");
-            }
-        }
-
-        #endregion
-
-        #region method Reset
-
-        /// <summary>
-        /// Resets SMTP session, all state data will be deleted.
-        /// </summary>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
-        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
-        public void Reset()
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        /// <remarks>Before using <b>notify</b> or <b>orcpt</b> arguments, check that remote server supports(SMTP_Client.EsmtpFeatures) SMTP DSN extention.</remarks>
+        public bool RcptToAsync(RcptToAsyncOP op)
         {
             if(this.IsDisposed){
                 throw new ObjectDisposedException(this.GetType().Name);
@@ -1154,116 +2060,43 @@ namespace LumiSoft.Net.SMTP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("You must connect first.");
             }
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
 
-            /* RFC 2821 4.1.1.5 RESET (RSET).
-                This command specifies that the current mail transaction will be
-                aborted.  Any stored sender, recipients, and mail data MUST be
-                discarded, and all buffers and state tables cleared.  The receiver
-                MUST send a "250 OK" reply to a RSET command with no arguments.  A
-                reset command may be issued by the client at any time.
-            */
-
-            WriteLine("RSET");
-
-			string line = ReadLine();
-			if(!line.StartsWith("250")){
-				throw new SMTP_ClientException(line);
-			}
-
-            m_MailFrom = null;
-            m_pRecipients.Clear();
+            return op.Start(this);
         }
 
         #endregion
-
-        #region method BeginSendMessage
-
-        /// <summary>
-        /// Internal helper method for asynchronous SendMessage method.
-        /// </summary>
-        private delegate void SendMessageDelegate(Stream message);
-
-        /// <summary>
-        /// Starts sending specified raw message to SMTP server.
-        /// </summary>
-        /// <param name="message">Message stream. Message will be readed from current stream position and to the end of stream.</param>
-        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
-        /// <param name="state">User data.</param>
-        /// <returns>An IAsyncResult that references the asynchronous method.</returns>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
-        /// <exception cref="ArgumentNullException">Is raised when <b>message</b> is null.</exception>
-        public IAsyncResult BeginSendMessage(Stream message,AsyncCallback callback,object state)
-        {
-            if(this.IsDisposed){
-                throw new ObjectDisposedException(this.GetType().Name);
-            }
-            if(!this.IsConnected){
-                throw new InvalidOperationException("You must connect first.");
-            }
-            if(message == null){
-                throw new ArgumentNullException("message");
-            }
-
-            SendMessageDelegate asyncMethod = new SendMessageDelegate(this.SendMessage);
-            AsyncResultState asyncState = new AsyncResultState(this,asyncMethod,callback,state);
-            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(message,new AsyncCallback(asyncState.CompletedCallback),null));
-
-            return asyncState;
-        }
-
-        #endregion
-
-        #region method EndSendMessage
-
-        /// <summary>
-        /// Ends a pending asynchronous SendMessage request.
-        /// </summary>
-        /// <param name="asyncResult">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
-        /// <exception cref="ArgumentNullException">Is raised when <b>asyncResult</b> is null.</exception>
-        /// <exception cref="ArgumentException">Is raised when invalid <b>asyncResult</b> passed to this method.</exception>
-        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
-        public void EndSendMessage(IAsyncResult asyncResult)
-        {
-            if(this.IsDisposed){
-                throw new ObjectDisposedException(this.GetType().Name);
-            }
-            if(asyncResult == null){
-                throw new ArgumentNullException("asyncResult");
-            }
-
-            AsyncResultState castedAsyncResult = asyncResult as AsyncResultState;
-            if(castedAsyncResult == null || castedAsyncResult.AsyncObject != this){
-                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginSendMessage method.");
-            }
-            if(castedAsyncResult.IsEndCalled){
-                throw new InvalidOperationException("BeginSendMessage was previously called for the asynchronous connection.");
-            }
-             
-            castedAsyncResult.IsEndCalled = true;
-            if(castedAsyncResult.AsyncDelegate is SendMessageDelegate){
-                ((SendMessageDelegate)castedAsyncResult.AsyncDelegate).EndInvoke(castedAsyncResult.AsyncResult);
-            }
-            else{
-                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginSendMessage method.");
-            }
-        }
-
-        #endregion
-
+ 
         #region method SendMessage
-                
+
         /// <summary>
-        /// Sends specified raw message to SMTP server.
+        /// Sends raw message to SMTP server.
         /// </summary>
-        /// <param name="message">Message stream. Message will be readed from current stream position and to the end of stream.</param>
-        /// <remarks>The stream must contain data in MIME format, other formats normally are rejected by SMTP server.</remarks>
+        /// <param name="stream">Message stream. Sending starts from stream current position.</param>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
         /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
-        /// <exception cref="ArgumentNullException">Is raised when <b>message</b> is null.</exception>
         /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
-        public void SendMessage(Stream message)
+        /// <remarks>The stream must contain data in MIME format, other formats normally are rejected by SMTP server.</remarks>
+        public void SendMessage(Stream stream)
+        {
+            this.SendMessage(stream,false);
+        }
+
+        /// <summary>
+        /// Sends raw message to SMTP server.
+        /// </summary>
+        /// <param name="stream">Message stream. Sending starts from stream current position.</param>
+        /// <param name="useBdatIfPossibe">Specifies if BDAT command is used to send message, if remote server supports it.</param>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
+        /// <remarks>The stream must contain data in MIME format, other formats normally are rejected by SMTP server.</remarks>
+        public void SendMessage(Stream stream,bool useBdatIfPossibe)
         {
             if(this.IsDisposed){
                 throw new ObjectDisposedException(this.GetType().Name);
@@ -1271,123 +2104,1184 @@ namespace LumiSoft.Net.SMTP.Client
             if(!this.IsConnected){
                 throw new InvalidOperationException("You must connect first.");
             }
-            if(message == null){
-                throw new ArgumentNullException("message");
+
+            ManualResetEvent wait = new ManualResetEvent(false);
+            SendMessageAsyncOP op = new SendMessageAsyncOP(stream,useBdatIfPossibe);
+            op.CompletedAsync += delegate(object s1,EventArgs<SendMessageAsyncOP> e1){
+                wait.Set();
+            };
+            if(!this.SendMessageAsync(op)){
+                wait.Set();
             }
-			
-            // See if BDAT supported.
-            bool bdatSupported = false;
-            if(m_BdatEnabled){
-                foreach(string feature in this.EsmtpFeatures){
-                    if(feature.ToUpper() == SMTP_ServiceExtensions.CHUNKING){
-                        bdatSupported = true;
-                        break;
-                    }
+            wait.WaitOne();
+
+            if(op.Error != null){
+                throw op.Error;
+            }
+        }
+
+        #endregion
+
+        #region method SendMessageAsync
+
+        #region class SendMessageAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="SMTP_Client.SendMessageAsync"/> asynchronous operation.
+        /// </summary>
+        public class SendMessageAsyncOP : IDisposable,IAsyncOP
+        {
+            private object        m_pLock             = new object();
+            private AsyncOP_State m_State             = AsyncOP_State.WaitingForStart;
+            private Exception     m_pException        = null;
+            private Stream        m_pStream           = null;
+            private bool          m_UseBdat           = false;
+            private SMTP_Client   m_pSmtpClient       = null;
+            private byte[]        m_pBdatBuffer       = null;
+            private int           m_BdatBytesInBuffer = 0;
+            private byte[]        m_BdatSendBuffer    = null;
+            private bool          m_RiseCompleted     = false;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="stream">Message stream. Message sending starts from <b>stream</b> current position and all stream data will be sent.</param>
+            /// <param name="useBdatIfPossibe">Specifies if BDAT command is used to send message, if remote server supports it.</param>
+            public SendMessageAsyncOP(Stream stream,bool useBdatIfPossibe)
+            {
+                if(stream == null){
+                    throw new ArgumentNullException("stream");
                 }
+
+                m_pStream = stream;
+                m_UseBdat = useBdatIfPossibe;
             }
 
-            #region DATA
+            #region method Dispose
 
-            if(!bdatSupported){
-                /* RFC 2821 4.1.1.4 DATA
-			        Notes:
-			 		    Message must be period handled for DATA command. This meas if message line starts with .,
-			 		    additional .(period) must be added.
-			 		    Message send is ended with <CRLF>.<CRLF>.
+            /// <summary>
+            /// Cleans up any resources being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
                 
-			 	    Examples:
-			 		    C: DATA<CRLF>
-			 		    S: 354 Start sending message, end with <crlf>.<crlf><CRLF>
-			 		    C: send_message
-			 		    C: <CRLF>.<CRLF>
-                        S: 250 Ok<CRLF>
-			    */
+                m_pException     = null;
+                m_pStream        = null;
+                m_pSmtpClient    = null;
+                m_pBdatBuffer    = null;
+                m_BdatSendBuffer = null;
 
-                WriteLine("DATA");
-
-                string line = ReadLine();
-                if(line.StartsWith("354")){
-                    long writtenCount = this.TcpStream.WritePeriodTerminated(message);
-                    LogAddWrite(writtenCount,"Wrote " + writtenCount.ToString() + " bytes.");
-
-                    // Read server reply.
-                    line = ReadLine();
-                    if(!line.StartsWith("250")){
-                        throw new SMTP_ClientException(line);
-                    }
-                }
-                else{
-                    throw new SMTP_ClientException(line);
-                }
+                this.CompletedAsync = null;
             }
 
             #endregion
 
-            #region BDAT
 
-            else{
-                /* RFC 3030 BDAT
-			 	    Syntax:
-                        BDAT<SP>ChunkSize[<SP>LAST]<CRLF>
-			 	
-			 	    Exapmle:
-    			 		C: BDAT 1000 LAST<CRLF>
-	    		 		C: send_1000_byte_message
-		    	 		S: 250 OK<CRLF>			  
-			    */
+            #region method Start
 
-                // We just read 1 buffer ahead, then you see when source stream has EOS.
-                byte[] buffer1         = new byte[16000];
-                byte[] buffer2         = new byte[16000];
-                byte[] currentBuffer   = buffer1;
-                byte[] lastBuffer      = buffer2;
-                int    lastReadedCount = 0;
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner SMTP client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            internal bool Start(SMTP_Client owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
 
-                // Buffer first data block.
-                lastReadedCount = message.Read(lastBuffer,0,lastBuffer.Length);
+                m_pSmtpClient = owner;
 
-                while(true){
-                    // Read data block to free buffer.
-                    int readedCount = message.Read(currentBuffer,0,currentBuffer.Length);
+                SetState(AsyncOP_State.Active);
 
-                    // End of stream reached, "last data block" this is last one.
-                    if(readedCount == 0){
-                        WriteLine("BDAT " + lastReadedCount.ToString() + " LAST");                        
-                        this.TcpStream.Write(lastBuffer,0,lastReadedCount);
-                        LogAddWrite(readedCount,"Wrote " + lastReadedCount.ToString() + " bytes.");
+                try{
+                    // See if BDAT supported.
+                    bool bdatSupported = false;
+                    foreach(string feature in m_pSmtpClient.EsmtpFeatures){
+                        if(feature.ToUpper() == SMTP_ServiceExtensions.CHUNKING){
+                            bdatSupported = true;
 
-                        // Read server response.
-                        string line = ReadLine();
-                        if(!line.StartsWith("250")){
-                            throw new SMTP_ClientException(line);
+                            break;
                         }
-
-                        // We are done, exit while.
-                        break;
                     }
-                    // Send last data block, free it up for reuse.
+            
+                    // BDAT.
+                    if(bdatSupported && m_UseBdat){
+                        /* RFC 3030 2.
+                            bdat-cmd   ::= "BDAT" SP chunk-size [ SP end-marker ] CR LF
+                            chunk-size ::= 1*DIGIT
+                            end-marker ::= "LAST"
+                        */
+
+                        m_pBdatBuffer    = new byte[64000];
+                        m_BdatSendBuffer = new byte[64100]; // 100 bytes for "BDAT xxxxxx...CRLF"
+
+                        // Start reading message data-block.
+                        m_pStream.BeginRead(m_pBdatBuffer,0,m_pBdatBuffer.Length,this.BdatChunkReadingCompleted,null);
+                    }
+                    // DATA.
                     else{
-                        WriteLine("BDAT " + lastReadedCount.ToString());                        
-                        this.TcpStream.Write(lastBuffer,0,lastReadedCount);
-                        LogAddWrite(readedCount,"Wrote " + lastReadedCount.ToString() + " bytes.");
+                        /* RFC 5321 4.1.1.4.
+                            The mail data are terminated by a line containing only a period, that
+                            is, the character sequence "<CRLF>.<CRLF>", where the first <CRLF> is
+                            actually the terminator of the previous line.
+                          
+                            Examples:
+			 		            C: DATA<CRLF>
+			 		            S: 354 Start sending message, end with <crlf>.<crlf>.<CRLF>
+			 		            C: send_message
+			 		            C: .<CRLF>
+                                S: 250 Ok<CRLF>
+                        */
 
-                        // Read server response.
-                        string line = ReadLine();
-                        if(!line.StartsWith("250")){
-                            throw new SMTP_ClientException(line);
-                        }
+                        byte[] buffer = Encoding.UTF8.GetBytes("DATA\r\n");
 
-                        // Mark last buffer as current(free it up), just mark current buffer as last for next while cycle.
-                        byte[] tmp    = lastBuffer;
-                        lastBuffer    = currentBuffer;
-                        currentBuffer = tmp;                                               
-                    }
+                        // Log
+                        m_pSmtpClient.LogAddWrite(buffer.Length,"DATA");
 
-                    lastReadedCount = readedCount;
+                        // Start command sending.
+                        m_pSmtpClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.DataCommandSendingCompleted,null);
+                    }                    
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
                 }
             }
 
             #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method BdatChunkReadingCompleted
+
+            /// <summary>
+            /// Is called when message data block for BDAT reading has completed.
+            /// </summary>
+            /// <param name="ar">Asynchronous result.</param>
+            private void BdatChunkReadingCompleted(IAsyncResult ar)
+            {
+                try{
+                    m_BdatBytesInBuffer = m_pStream.EndRead(ar);
+
+                    /* RFC 3030 2.
+                        bdat-cmd   ::= "BDAT" SP chunk-size [ SP end-marker ] CR LF
+                        chunk-size ::= 1*DIGIT
+                        end-marker ::= "LAST"
+                    */
+
+                    // Send data chunk.
+                    if(m_BdatBytesInBuffer > 0){
+                        byte[] buffer = Encoding.UTF8.GetBytes("BDAT " + m_BdatBytesInBuffer + "\r\n");
+
+                        // Log
+                        m_pSmtpClient.LogAddWrite(buffer.Length,"BDAT " + m_BdatBytesInBuffer);
+                        m_pSmtpClient.LogAddWrite(m_BdatBytesInBuffer,"<BDAT data-chunk of " + m_BdatBytesInBuffer + " bytes>");
+
+                        // Copy data to send buffer.(BDAT xxxCRLF<xxx-bytes>).
+                        Array.Copy(buffer,m_BdatSendBuffer,buffer.Length);
+                        Array.Copy(m_pBdatBuffer,0,m_BdatSendBuffer,buffer.Length,m_BdatBytesInBuffer);
+
+                        // Start command sending.
+                        m_pSmtpClient.TcpStream.BeginWrite(m_BdatSendBuffer,0,buffer.Length + m_BdatBytesInBuffer,this.BdatCommandSendingCompleted,null);
+                    }
+                    // EOS, we readed all message data.
+                    else{
+                        byte[] buffer = Encoding.UTF8.GetBytes("BDAT 0 LAST\r\n");
+
+                        // Log
+                        m_pSmtpClient.LogAddWrite(buffer.Length,"BDAT 0 LAST");
+
+                        // Start command sending.
+                        m_pSmtpClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.BdatCommandSendingCompleted,null);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);
+                }
+            }
+
+            #endregion
+
+            #region method BdatCommandSendingCompleted
+
+            /// <summary>
+            /// Is called when BDAT command sending has finished.
+            /// </summary>
+            /// <param name="ar">Asynchronous result.</param>
+            private void BdatCommandSendingCompleted(IAsyncResult ar)
+            {
+                try{
+                    m_pSmtpClient.TcpStream.EndWrite(ar);
+
+                    // Read BDAT command response.
+                    ReadResponseAsyncOP readResponseOP = new ReadResponseAsyncOP();
+                    readResponseOP.CompletedAsync += delegate(object s,EventArgs<ReadResponseAsyncOP> e){
+                        BdatReadResponseCompleted(readResponseOP);
+                    };
+                    if(!m_pSmtpClient.ReadResponseAsync(readResponseOP)){
+                        BdatReadResponseCompleted(readResponseOP);
+                    }          
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);   
+                }
+            }
+
+            #endregion
+
+            #region method BdatReadResponseCompleted
+
+            /// <summary>
+            /// Is called when SMTP server BDAT command response reading has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+            private void BdatReadResponseCompleted(ReadResponseAsyncOP op)
+            {
+                if(op == null){
+                    throw new ArgumentNullException("op");
+                }
+
+                try{
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                        m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                        SetState(AsyncOP_State.Completed);
+                    }
+                    else{
+                        // BDAT succeeded.
+                        if(op.ReplyLines[0].ReplyCode == 250){ 
+                            // We have sent whole message, we are done.
+                            if(m_BdatBytesInBuffer == 0){
+                                SetState(AsyncOP_State.Completed);
+                                OnCompletedAsync();
+
+                                return;
+                            }
+                            // Send next BDAT data-chunk.
+                            else{
+                                // Start reading next message data-block.
+                                m_pStream.BeginRead(m_pBdatBuffer,0,m_pBdatBuffer.Length,this.BdatChunkReadingCompleted,null);
+                            }
+                        }
+                        // BDAT failed.
+                        else{
+                            m_pException = new SMTP_ClientException(op.ReplyLines);
+                        }
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                op.Dispose();
+            }
+
+            #endregion
+
+            #region method DataCommandSendingCompleted
+
+            /// <summary>
+            /// Is called when DATA command sending has finished.
+            /// </summary>
+            /// <param name="ar">Asynchronous result.</param>
+            private void DataCommandSendingCompleted(IAsyncResult ar)
+            {
+                try{
+                    m_pSmtpClient.TcpStream.EndWrite(ar);
+
+                    // Read DATA command response.
+                    ReadResponseAsyncOP readResponseOP = new ReadResponseAsyncOP();
+                    readResponseOP.CompletedAsync += delegate(object s,EventArgs<ReadResponseAsyncOP> e){
+                        DataReadResponseCompleted(readResponseOP);
+                    };
+                    if(!m_pSmtpClient.ReadResponseAsync(readResponseOP)){
+                        DataReadResponseCompleted(readResponseOP);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);    
+                }
+            }
+
+            #endregion
+
+            #region method DataReadResponseCompleted
+
+            /// <summary>
+            /// Is called when SMTP server DATA command initial response reading has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+            private void DataReadResponseCompleted(ReadResponseAsyncOP op)
+            {
+                if(op == null){
+                    throw new ArgumentNullException("op");
+                }
+
+                try{
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                        m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                        SetState(AsyncOP_State.Completed);
+                    }
+                    else{
+                        // DATA command succeeded.
+                        if(op.ReplyLines[0].ReplyCode == 354){ 
+                            // Start sending message.
+                            SmartStream.WritePeriodTerminatedAsyncOP sendMsgOP = new SmartStream.WritePeriodTerminatedAsyncOP(m_pStream);
+                            sendMsgOP.CompletedAsync += delegate(object s,EventArgs<SmartStream.WritePeriodTerminatedAsyncOP> e){
+                                DataMsgSendingCompleted(sendMsgOP);
+                            };
+                            if(!m_pSmtpClient.TcpStream.WritePeriodTerminatedAsync(sendMsgOP)){
+                                DataMsgSendingCompleted(sendMsgOP);
+                            }                            
+                        }
+                        // DATA command failed.
+                        else{
+                            m_pException = new SMTP_ClientException(op.ReplyLines);
+                        }
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                op.Dispose();
+            }
+
+            #endregion
+
+            #region method DataMsgSendingCompleted
+
+            /// <summary>
+            /// Is called when DATA command message sending has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+            private void DataMsgSendingCompleted(SmartStream.WritePeriodTerminatedAsyncOP op)
+            {
+                if(op == null){
+                    throw new ArgumentNullException("op");
+                }
+
+                try{
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                        m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                        SetState(AsyncOP_State.Completed);
+                    }
+                    else{
+                        // Log
+                        m_pSmtpClient.LogAddWrite(op.BytesWritten,"Sent message " + op.BytesWritten + " bytes.");
+                                                                       
+                        // Read DATA command final response.
+                        ReadResponseAsyncOP readResponseOP = new ReadResponseAsyncOP();
+                        readResponseOP.CompletedAsync += delegate(object s,EventArgs<ReadResponseAsyncOP> e){
+                            DataReadFinalResponseCompleted(readResponseOP);
+                        };
+                        if(!m_pSmtpClient.ReadResponseAsync(readResponseOP)){
+                            DataReadFinalResponseCompleted(readResponseOP);
+                        }
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                op.Dispose();
+            }
+
+            #endregion
+
+            #region method DataReadFinalResponseCompleted
+
+            /// <summary>
+            /// Is called when SMTP server DATA command final response reading has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+            private void DataReadFinalResponseCompleted(ReadResponseAsyncOP op)
+            {
+                if(op == null){
+                    throw new ArgumentNullException("op");
+                }
+
+                try{
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                        m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                        SetState(AsyncOP_State.Completed);
+                    }
+                    else{
+                        SetState(AsyncOP_State.Completed);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                op.Dispose();
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<SendMessageAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<SendMessageAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Starts sending message to SMTP server.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="SendMessageAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        public bool SendMessageAsync(SendMessageAsyncOP op)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("You must connect first.");
+            }
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+
+            return op.Start(this);
+        }
+
+        #endregion
+
+        #region method Rset
+
+        /// <summary>
+        /// Send RSET command to server.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
+        public void Rset()
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("You must connect first.");
+            }
+
+            ManualResetEvent wait = new ManualResetEvent(false);
+            RsetAsyncOP op = new RsetAsyncOP();
+            op.CompletedAsync += delegate(object s1,EventArgs<RsetAsyncOP> e1){
+                wait.Set();
+            };
+            if(!this.RsetAsync(op)){
+                wait.Set();
+            }
+            wait.WaitOne();
+
+            if(op.Error != null){
+                throw op.Error;
+            }
+        }
+
+        #endregion
+
+        #region method RsetAsync
+
+        #region class RsetAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="SMTP_Client.RsetAsync"/> asynchronous operation.
+        /// </summary>
+        public class RsetAsyncOP : IDisposable,IAsyncOP
+        {
+            private object        m_pLock         = new object();
+            private AsyncOP_State m_State         = AsyncOP_State.WaitingForStart;
+            private Exception     m_pException    = null;
+            private SMTP_Client   m_pSmtpClient   = null;
+            private bool          m_RiseCompleted = false;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            public RsetAsyncOP()
+            {
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resources being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+                
+                m_pException  = null;
+                m_pSmtpClient = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner SMTP client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            internal bool Start(SMTP_Client owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+
+                m_pSmtpClient = owner;
+
+                SetState(AsyncOP_State.Active);
+
+                try{
+                    /* RFC 5321 4.1.1.5.
+                        rset = "REST" CRLF
+                    */
+
+                    byte[] buffer = Encoding.UTF8.GetBytes("RSET\r\n");
+
+                    // Log
+                    m_pSmtpClient.LogAddWrite(buffer.Length,"RSET");
+
+                    // Start command sending.
+                    m_pSmtpClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.RsetCommandSendingCompleted,null);
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method RsetCommandSendingCompleted
+
+            /// <summary>
+            /// Is called when RSET command sending has finished.
+            /// </summary>
+            /// <param name="ar">Asynchronous result.</param>
+            private void RsetCommandSendingCompleted(IAsyncResult ar)
+            {
+                try{
+                    m_pSmtpClient.TcpStream.EndWrite(ar);
+
+                    // Read SMTP server response.
+                    ReadResponseAsyncOP readResponseOP = new ReadResponseAsyncOP();
+                    readResponseOP.CompletedAsync += delegate(object s,EventArgs<ReadResponseAsyncOP> e){
+                        RsetReadResponseCompleted(readResponseOP);
+                    };
+                    if(!m_pSmtpClient.ReadResponseAsync(readResponseOP)){
+                        RsetReadResponseCompleted(readResponseOP);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);
+                }
+            }
+
+            #endregion
+
+            #region method RsetReadResponseCompleted
+
+            /// <summary>
+            /// Is called when SMTP server RSET command response reading has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+            private void RsetReadResponseCompleted(ReadResponseAsyncOP op)
+            {
+                if(op == null){
+                    throw new ArgumentNullException("op");
+                }
+
+                try{
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                        m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    }
+                    else{
+                        // RSET succeeded.
+                        if(op.ReplyLines[0].ReplyCode == 250){
+                            /* RFC 5321 4.1.1.9.
+                                rset      = "RSET" CRLF
+                                rset-resp = "250 OK" CRLF
+                            */
+
+                            // Do nothing.
+                        }
+                        // RSET failed.
+                        else{
+                            m_pException = new SMTP_ClientException(op.ReplyLines);
+                            m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                        }
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + x.Message,x);
+                }
+
+                SetState(AsyncOP_State.Completed);
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<RsetAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<RsetAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Starts sending RSET command to SMTP server.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="RsetAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        public bool RsetAsync(RsetAsyncOP op)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("You must connect first.");
+            }
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+
+            return op.Start(this);
+        }
+
+        #endregion
+                
+        #region method Noop
+
+        /// <summary>
+        /// Send NOOP command to server. This method can be used for keeping connection alive(not timing out).
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
+        public void Noop()
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("You must connect first.");
+            }
+
+            ManualResetEvent wait = new ManualResetEvent(false);
+            NoopAsyncOP op = new NoopAsyncOP();
+            op.CompletedAsync += delegate(object s1,EventArgs<NoopAsyncOP> e1){
+                wait.Set();
+            };
+            if(!this.NoopAsync(op)){
+                wait.Set();
+            }
+            wait.WaitOne();
+
+            if(op.Error != null){
+                throw op.Error;
+            }
+        }
+
+        #endregion
+        
+        #region method NoopAsync
+
+        #region class NoopAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="SMTP_Client.NoopAsync"/> asynchronous operation.
+        /// </summary>
+        public class NoopAsyncOP : IDisposable,IAsyncOP
+        {
+            private object        m_pLock         = new object();
+            private AsyncOP_State m_State         = AsyncOP_State.WaitingForStart;
+            private Exception     m_pException    = null;
+            private SMTP_Client   m_pSmtpClient   = null;
+            private bool          m_RiseCompleted = false;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            public NoopAsyncOP()
+            {
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resources being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+                
+                m_pException  = null;
+                m_pSmtpClient = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner SMTP client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            internal bool Start(SMTP_Client owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+
+                m_pSmtpClient = owner;
+
+                SetState(AsyncOP_State.Active);
+
+                try{
+                    /* RFC 5321 4.1.1.9.
+                        noop = "NOOP" [ SP String ] CRLF
+                    */
+
+                    byte[] buffer = Encoding.UTF8.GetBytes("NOOP\r\n");
+
+                    // Log
+                    m_pSmtpClient.LogAddWrite(buffer.Length,"NOOP");
+
+                    // Start command sending.
+                    m_pSmtpClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.NoopCommandSendingCompleted,null);                    
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method NoopCommandSendingCompleted
+
+            /// <summary>
+            /// Is called when NOOP command sending has finished.
+            /// </summary>
+            /// <param name="ar">Asynchronous result.</param>
+            private void NoopCommandSendingCompleted(IAsyncResult ar)
+            {
+                try{
+                    m_pSmtpClient.TcpStream.EndWrite(ar);
+
+                    // Read SMTP server response.
+                    ReadResponseAsyncOP readResponseOP = new ReadResponseAsyncOP();
+                    readResponseOP.CompletedAsync += delegate(object s,EventArgs<ReadResponseAsyncOP> e){
+                        NoopReadResponseCompleted(readResponseOP);
+                    };
+                    if(!m_pSmtpClient.ReadResponseAsync(readResponseOP)){
+                        NoopReadResponseCompleted(readResponseOP);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);
+                }
+            }
+
+            #endregion
+
+            #region method NoopReadResponseCompleted
+
+            /// <summary>
+            /// Is called when NOOP command response reading has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+            private void NoopReadResponseCompleted(ReadResponseAsyncOP op)
+            {
+                if(op == null){
+                    throw new ArgumentNullException("op");
+                }
+
+                try{
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                        m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    }
+                    else{
+                        // NOOP succeeded.
+                        if(op.ReplyLines[0].ReplyCode == 250){
+                            /* RFC 5321 4.1.1.9.
+                                noop      = "NOOP" [ SP String ] CRLF
+                                noop-resp = "250 OK" CRLF
+                            */
+
+                            // Do nothing.
+                        }
+                        // NOOP failed.
+                        else{
+                            m_pException = new SMTP_ClientException(op.ReplyLines);
+                            m_pSmtpClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                        }
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + x.Message,x);
+                }
+
+                op.Dispose();
+
+                SetState(AsyncOP_State.Completed);
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<NoopAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<NoopAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Starts sending NOOP command to SMTP server. This method can be used for keeping connection alive(not timing out).
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="NoopAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        public bool NoopAsync(NoopAsyncOP op)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("You must connect first.");
+            }
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+
+            return op.Start(this);
         }
 
         #endregion
@@ -1396,239 +3290,337 @@ namespace LumiSoft.Net.SMTP.Client
         #region override method OnConnected
 
         /// <summary>
-        /// This method is called after TCP client has sucessfully connected.
+        /// This method is called when TCP client has sucessfully connected.
         /// </summary>
-        protected override void OnConnected()
+        /// <param name="callback">Callback to be called to complete connect operation.</param>
+        protected override void OnConnected(CompleteConnectCallback callback)
+        {            
+            // Read SMTP server greeting response.
+            ReadResponseAsyncOP readGreetingOP = new ReadResponseAsyncOP();
+            readGreetingOP.CompletedAsync += delegate(object s,EventArgs<ReadResponseAsyncOP> e){
+                ReadServerGreetingCompleted(readGreetingOP,callback);
+            };
+            if(!ReadResponseAsync(readGreetingOP)){
+                ReadServerGreetingCompleted(readGreetingOP,callback);
+            }
+        }
+
+        #endregion
+
+        #region method ReadServerGreetingCompleted
+
+        /// <summary>
+        /// Is called when SMTP server greeting reading has completed.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <param name="connectCallback">Callback to be called to complete connect operation.</param>
+        private void ReadServerGreetingCompleted(ReadResponseAsyncOP op,CompleteConnectCallback connectCallback)
         {
-            /*
-			  Notes: Greeting may be single or multiline response.
-			 		
-			  Examples:
-			 	220<SP>SMTP server ready<CRLF> 
-			  
-			 	220-SMTP server ready<CRLF>
-			 	220-Addtitional text<CRLF>
-			 	220<SP>final row<CRLF>			  
-			*/
-                       
-            StringBuilder response = new StringBuilder();
-            string line = ReadLine();
-            response.AppendLine(line);
-            // Read multiline response.
-            while(line.Length >= 4 && line[3] == '-'){
-                line = ReadLine();
-                response.AppendLine(line);
-            }
+            Exception error = null;
 
-            if(line.StartsWith("220")){
-                m_GreetingText = response.ToString();
-            }
-            else{
-                throw new SMTP_ClientException(response.ToString());
-            }
-
-            #region EHLO/HELO
-
-            // If local host name not specified, get local computer name.
-            string localHostName = m_LocalHostName;
-            if(string.IsNullOrEmpty(localHostName)){
-                localHostName = System.Net.Dns.GetHostName();
-            }
-
-            // Do EHLO/HELO.
-            WriteLine("EHLO " + localHostName);
-
-            // Read server response.
-            line = ReadLine();
-            if(line.StartsWith("250")){
-                m_IsEsmtpSupported = true;
-
-                /* RFC 2821 4.1.1.1 EHLO
-					Examples:
-                        C: EHLO domain<CRLF>
-				    	S: 250-domain freeText<CRLF>
-				        S: 250-EHLO_keyword<CRLF>
-						S: 250 EHLO_keyword<CRLF>
-				 
-						250<SP> specifies that last EHLO response line.
-			    */
-
-                // We may have 250- or 250 SP as domain separator.
-                // 250-
-                if(line.StartsWith("250-")){
-                    m_RemoteHostName = line.Substring(4).Split(new char[]{' '},2)[0];
+            try{
+                // Greeting reading failed, we are done.
+                if(op.Error != null){
+                    error = op.Error;
                 }
-                // 250 SP
+                // Greeting reading succeded.
                 else{
-                    m_RemoteHostName = line.Split(new char[]{' '},3)[1];
-                }
+                    /* RFC 5321 4.2.
+                        Greeting = ( "220 " (Domain / address-literal) [ SP textstring ] CRLF ) /
+                                   ( "220-" (Domain / address-literal) [ SP textstring ] CRLF
+                                  *( "220-" [ textstring ] CRLF )
+                                     "220" [ SP textstring ] CRLF )
 
-                m_pEsmtpFeatures = new List<string>();
-                // Read multiline response, EHLO keywords.
-                while(line.StartsWith("250-")){
-                    line = ReadLine();
+                    */
 
-                    if(line.StartsWith("250")){
-                        m_pEsmtpFeatures.Add(line.Substring(4));
+                    // SMTP server accepted connection, get greeting text.
+                    if(op.ReplyLines[0].ReplyCode == 220){
+                        StringBuilder greetingText = new StringBuilder();
+                        foreach(SMTP_t_ReplyLine line in op.ReplyLines){
+                            greetingText.AppendLine(line.Text);
+                        }
+
+                        m_GreetingText = greetingText.ToString();
+                        m_pRecipients = new List<string>();
+                    }
+                    // SMTP server rejected connection.
+                    else{
+                        error = new SMTP_ClientException(op.ReplyLines);
                     }
                 }
             }
-            // Probably EHLO not supported, try HELO.
-            else{
-                m_IsEsmtpSupported = false;
-                m_pEsmtpFeatures   = new List<string>();
+            catch(Exception x){
+                error = x;
+            }
 
-                WriteLine("HELO " + localHostName);
+            // Complete TCP_Client connect operation.
+            connectCallback(error);
+        }
 
-                line = ReadLine();
-                if(line.StartsWith("250")){
-                    /* Rfc 2821 4.1.1.1 EHLO/HELO
-			            Syntax: "HELO" SP Domain CRLF
-                    
-                        Examples:
-                            C: HELO domain<CRLF>
-                            S: 250 domain freeText<CRLF>
-			        */
+        #endregion
 
-                    m_RemoteHostName = line.Split(new char[]{' '},3)[1];
+
+        #region method ReadResponseAsync
+
+        #region class ReadResponseAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="SMTP_Client.ReadResponseAsync"/> asynchronous operation.
+        /// </summary>
+        private class ReadResponseAsyncOP : IDisposable,IAsyncOP
+        {
+            private AsyncOP_State          m_State       = AsyncOP_State.WaitingForStart;
+            private Exception              m_pException  = null;
+            private SMTP_Client            m_pSmtpClient = null;
+            private List<SMTP_t_ReplyLine> m_pReplyLines = null;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            public ReadResponseAsyncOP()
+            {
+                m_pReplyLines = new List<SMTP_t_ReplyLine>();
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resource being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
                 }
-                // Server rejects us for some reason.
-                else{
-                    throw new SMTP_ClientException(line);
+                SetState(AsyncOP_State.Disposed);
+
+                m_pException  = null;
+                m_pSmtpClient = null;
+                m_pReplyLines = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner SMTP client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            internal bool Start(SMTP_Client owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+
+                m_pSmtpClient = owner;
+
+                try{
+                    SmartStream.ReadLineAsyncOP op = new SmartStream.ReadLineAsyncOP(new byte[8000],SizeExceededAction.JunkAndThrowException);
+                    op.Completed += delegate(object s,EventArgs<SmartStream.ReadLineAsyncOP> e){                        
+                        // Response reading completed.
+                        if(!ReadLineCompleted(op)){
+                            SetState(AsyncOP_State.Completed);                        
+                            OnCompletedAsync();
+                        }
+                        // Continue response reading.
+                        else{
+                            while(owner.TcpStream.ReadLine(op,true)){
+                                // Response reading completed.
+                                if(!ReadLineCompleted(op)){
+                                    SetState(AsyncOP_State.Completed);                        
+                                    OnCompletedAsync();
+
+                                    break;
+                                }
+                            }
+                        }
+                    };
+                    while(owner.TcpStream.ReadLine(op,true)){
+                        // Response reading completed.
+                        if(!ReadLineCompleted(op)){
+                            SetState(AsyncOP_State.Completed);
+
+                            return false;
+                        }                        
+                    }
+
+                    return true;
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    SetState(AsyncOP_State.Completed);
+
+                    return false;
+                }                
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                m_State = state;
+            }
+
+            #endregion
+
+            #region method ReadLineCompleted
+
+            /// <summary>
+            /// Is called when read line has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            /// <returns>Returns true if multiline response has more response lines.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+            private bool ReadLineCompleted(SmartStream.ReadLineAsyncOP op)
+            {
+                if(op == null){
+                    throw new ArgumentNullException("op");
+                }
+
+                try{
+                    // Line reading failed, we are done.
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                    }
+                    // Line reading succeeded.
+                    else{
+                        // Log.
+                        m_pSmtpClient.LogAddRead(op.BytesInBuffer,op.LineUtf8);
+
+                        SMTP_t_ReplyLine replyLine = SMTP_t_ReplyLine.Parse(op.LineUtf8);
+                        m_pReplyLines.Add(replyLine);
+
+                        return !replyLine.IsLastLine;
+                    }                    
+                }
+                catch(Exception x){
+                    m_pException = x;
+                }
+
+                return false;
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            /// <summary>
+            /// Gets SMTP server reply-lines.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public SMTP_t_ReplyLine[] ReplyLines
+            {
+                get{
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'ReplyLines' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+                    if(m_pException != null){
+                        throw m_pException;
+                    }
+
+                    return m_pReplyLines.ToArray();
                 }
             }
 
             #endregion
 
-            m_pRecipients = new List<string>();
-        }
+            #region Events implementation
 
-        #endregion
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<ReadResponseAsyncOP>> CompletedAsync = null;
 
+            #region method OnCompletedAsync
 
-        #region static method BeginGetDomainHosts
-
-        /// <summary>
-        /// Internal helper method for asynchronous SendMessage method.
-        /// </summary>
-        private delegate string[] GetDomainHostsDelegate(string domain);
-
-        /// <summary>
-        /// Starts getting specified email domain SMTP hosts.
-        /// </summary>
-        /// <param name="domain">Email domain or email address. For example domain.com or user@domain.com.</param>
-        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
-        /// <param name="state">User data.</param>
-        /// <returns>An IAsyncResult that references the asynchronous method.</returns>
-        /// <exception cref="ArgumentNullException">Is raised when <b>domain</b> is null.</exception>
-        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        public static IAsyncResult BeginGetDomainHosts(string domain,AsyncCallback callback,object state)
-        {
-            if(domain == null){
-                throw new ArgumentNullException("domain");
-            }
-            if(string.IsNullOrEmpty(domain)){
-                throw new ArgumentException("Invalid argument 'domain' value, you need to specify domain value.");
-            }
-            
-            GetDomainHostsDelegate asyncMethod = new GetDomainHostsDelegate(GetDomainHosts);
-            AsyncResultState asyncState = new AsyncResultState(null,asyncMethod,callback,state);
-            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(domain,new AsyncCallback(asyncState.CompletedCallback),null));
-
-            return asyncState;
-        }
-
-        #endregion
-
-        #region static method EndGetDomainHosts
-
-        /// <summary>
-        /// Ends a pending asynchronous BeginGetDomainHosts request.
-        /// </summary>
-        /// <param name="asyncResult">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
-        /// <returns>Returns specified email domain SMTP hosts.</returns>
-        /// <exception cref="ArgumentNullException">Is raised when <b>asyncResult</b> is null.</exception>
-        /// <exception cref="ArgumentException">Is raised when invalid <b>asyncResult</b> passed to this method.</exception>
-        public static string[] EndGetDomainHosts(IAsyncResult asyncResult)
-        {
-            if(asyncResult == null){
-                throw new ArgumentNullException("asyncResult");
-            }
-
-            AsyncResultState castedAsyncResult = asyncResult as AsyncResultState;
-            if(castedAsyncResult == null){
-                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginGetDomainHosts method.");
-            }
-            if(castedAsyncResult.IsEndCalled){
-                throw new InvalidOperationException("BeginGetDomainHosts was previously called for the asynchronous connection.");
-            }
-             
-            castedAsyncResult.IsEndCalled = true;
-            if(castedAsyncResult.AsyncDelegate is GetDomainHostsDelegate){
-                return ((GetDomainHostsDelegate)castedAsyncResult.AsyncDelegate).EndInvoke(castedAsyncResult.AsyncResult);
-            }
-            else{
-                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginGetDomainHosts method.");
-            }
-        }
-
-        #endregion
-
-        #region static method GetDomainHosts
-
-        /// <summary>
-        /// Gets specified email domain SMTP hosts. Values are in descending priority order.
-        /// </summary>
-        /// <param name="domain">Domain name. This value can be email address too, then domain parsed automatically.</param>
-        /// <returns>Returns specified email domain SMTP hosts.</returns>
-        /// <exception cref="ArgumentNullException">Is raised when <b>domain</b> is null.</exception>
-        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        /// <exception cref="DNS_ClientException">Is raised when DNS query failure.</exception>
-        public static string[] GetDomainHosts(string domain)
-        {
-            if(domain == null){
-                throw new ArgumentNullException("domain");
-            }
-            if(string.IsNullOrEmpty(domain)){
-                throw new ArgumentException("Invalid argument 'domain' value, you need to specify domain value.");
-            }
-
-            // We have email address, parse domain.
-            if(domain.IndexOf("@") > -1){
-                domain = domain.Substring(domain.IndexOf('@') + 1);
-            }
-
-            List<string> retVal = new List<string>();
-
-            // Get MX records.
-            using(Dns_Client dns = new Dns_Client()){
-                DnsServerResponse response = dns.Query(domain,DNS_QType.MX);
-                if(response.ResponseCode == DNS_RCode.NO_ERROR){
-                    foreach(DNS_rr_MX mx in response.GetMXRecords()){
-                        // Block invalid MX records.
-                        if(!string.IsNullOrEmpty(mx.Host)){
-                            retVal.Add(mx.Host);
-                        }
-                    }
-                }
-                else{
-                    throw new DNS_ClientException(response.ResponseCode);
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<ReadResponseAsyncOP>(this));
                 }
             }
 
-            /* RFC 2821 5.
-			    If no MX records are found, but an A RR is found, the A RR is treated as if it 
-                was associated with an implicit MX RR, with a preference of 0, pointing to that host.
-			*/
-            if(retVal.Count == 0){
-                retVal.Add(domain);
-            }
+            #endregion
 
-            return retVal.ToArray();
+            #endregion
         }
 
         #endregion
 
+        /// <summary>
+        /// Reads SMTP server single or multiline response.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="ReadResponseAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        private bool ReadResponseAsync(ReadResponseAsyncOP op)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+
+            return op.Start(this);
+        }
+
+        #endregion
+
+                
         #region static method QuickSend
 
         /// <summary>
@@ -1768,7 +3760,8 @@ namespace LumiSoft.Net.SMTP.Client
                 throw new ArgumentNullException("message");
             }
 
-            QuickSendSmartHost(localHost,SMTP_Client.GetDomainHosts(to)[0],25,false,from,new string[]{to},message);
+            Dns_Client dns = new Dns_Client();
+            QuickSendSmartHost(localHost,dns.GetEmailHosts(to)[0].HostName,25,false,from,new string[]{to},message);
         }
 
         #endregion
@@ -2116,18 +4109,674 @@ namespace LumiSoft.Net.SMTP.Client
                 return m_pAuthdUserIdentity; 
             }
         }
+                
+        #endregion
+
+                
+        //------- OBSOLETE
+
+        #region method BeginNoop
+
+        /// <summary>
+        /// Internal helper method for asynchronous Noop method.
+        /// </summary>
+        private delegate void NoopDelegate();
+
+        /// <summary>
+        /// Starts sending NOOP command to server. This method can be used for keeping connection alive(not timing out).
+        /// </summary>
+        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
+        /// <param name="state">User data.</param>
+        /// <returns>An IAsyncResult that references the asynchronous operation.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        [Obsolete("Use method 'NoopAsync' instead.")]
+        public IAsyncResult BeginNoop(AsyncCallback callback,object state)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+				throw new InvalidOperationException("You must connect first.");
+			}
+
+            NoopDelegate asyncMethod = new NoopDelegate(this.Noop);
+            AsyncResultState asyncState = new AsyncResultState(this,asyncMethod,callback,state);
+            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(new AsyncCallback(asyncState.CompletedCallback),null));
+
+            return asyncState;
+        }
+
+        #endregion
+
+        #region method EndNoop
+
+        /// <summary>
+        /// Ends a pending asynchronous Noop request.
+        /// </summary>
+        /// <param name="asyncResult">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>asyncResult</b> is null.</exception>
+        /// <exception cref="ArgumentException">Is raised when invalid <b>asyncResult</b> passed to this method.</exception>
+        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
+        [Obsolete("Use method 'NoopAsync' instead.")]
+        public void EndNoop(IAsyncResult asyncResult)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(asyncResult == null){
+                throw new ArgumentNullException("asyncResult");
+            }
+
+            AsyncResultState castedAsyncResult = asyncResult as AsyncResultState;
+            if(castedAsyncResult == null || castedAsyncResult.AsyncObject != this){
+                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginNoop method.");
+            }
+            if(castedAsyncResult.IsEndCalled){
+                throw new InvalidOperationException("BeginNoop was previously called for the asynchronous connection.");
+            }
+             
+            castedAsyncResult.IsEndCalled = true;
+            if(castedAsyncResult.AsyncDelegate is NoopDelegate){
+                ((NoopDelegate)castedAsyncResult.AsyncDelegate).EndInvoke(castedAsyncResult.AsyncResult);
+            }
+            else{
+                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginNoop method.");
+            }
+        }
+
+        #endregion
+
+        #region method BeginStartTLS
+
+        /// <summary>
+        /// Internal helper method for asynchronous StartTLS method.
+        /// </summary>
+        private delegate void StartTLSDelegate();
+
+        /// <summary>
+        /// Starts switching to SSL.
+        /// </summary>
+        /// <returns>An IAsyncResult that references the asynchronous operation.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected or is already secure connection.</exception>
+        [Obsolete("Use method StartTlsAsync instead.")]
+        public IAsyncResult BeginStartTLS(AsyncCallback callback,object state)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+				throw new InvalidOperationException("You must connect first.");
+			}
+            if(this.IsSecureConnection){
+                throw new InvalidOperationException("Connection is already secure.");
+            }
+
+            StartTLSDelegate asyncMethod = new StartTLSDelegate(this.StartTLS);
+            AsyncResultState asyncState = new AsyncResultState(this,asyncMethod,callback,state);
+            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(new AsyncCallback(asyncState.CompletedCallback),null));
+
+            return asyncState;
+        }
+
+        #endregion
+
+        #region method EndStartTLS
+
+        /// <summary>
+        /// Ends a pending asynchronous StartTLS request.
+        /// </summary>
+        /// <param name="asyncResult">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>asyncResult</b> is null.</exception>
+        /// <exception cref="ArgumentException">Is raised when invalid <b>asyncResult</b> passed to this method.</exception>
+        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
+        [Obsolete("Use method StartTlsAsync instead.")]
+        public void EndStartTLS(IAsyncResult asyncResult)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(asyncResult == null){
+                throw new ArgumentNullException("asyncResult");
+            }
+
+            AsyncResultState castedAsyncResult = asyncResult as AsyncResultState;
+            if(castedAsyncResult == null || castedAsyncResult.AsyncObject != this){
+                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginReset method.");
+            }
+            if(castedAsyncResult.IsEndCalled){
+                throw new InvalidOperationException("BeginReset was previously called for the asynchronous connection.");
+            }
+             
+            castedAsyncResult.IsEndCalled = true;
+            if(castedAsyncResult.AsyncDelegate is StartTLSDelegate){
+                ((StartTLSDelegate)castedAsyncResult.AsyncDelegate).EndInvoke(castedAsyncResult.AsyncResult);
+            }
+            else{
+                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginReset method.");
+            }
+        }
+
+        #endregion
+
+        #region method BeginRcptTo
+
+        /// <summary>
+        /// Internal helper method for asynchronous RcptTo method.
+        /// </summary>
+        private delegate void RcptToDelegate(string to,SMTP_DSN_Notify notify,string orcpt);
+
+        /// <summary>
+        /// Starts sending RCPT TO: command to SMTP server.
+        /// </summary>
+        /// <param name="to">Recipient email address.</param>
+        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
+        /// <param name="state">User data.</param>
+        /// <returns>An IAsyncResult that references the asynchronous disconnect.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        [Obsolete("Use method RcptToAsync instead.")]
+        public IAsyncResult BeginRcptTo(string to,AsyncCallback callback,object state)
+        {
+            return BeginRcptTo(to,SMTP_DSN_Notify.NotSpecified,null,callback,state);
+        }
+
+        /// <summary>
+        /// Starts sending RCPT TO: command to SMTP server.
+        /// </summary>
+        /// <param name="to">Recipient email address.</param>
+        /// <param name="notify">Delivery satus notification(DSN) NOTIFY value. For more info see RFC 3461.</param>
+        /// <param name="orcpt">Delivery satus notification(DSN) ORCPT value. Value null means not specified. For more info see RFC 3461.</param>
+        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
+        /// <param name="state">User data.</param>
+        /// <returns>An IAsyncResult that references the asynchronous disconnect.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        /// <remarks>Before using <b>notify</b> or <b>orcpt</b> arguments, check that remote server supports SMTP DSN extention.</remarks>
+        [Obsolete("Use method RcptToAsync instead.")]
+        public IAsyncResult BeginRcptTo(string to,SMTP_DSN_Notify notify,string orcpt,AsyncCallback callback,object state)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+				throw new InvalidOperationException("You must connect first.");
+			}
+
+            RcptToDelegate asyncMethod = new RcptToDelegate(this.RcptTo);
+            AsyncResultState asyncState = new AsyncResultState(this,asyncMethod,callback,state);
+            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(to,notify,orcpt,new AsyncCallback(asyncState.CompletedCallback),null));
+
+            return asyncState;
+        }
+
+        #endregion
+
+        #region method EndRcptTo
+
+        /// <summary>
+        /// Ends a pending asynchronous RcptTo request.
+        /// </summary>
+        /// <param name="asyncResult">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>asyncResult</b> is null.</exception>
+        /// <exception cref="ArgumentException">Is raised when invalid <b>asyncResult</b> passed to this method.</exception>
+        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
+        [Obsolete("Use method RcptToAsync instead.")]
+        public void EndRcptTo(IAsyncResult asyncResult)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(asyncResult == null){
+                throw new ArgumentNullException("asyncResult");
+            }
+
+            AsyncResultState castedAsyncResult = asyncResult as AsyncResultState;
+            if(castedAsyncResult == null || castedAsyncResult.AsyncObject != this){
+                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginReset method.");
+            }
+            if(castedAsyncResult.IsEndCalled){
+                throw new InvalidOperationException("BeginReset was previously called for the asynchronous connection.");
+            }
+             
+            castedAsyncResult.IsEndCalled = true;
+            if(castedAsyncResult.AsyncDelegate is RcptToDelegate){
+                ((RcptToDelegate)castedAsyncResult.AsyncDelegate).EndInvoke(castedAsyncResult.AsyncResult);
+            }
+            else{
+                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginReset method.");
+            }
+        }
+
+        #endregion
+
+        #region method BeginMailFrom
+
+        /// <summary>
+        /// Internal helper method for asynchronous MailFrom method.
+        /// </summary>
+        private delegate void MailFromDelegate(string from,long messageSize,SMTP_DSN_Ret ret,string envid);
+
+        /// <summary>
+        /// Starts sending MAIL FROM: command to SMTP server.
+        /// </summary>
+        /// <param name="from">Sender email address reported to SMTP server.</param>
+        /// <param name="messageSize">Sendable message size in bytes, -1 if message size unknown.</param>
+        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
+        /// <param name="state">User data.</param>
+        /// <returns>An IAsyncResult that references the asynchronous disconnect.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        [Obsolete("Use method MailFromAsync instead.")]
+        public IAsyncResult BeginMailFrom(string from,long messageSize,AsyncCallback callback,object state)
+        {
+            return BeginMailFrom(from,messageSize,SMTP_DSN_Ret.NotSpecified,null,callback,state);
+        }
+
+        /// <summary>
+        /// Starts sending MAIL FROM: command to SMTP server.
+        /// </summary>
+        /// <param name="from">Sender email address reported to SMTP server.</param>
+        /// <param name="messageSize">Sendable message size in bytes, -1 if message size unknown.</param>
+        /// <param name="ret">Delivery satus notification(DSN) ret value. For more info see RFC 3461.</param>
+        /// <param name="envid">Envelope ID. Value null means not specified. For more info see RFC 3461.</param>
+        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
+        /// <param name="state">User data.</param>
+        /// <returns>An IAsyncResult that references the asynchronous disconnect.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        /// <remarks>Before using <b>ret</b> or <b>envid</b> arguments, check that remote server supports SMTP DSN extention.</remarks>
+        [Obsolete("Use method MailFromAsync instead.")]
+        public IAsyncResult BeginMailFrom(string from,long messageSize,SMTP_DSN_Ret ret,string envid,AsyncCallback callback,object state)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+				throw new InvalidOperationException("You must connect first.");
+			}
+
+            MailFromDelegate asyncMethod = new MailFromDelegate(this.MailFrom);
+            AsyncResultState asyncState = new AsyncResultState(this,asyncMethod,callback,state);
+            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(from,(int)messageSize,ret,envid,new AsyncCallback(asyncState.CompletedCallback),null));
+
+            return asyncState;
+        }
+
+        #endregion
+
+        #region method EndMailFrom
+
+        /// <summary>
+        /// Ends a pending asynchronous MailFrom request.
+        /// </summary>
+        /// <param name="asyncResult">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>asyncResult</b> is null.</exception>
+        /// <exception cref="ArgumentException">Is raised when invalid <b>asyncResult</b> passed to this method.</exception>
+        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
+        [Obsolete("Use method MailFromAsync instead.")]
+        public void EndMailFrom(IAsyncResult asyncResult)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(asyncResult == null){
+                throw new ArgumentNullException("asyncResult");
+            }
+
+            AsyncResultState castedAsyncResult = asyncResult as AsyncResultState;
+            if(castedAsyncResult == null || castedAsyncResult.AsyncObject != this){
+                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginReset method.");
+            }
+            if(castedAsyncResult.IsEndCalled){
+                throw new InvalidOperationException("BeginReset was previously called for the asynchronous connection.");
+            }
+             
+            castedAsyncResult.IsEndCalled = true;
+            if(castedAsyncResult.AsyncDelegate is MailFromDelegate){
+                ((MailFromDelegate)castedAsyncResult.AsyncDelegate).EndInvoke(castedAsyncResult.AsyncResult);
+            }
+            else{
+                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginReset method.");
+            }
+        }
+
+        #endregion
+
+        #region method BeginReset
+
+        /// <summary>
+        /// Internal helper method for asynchronous Reset method.
+        /// </summary>
+        private delegate void ResetDelegate();
+
+        /// <summary>
+        /// Starts resetting SMTP session, all state data will be deleted.
+        /// </summary>
+        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
+        /// <param name="state">User data.</param>
+        /// <returns>An IAsyncResult that references the asynchronous disconnect.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        [Obsolete("Use 'RsetAsync' method instead.")]
+        public IAsyncResult BeginReset(AsyncCallback callback,object state)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+				throw new InvalidOperationException("You must connect first.");
+			}
+
+            ResetDelegate asyncMethod = new ResetDelegate(this.Reset);
+            AsyncResultState asyncState = new AsyncResultState(this,asyncMethod,callback,state);
+            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(new AsyncCallback(asyncState.CompletedCallback),null));
+
+            return asyncState;
+        }
+
+        #endregion
+
+        #region method EndReset
+
+        /// <summary>
+        /// Ends a pending asynchronous reset request.
+        /// </summary>
+        /// <param name="asyncResult">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>asyncResult</b> is null.</exception>
+        /// <exception cref="ArgumentException">Is raised when invalid <b>asyncResult</b> passed to this method.</exception>
+        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
+        [Obsolete("Use 'RsetAsync' method instead.")]
+        public void EndReset(IAsyncResult asyncResult)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(asyncResult == null){
+                throw new ArgumentNullException("asyncResult");
+            }
+
+            AsyncResultState castedAsyncResult = asyncResult as AsyncResultState;
+            if(castedAsyncResult == null || castedAsyncResult.AsyncObject != this){
+                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginReset method.");
+            }
+            if(castedAsyncResult.IsEndCalled){
+                throw new InvalidOperationException("BeginReset was previously called for the asynchronous connection.");
+            }
+             
+            castedAsyncResult.IsEndCalled = true;
+            if(castedAsyncResult.AsyncDelegate is ResetDelegate){
+                ((ResetDelegate)castedAsyncResult.AsyncDelegate).EndInvoke(castedAsyncResult.AsyncResult);
+            }
+            else{
+                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginReset method.");
+            }
+        }
+
+        #endregion
+
+        #region method Reset
+
+        /// <summary>
+        /// Resets SMTP session, all state data will be deleted.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
+        [Obsolete("Use Rset method instead.")]
+        public void Reset()
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("You must connect first.");
+            }
+
+            /* RFC 2821 4.1.1.5 RESET (RSET).
+                This command specifies that the current mail transaction will be
+                aborted.  Any stored sender, recipients, and mail data MUST be
+                discarded, and all buffers and state tables cleared.  The receiver
+                MUST send a "250 OK" reply to a RSET command with no arguments.  A
+                reset command may be issued by the client at any time.
+            */
+
+            WriteLine("RSET");
+
+			string line = ReadLine();
+			if(!line.StartsWith("250")){
+				throw new SMTP_ClientException(line);
+			}
+
+            m_MailFrom = null;
+            m_pRecipients.Clear();
+        }
+
+        #endregion
+
+        #region method BeginSendMessage
+
+        /// <summary>
+        /// Internal helper method for asynchronous SendMessage method.
+        /// </summary>
+        private delegate void SendMessageDelegate(Stream message);
+
+        /// <summary>
+        /// Starts sending specified raw message to SMTP server.
+        /// </summary>
+        /// <param name="message">Message stream. Message will be readed from current stream position and to the end of stream.</param>
+        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
+        /// <param name="state">User data.</param>
+        /// <returns>An IAsyncResult that references the asynchronous method.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>message</b> is null.</exception>
+        [Obsolete("Use method 'SendMessageAsync' instead.")]
+        public IAsyncResult BeginSendMessage(Stream message,AsyncCallback callback,object state)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("You must connect first.");
+            }
+            if(message == null){
+                throw new ArgumentNullException("message");
+            }
+
+            SendMessageDelegate asyncMethod = new SendMessageDelegate(this.SendMessage);
+            AsyncResultState asyncState = new AsyncResultState(this,asyncMethod,callback,state);
+            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(message,new AsyncCallback(asyncState.CompletedCallback),null));
+
+            return asyncState;
+        }
+
+        #endregion
+
+        #region method EndSendMessage
+
+        /// <summary>
+        /// Ends a pending asynchronous SendMessage request.
+        /// </summary>
+        /// <param name="asyncResult">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>asyncResult</b> is null.</exception>
+        /// <exception cref="ArgumentException">Is raised when invalid <b>asyncResult</b> passed to this method.</exception>
+        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
+        [Obsolete("Use method 'SendMessageAsync' instead.")]
+        public void EndSendMessage(IAsyncResult asyncResult)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(asyncResult == null){
+                throw new ArgumentNullException("asyncResult");
+            }
+
+            AsyncResultState castedAsyncResult = asyncResult as AsyncResultState;
+            if(castedAsyncResult == null || castedAsyncResult.AsyncObject != this){
+                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginSendMessage method.");
+            }
+            if(castedAsyncResult.IsEndCalled){
+                throw new InvalidOperationException("BeginSendMessage was previously called for the asynchronous connection.");
+            }
+             
+            castedAsyncResult.IsEndCalled = true;
+            if(castedAsyncResult.AsyncDelegate is SendMessageDelegate){
+                ((SendMessageDelegate)castedAsyncResult.AsyncDelegate).EndInvoke(castedAsyncResult.AsyncResult);
+            }
+            else{
+                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginSendMessage method.");
+            }
+        }
+
+        #endregion
+
+
+        #region static method BeginGetDomainHosts
+
+        /// <summary>
+        /// Internal helper method for asynchronous SendMessage method.
+        /// </summary>
+        private delegate string[] GetDomainHostsDelegate(string domain);
+
+        /// <summary>
+        /// Starts getting specified email domain SMTP hosts.
+        /// </summary>
+        /// <param name="domain">Email domain or email address. For example domain.com or user@domain.com.</param>
+        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
+        /// <param name="state">User data.</param>
+        /// <returns>An IAsyncResult that references the asynchronous method.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>domain</b> is null.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>        
+        [Obsolete("Use method Dns_Client.GetEmailHostsAsync instead.")]
+        public static IAsyncResult BeginGetDomainHosts(string domain,AsyncCallback callback,object state)
+        {
+            if(domain == null){
+                throw new ArgumentNullException("domain");
+            }
+            if(string.IsNullOrEmpty(domain)){
+                throw new ArgumentException("Invalid argument 'domain' value, you need to specify domain value.");
+            }
+            
+            GetDomainHostsDelegate asyncMethod = new GetDomainHostsDelegate(GetDomainHosts);
+            AsyncResultState asyncState = new AsyncResultState(null,asyncMethod,callback,state);
+            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(domain,new AsyncCallback(asyncState.CompletedCallback),null));
+
+            return asyncState;
+        }
+
+        #endregion
+
+        #region static method EndGetDomainHosts
+
+        /// <summary>
+        /// Ends a pending asynchronous BeginGetDomainHosts request.
+        /// </summary>
+        /// <param name="asyncResult">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
+        /// <returns>Returns specified email domain SMTP hosts.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>asyncResult</b> is null.</exception>
+        /// <exception cref="ArgumentException">Is raised when invalid <b>asyncResult</b> passed to this method.</exception>      
+        [Obsolete("Use method Dns_Client.GetEmailHostsAsync instead.")]
+        public static string[] EndGetDomainHosts(IAsyncResult asyncResult)
+        {
+            if(asyncResult == null){
+                throw new ArgumentNullException("asyncResult");
+            }
+
+            AsyncResultState castedAsyncResult = asyncResult as AsyncResultState;
+            if(castedAsyncResult == null){
+                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginGetDomainHosts method.");
+            }
+            if(castedAsyncResult.IsEndCalled){
+                throw new InvalidOperationException("BeginGetDomainHosts was previously called for the asynchronous connection.");
+            }
+             
+            castedAsyncResult.IsEndCalled = true;
+            if(castedAsyncResult.AsyncDelegate is GetDomainHostsDelegate){
+                return ((GetDomainHostsDelegate)castedAsyncResult.AsyncDelegate).EndInvoke(castedAsyncResult.AsyncResult);
+            }
+            else{
+                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginGetDomainHosts method.");
+            }
+        }
+
+        #endregion
+
+        #region static method GetDomainHosts
+
+        /// <summary>
+        /// Gets specified email domain SMTP hosts. Values are in descending priority order.
+        /// </summary>
+        /// <param name="domain">Domain name. This value can be email address too, then domain parsed automatically.</param>
+        /// <returns>Returns specified email domain SMTP hosts.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>domain</b> is null.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="DNS_ClientException">Is raised when DNS query failure.</exception>
+        [Obsolete("Use method Dns_Client.GetEmailHosts instead.")]
+        public static string[] GetDomainHosts(string domain)
+        {
+            if(domain == null){
+                throw new ArgumentNullException("domain");
+            }
+            if(string.IsNullOrEmpty(domain)){
+                throw new ArgumentException("Invalid argument 'domain' value, you need to specify domain value.");
+            }
+
+            // We have email address, parse domain.
+            if(domain.IndexOf("@") > -1){
+                domain = domain.Substring(domain.IndexOf('@') + 1);
+            }
+
+            List<string> retVal = new List<string>();
+
+            // Get MX records.
+            using(Dns_Client dns = new Dns_Client()){
+                DnsServerResponse response = dns.Query(domain,DNS_QType.MX);
+                if(response.ResponseCode == DNS_RCode.NO_ERROR){
+                    foreach(DNS_rr_MX mx in response.GetMXRecords()){
+                        // Block invalid MX records.
+                        if(!string.IsNullOrEmpty(mx.Host)){
+                            retVal.Add(mx.Host);
+                        }
+                    }
+                }
+                else{
+                    throw new DNS_ClientException(response.ResponseCode);
+                }
+            }
+
+            /* RFC 2821 5.
+			    If no MX records are found, but an A RR is found, the A RR is treated as if it 
+                was associated with an implicit MX RR, with a preference of 0, pointing to that host.
+			*/
+            if(retVal.Count == 0){
+                retVal.Add(domain);
+            }
+
+            return retVal.ToArray();
+        }
+
+        #endregion
+
+        private bool m_BdatEnabled = true;
 
         /// <summary>
         /// Gets or sets if BDAT command can be used.
         /// </summary>
+        [Obsolete("Use method SendMessage argument 'useBdatIfPossibe' instead.")]
         public bool BdatEnabled
         {
             get{ return m_BdatEnabled; }
 
             set{ m_BdatEnabled = value; }
         }
-
-        #endregion
 
     }
 }
