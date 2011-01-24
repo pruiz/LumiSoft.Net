@@ -124,12 +124,13 @@ namespace LumiSoft.Net.DNS.Client
             ThreadPool.QueueUserWorkItem(delegate(object state){
                 try{
                     // Use DNS cache if allowed.
-			        if(Dns_Client.UseDnsCache){
+			        if(Dns_Client.UseDnsCache){ 
 	                    DnsServerResponse response = DnsCache.GetFromCache(m_QName,(int)m_QType);
 				        if(response != null){
 					        m_pResponse = response;
 
                             SetState(DNS_ClientTransactionState.Completed);
+                            Dispose();
 
                             return;
 				        }
@@ -169,18 +170,22 @@ namespace LumiSoft.Net.DNS.Client
             if(response == null){
                 throw new ArgumentNullException("response");
             }
-
+                        
             try{
                 lock(m_pLock){
+                    if(this.State != DNS_ClientTransactionState.Active){
+                        return;
+                    }
+
                     // Late arriving response or retransmitted response, just skip it.
                     if(m_pResponse != null){
                         return;
                     }
 
                     m_pResponse = response;
-                }
-                
-                SetState(DNS_ClientTransactionState.Completed);
+
+                    SetState(DNS_ClientTransactionState.Completed);
+                } 
             }
             finally{
                 if(this.State == DNS_ClientTransactionState.Completed){
