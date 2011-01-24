@@ -208,13 +208,30 @@ namespace LumiSoft.Net.DNS.Client
 				}
 			}
 
-            DNS_ClientTransaction retVal = new DNS_ClientTransaction(this,m_pRandom.Next(0xFFFF),queryType,queryText,timeout);
+            // Create transaction ID.
+            int transactionID = 0;
+            lock(m_pTransactions){
+                while(true){
+                    transactionID = m_pRandom.Next(0xFFFF);
+
+                    // We got not used transaction ID.
+                    if(!m_pTransactions.ContainsKey(transactionID)){
+                        break;
+                    }
+                }
+            }
+
+            DNS_ClientTransaction retVal = new DNS_ClientTransaction(this,transactionID,queryType,queryText,timeout);
             retVal.StateChanged += delegate(object s1,EventArgs<DNS_ClientTransaction> e1){
                 if(retVal.State == DNS_ClientTransactionState.Disposed){
-                    m_pTransactions.Remove(e1.Value.ID);
+                    lock(m_pTransactions){
+                        m_pTransactions.Remove(e1.Value.ID);
+                    }
                 }
             };
-            m_pTransactions.Add(retVal.ID,retVal);
+            lock(m_pTransactions){
+                m_pTransactions.Add(retVal.ID,retVal);
+            }
 
             return retVal;
         }
@@ -334,6 +351,7 @@ namespace LumiSoft.Net.DNS.Client
             private List<IPAddress> m_pIPv4Addresses = null;
             private List<IPAddress> m_pIPv6Addresses = null;
             private int             m_Counter        = 0;
+            private bool            m_RiseCompleted  = false;
 
             /// <summary>
             /// Default constructor.
@@ -391,12 +409,11 @@ namespace LumiSoft.Net.DNS.Client
 
                 SetState(AsyncOP_State.Active);
 
+                // Argument 'hostNameOrIP' is IP address.
                 if(Net_Utils.IsIPAddress(m_HostNameOrIP)){
                     m_pIPv4Addresses.Add(IPAddress.Parse(m_HostNameOrIP));
 
                     SetState(AsyncOP_State.Completed);
-
-                    return false;
                 }
                 // This is probably NetBios name.
 			    if(m_HostNameOrIP.IndexOf(".") == -1){
@@ -418,26 +435,23 @@ namespace LumiSoft.Net.DNS.Client
                             }
 
                             SetState(AsyncOP_State.Completed);
-
-                            // We may not call CompletedAsync event for synchronous completion.
-                            if(!ar.CompletedSynchronously){
-                                OnCompletedAsync();
-                            }
                         };
+
                         // Start resolving host ip addresses.
-                        return !System.Net.Dns.BeginGetHostAddresses(m_HostNameOrIP,callback,null).CompletedSynchronously; 
+                        System.Net.Dns.BeginGetHostAddresses(m_HostNameOrIP,callback,null); 
                     }
                     catch(Exception x){
                         m_pException = x;
                     }
 			    }
+                // Query A/AAAA records.
                 else{
                     #region A records transaction
 
                     DNS_ClientTransaction transaction_A = dnsClient.CreateTransaction(DNS_QType.A,m_HostNameOrIP,2000);
-                    transaction_A.StateChanged += delegate(object s1,EventArgs<DNS_ClientTransaction> e1){
+                    transaction_A.StateChanged += delegate(object s1,EventArgs<DNS_ClientTransaction> e1){ 
                         if(e1.Value.State == DNS_ClientTransactionState.Completed){
-                            lock(m_pLock){
+                            lock(m_pLock){ 
                                 if(e1.Value.Response.ResponseCode != DNS_RCode.NO_ERROR){
                                     m_pException = new DNS_ClientException(e1.Value.Response.ResponseCode);
                                 }
@@ -452,7 +466,6 @@ namespace LumiSoft.Net.DNS.Client
                                 // Both A and AAAA transactions are completed, we are done.
                                 if(m_Counter == 2){
                                     SetState(AsyncOP_State.Completed);
-                                    OnCompletedAsync();
                                 }
                             }
                         }
@@ -465,18 +478,17 @@ namespace LumiSoft.Net.DNS.Client
                             // Both A and AAAA transactions are completed, we are done.
                             if(m_Counter == 2){
                                 SetState(AsyncOP_State.Completed);
-                                OnCompletedAsync();
                             }
                         }
                     };
                     transaction_A.Start();
-
+                    
                     #endregion
 
                     #region AAAA records transaction
 
                     DNS_ClientTransaction transaction_AAAA = dnsClient.CreateTransaction(DNS_QType.AAAA,m_HostNameOrIP,2000);
-                    transaction_A.StateChanged += delegate(object s1,EventArgs<DNS_ClientTransaction> e1){
+                    transaction_AAAA.StateChanged += delegate(object s1,EventArgs<DNS_ClientTransaction> e1){
                         if(e1.Value.State == DNS_ClientTransactionState.Completed){
                             lock(m_pLock){
                                 if(e1.Value.Response.ResponseCode != DNS_RCode.NO_ERROR){
@@ -493,7 +505,6 @@ namespace LumiSoft.Net.DNS.Client
                                 // Both A and AAAA transactions are completed, we are done.
                                 if(m_Counter == 2){
                                     SetState(AsyncOP_State.Completed);
-                                    OnCompletedAsync();
                                 }
                             }
                         }
@@ -506,15 +517,21 @@ namespace LumiSoft.Net.DNS.Client
                             // Both A and AAAA transactions are completed, we are done.
                             if(m_Counter == 2){
                                 SetState(AsyncOP_State.Completed);
-                                OnCompletedAsync();
                             }
                         }
                     };
+                    transaction_AAAA.Start();
 
                     #endregion
                 }
 
-                return true;
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
             }
 
             #endregion
@@ -528,7 +545,17 @@ namespace LumiSoft.Net.DNS.Client
             /// <param name="state">New state.</param>
             private void SetState(AsyncOP_State state)
             {
-                m_State = state;
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
             }
 
             #endregion
@@ -713,6 +740,7 @@ namespace LumiSoft.Net.DNS.Client
             private string[]                                m_pHostNames     = null;
             private Dictionary<int,GetHostAddressesAsyncOP> m_pIpLookupQueue = null;
             private HostEntry[]                             m_pHostEntries   = null;
+            private bool                                    m_RiseCompleted  = false;
 
             /// <summary>
             /// Default constructor.
@@ -781,28 +809,31 @@ namespace LumiSoft.Net.DNS.Client
                 }
 
                 // Start operations.
-                bool async = false;
                 foreach(KeyValuePair<int,GetHostAddressesAsyncOP> entry in opList){
                     // NOTE: We may not access "entry" in CompletedAsync, because next for loop reassigns this value.
                     int index = entry.Key;
 
                     // This event is raised when GetHostAddressesAsync completes asynchronously.
                     entry.Value.CompletedAsync += delegate(object s1,EventArgs<GetHostAddressesAsyncOP> e1){                        
-                        GetHostAddressesCompleted(true,e1.Value,index);
+                        GetHostAddressesCompleted(e1.Value,index);
                     };                    
                     // GetHostAddressesAsync completes synchronously.
                     if(!dnsClient.GetHostAddressesAsync(entry.Value)){
-                        GetHostAddressesCompleted(false,entry.Value,index);
-                    }
-                    else{
-                        async = true;
+                        GetHostAddressesCompleted(entry.Value,index);
                     }
                 }
 
-                return async;
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
             }
 
             #endregion
+
 
             #region method SetState
 
@@ -812,7 +843,17 @@ namespace LumiSoft.Net.DNS.Client
             /// <param name="state">New state.</param>
             private void SetState(AsyncOP_State state)
             {
-                m_State = state;
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
             }
 
             #endregion
@@ -822,10 +863,9 @@ namespace LumiSoft.Net.DNS.Client
             /// <summary>
             /// This method is called when GetHostAddresses operation has completed.
             /// </summary>
-            /// <param name="async">If true, this method is called from asynchronous callback.</param>
             /// <param name="op">Asynchronous operation.</param>
             /// <param name="index">Index in 'm_pHostEntries' where to store lookup result.</param>
-            private void GetHostAddressesCompleted(bool async,GetHostAddressesAsyncOP op,int index)
+            private void GetHostAddressesCompleted(GetHostAddressesAsyncOP op,int index)
             {
                 lock(m_pLock){
                     if(op.Error != null){
@@ -838,9 +878,6 @@ namespace LumiSoft.Net.DNS.Client
                     m_pIpLookupQueue.Remove(index);
                     if(m_pIpLookupQueue.Count == 0){
                         SetState(AsyncOP_State.Completed);
-                        if(async){
-                            OnCompletedAsync();
-                        }
                     }
                 }
 
@@ -1022,10 +1059,12 @@ namespace LumiSoft.Net.DNS.Client
         /// </summary>
         public class GetEmailHostsAsyncOP : IDisposable,IAsyncOP
         {
-            private AsyncOP_State m_State      = AsyncOP_State.WaitingForStart;
-            private Exception     m_pException = null;
-            private string        m_Domain     = null;
-            private HostEntry[]   m_pHosts     = null;
+            private object        m_pLock         = new object();
+            private AsyncOP_State m_State         = AsyncOP_State.WaitingForStart;
+            private Exception     m_pException    = null;
+            private string        m_Domain        = null;
+            private HostEntry[]   m_pHosts        = null;
+            private bool          m_RiseCompleted = false;
 
             /// <summary>
             /// Default constructor.
@@ -1086,6 +1125,8 @@ namespace LumiSoft.Net.DNS.Client
                     throw new ArgumentNullException("dnsClient");
                 }
 
+                SetState(AsyncOP_State.Active);
+
                 /* RFC 5321 5.
                     The lookup first attempts to locate an MX record associated with the
                     name.  If a CNAME record is found, the resulting name is processed as
@@ -1097,20 +1138,46 @@ namespace LumiSoft.Net.DNS.Client
 
                 try{
                     LookupMX(dnsClient,m_Domain,false);
-
-                    return true;
                 }
                 catch(Exception x){
                     m_pException = x;
-
                     SetState(AsyncOP_State.Completed);
+                }
 
-                    return false;
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
                 }
             }
 
             #endregion
 
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
 
             #region method LookupMX
 
@@ -1177,16 +1244,13 @@ namespace LumiSoft.Net.DNS.Client
                                     // All MX records resolved.
                                     else{
                                         SetState(AsyncOP_State.Completed);
-                                        OnCompletedAsync();
                                     }
                                 }
                                 // Use CNAME as initial domain name.
                                 else if(e1.Value.Response.GetCNAMERecords().Length > 0){
                                     if(domainIsCName){
                                         m_pException = new Exception("CNAME to CNAME loop dedected.");
-
                                         SetState(AsyncOP_State.Completed);
-                                        OnCompletedAsync();
                                     }
                                     else{
                                         LookupMX(dnsClient,e1.Value.Response.GetCNAMERecords()[0].Alias,true);
@@ -1214,23 +1278,17 @@ namespace LumiSoft.Net.DNS.Client
                             // DNS server returned error, just return error.
                             else{
                                 m_pException = new DNS_ClientException(e1.Value.Response.ResponseCode);
-
                                 SetState(AsyncOP_State.Completed);
-                                OnCompletedAsync();
                             }
                         }
                         transaction_MX.Timeout += delegate(object s2,EventArgs e2){
                             m_pException = new IOException("DNS transaction timeout, no response from DNS server.");
-
                             SetState(AsyncOP_State.Completed);
-                            OnCompletedAsync();
                         };
                     }
                     catch(Exception x){
                         m_pException = x;
-
                         SetState(AsyncOP_State.Completed);
-                        OnCompletedAsync();
                     }
                 };
                 transaction_MX.Start();
@@ -1304,29 +1362,10 @@ namespace LumiSoft.Net.DNS.Client
                 op.Dispose();
 
                 SetState(AsyncOP_State.Completed);
-                OnCompletedAsync();
             }
 
             #endregion
-
-
-            #region method SetState
-
-            /// <summary>
-            /// Sets operation state.
-            /// </summary>
-            /// <param name="state">New state.</param>
-            private void SetState(AsyncOP_State state)
-            {
-                if(m_State == AsyncOP_State.Disposed){
-                    return;
-                }
-
-                m_State = state;
-            }
-
-            #endregion
-
+                                    
 
             #region Properties implementation
 
