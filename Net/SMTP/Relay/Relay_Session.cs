@@ -151,8 +151,6 @@ namespace LumiSoft.Net.SMTP.Relay
             m_SessionCreateTime = DateTime.Now;
             m_pTargets          = new List<Relay_Target>();
             m_pSmtpClient       = new SMTP_Client();
-
-            m_pSmtpClient.BdatEnabled = false;
         }
 
         /// <summary>
@@ -189,8 +187,6 @@ namespace LumiSoft.Net.SMTP.Relay
             m_SessionCreateTime = DateTime.Now;
             m_pTargets          = new List<Relay_Target>();
             m_pSmtpClient       = new SMTP_Client();
-
-            m_pSmtpClient.BdatEnabled = false;
         }
 
         #region override method Dispose
@@ -459,97 +455,162 @@ namespace LumiSoft.Net.SMTP.Relay
                 return;
             }
 
-            m_pSmtpClient.BeginConnect(new IPEndPoint(m_pLocalBindInfo.IP,0),m_pActiveTarget.Target,false,new AsyncCallback(this.ConnectCallback),null);
+            // Start connecting to remote end point.
+            TCP_Client.ConnectAsyncOP connectOP = new TCP_Client.ConnectAsyncOP(new IPEndPoint(m_pLocalBindInfo.IP,0),m_pActiveTarget.Target,false,null);
+            connectOP.CompletedAsync += delegate(object s,EventArgs<TCP_Client.ConnectAsyncOP> e){
+                ConnectCompleted(connectOP);
+            };
+            if(!m_pSmtpClient.ConnectAsync(connectOP)){
+                ConnectCompleted(connectOP);
+            }
         }
 
         #endregion
 
-        #region method ConnectCallback
+        #region method ConnectCompleted
 
         /// <summary>
-        /// This method is called when asynchronous Connect method completes.
+        /// Is called when EHLO/HELO command has completed.
         /// </summary>
-        /// <param name="ar">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
-        private void ConnectCallback(IAsyncResult ar)
+        /// <param name="op">Asynchronous operation.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        private void ConnectCompleted(TCP_Client.ConnectAsyncOP op)
         {
-            try{
-                m_pSmtpClient.EndConnect(ar);                
-                                
-                // Start TLS requested, start switching to SSL.
-                if(m_pActiveTarget.SslMode == SslMode.TLS){
-                    m_pSmtpClient.BeginStartTLS(new AsyncCallback(this.StartTlsCallback),null);
-                }
-                // Authentication requested, start authenticating.
-                else if(!string.IsNullOrEmpty(m_pActiveTarget.UserName)){
-                    m_pSmtpClient.BeginAuthenticate(m_pActiveTarget.UserName,m_pActiveTarget.Password,new AsyncCallback(this.AuthenticateCallback),null);
-                }
-                else{
-                    long messageSize = -1;
-                    try{
-                        messageSize = m_pRelayItem.MessageStream.Length - m_pRelayItem.MessageStream.Position;
-                    }
-                    catch{
-                        // Stream doesn't support seeking.
-                    }
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
 
-                    m_pSmtpClient.BeginMailFrom(
-                        this.From,
-                        messageSize,
-                        IsDsnSupported() ? m_pRelayItem.DSN_Ret : SMTP_DSN_Ret.NotSpecified,
-                        IsDsnSupported() ? m_pRelayItem.EnvelopeID : null,
-                        new AsyncCallback(this.MailFromCallback),
-                        null
-                   );
+            try{
+                // Connect failed.
+                if(op.Error != null){
+                    try{
+                        // Release IP usage.
+                        m_pServer.RemoveIpUsage(m_pActiveTarget.Target.Address);
+                        m_pActiveTarget = null;
+
+                        // Connect failed, if there are more target IPs, try next one.
+                        if(!this.IsDisposed && !this.IsConnected && m_pTargets.Count > 0){
+                            BeginConnect();
+                        }
+                        else{
+                            Dispose(op.Error);
+                        }
+                    }
+                    catch(Exception x1){
+                        Dispose(x1);
+                    }
+                }
+                // Connect suceeded.
+                else{
+                    // Do EHLO/HELO.
+                    string hostName = string.IsNullOrEmpty(m_pLocalBindInfo.HostName) ? Dns.GetHostName() : m_pLocalBindInfo.HostName;
+                    SMTP_Client.EhloHeloAsyncOP ehloOP = new SMTP_Client.EhloHeloAsyncOP(hostName);
+                    ehloOP.CompletedAsync += delegate(object s,EventArgs<SMTP_Client.EhloHeloAsyncOP> e){
+                        EhloCommandCompleted(ehloOP);
+                    };
+                    if(!m_pSmtpClient.EhloHeloAsync(ehloOP)){
+                        EhloCommandCompleted(ehloOP);
+                    }
                 }
             }
             catch(Exception x){
-                try{
-                    // Release IP usage.
-                    m_pServer.RemoveIpUsage(m_pActiveTarget.Target.Address);
-                    m_pActiveTarget = null;
-
-                    // Connect failed, if there are more target IPs, try next one.
-                    if(!this.IsDisposed && !this.IsConnected && m_pTargets.Count > 0){
-                        BeginConnect();
-                    }
-                    else{
-                        Dispose(x);
-                    }
-                }
-                catch(Exception xx){
-                    Dispose(xx);
-                }
+                Dispose(x);
             }
         }
 
         #endregion
 
-        #region method StartTlsCallback
+        #region method EhloCommandCompleted
 
         /// <summary>
-        /// This method is called when asynchronous <b>StartTLS</b> method completes.
+        /// Is called when EHLO/HELO command has completed.
         /// </summary>
-        /// <param name="ar">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
-        private void StartTlsCallback(IAsyncResult ar)
+        /// <param name="op">Asynchronous operation.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        private void EhloCommandCompleted(SMTP_Client.EhloHeloAsyncOP op)
         {
-            try{
-                m_pSmtpClient.EndStartTLS(ar);
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
 
-                // Authentication requested, start authenticating.
-                if(!string.IsNullOrEmpty(m_pActiveTarget.UserName)){
-                    m_pSmtpClient.BeginAuthenticate(m_pActiveTarget.UserName,m_pActiveTarget.Password,new AsyncCallback(this.AuthenticateCallback),null);
+            try{
+                if(op.Error != null){
+                    Dispose(op.Error);
                 }
                 else{
-                    long messageSize = -1;
-                    try{
-                        messageSize = m_pRelayItem.MessageStream.Length - m_pRelayItem.MessageStream.Position;
+                    // Start TLS requested, start switching to secure.
+                    if(!m_pSmtpClient.IsSecureConnection && m_pActiveTarget.SslMode == SslMode.TLS){
+                        SMTP_Client.StartTlsAsyncOP startTlsOP = new SMTP_Client.StartTlsAsyncOP(null);
+                        startTlsOP.CompletedAsync += delegate(object s,EventArgs<SMTP_Client.StartTlsAsyncOP> e){
+                            StartTlsCommandCompleted(startTlsOP);
+                        };
+                        if(!m_pSmtpClient.StartTlsAsync(startTlsOP)){
+                            StartTlsCommandCompleted(startTlsOP);
+                        }
                     }
-                    catch{
-                        // Stream doesn't support seeking.
+                    // Authentication requested, start authenticating.
+                    else if(!string.IsNullOrEmpty(m_pActiveTarget.UserName)){
+                        m_pSmtpClient.BeginAuthenticate(m_pActiveTarget.UserName,m_pActiveTarget.Password,new AsyncCallback(this.AuthenticateCallback),null);
                     }
+                    // Start MAIL command.
+                    else{
+                        long messageSize = -1;
+                        try{
+                            messageSize = m_pRelayItem.MessageStream.Length - m_pRelayItem.MessageStream.Position;
+                        }
+                        catch{
+                            // Stream doesn't support seeking.
+                        }
 
-                    m_pSmtpClient.BeginMailFrom(this.From,messageSize,new AsyncCallback(this.MailFromCallback),null);
+                        SMTP_Client.MailFromAsyncOP mailOP = new SMTP_Client.MailFromAsyncOP(
+                            this.From,
+                            messageSize,
+                            IsDsnSupported() ? m_pRelayItem.DSN_Ret : SMTP_DSN_Ret.NotSpecified,
+                            IsDsnSupported() ? m_pRelayItem.EnvelopeID : null
+                        );
+                        mailOP.CompletedAsync += delegate(object s,EventArgs<SMTP_Client.MailFromAsyncOP> e){
+                            MailCommandCompleted(mailOP);
+                        };
+                        if(!m_pSmtpClient.MailFromAsync(mailOP)){
+                            MailCommandCompleted(mailOP);
+                        }
+                    }
+                }                                
+            }
+            catch(Exception x){
+                Dispose(x);
+            }
+        }
+
+        #endregion
+
+        #region method StartTlsCommandCompleted
+
+        /// <summary>
+        /// Is called when STARTTLS command has completed.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        private void StartTlsCommandCompleted(SMTP_Client.StartTlsAsyncOP op)
+        {
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+
+            try{
+                if(op.Error != null){
+                    Dispose(op.Error);
                 }
+                else{
+                    // Do EHLO/HELO.
+                    SMTP_Client.EhloHeloAsyncOP ehloOP = new SMTP_Client.EhloHeloAsyncOP(null);
+                    ehloOP.CompletedAsync += delegate(object s,EventArgs<SMTP_Client.EhloHeloAsyncOP> e){
+                        EhloCommandCompleted(ehloOP);
+                    };
+                    if(!m_pSmtpClient.EhloHeloAsync(ehloOP)){
+                        EhloCommandCompleted(ehloOP);
+                    }                    
+                }                                
             }
             catch(Exception x){
                 Dispose(x);
@@ -577,14 +638,18 @@ namespace LumiSoft.Net.SMTP.Relay
                     // Stream doesn't support seeking.
                 }
 
-                m_pSmtpClient.BeginMailFrom(
+                SMTP_Client.MailFromAsyncOP mailOP = new SMTP_Client.MailFromAsyncOP(
                     this.From,
                     messageSize,
                     IsDsnSupported() ? m_pRelayItem.DSN_Ret : SMTP_DSN_Ret.NotSpecified,
-                    IsDsnSupported() ? m_pRelayItem.EnvelopeID : null,
-                    new AsyncCallback(this.MailFromCallback),
-                    null
+                    IsDsnSupported() ? m_pRelayItem.EnvelopeID : null
                 );
+                mailOP.CompletedAsync += delegate(object s,EventArgs<SMTP_Client.MailFromAsyncOP> e){
+                    MailCommandCompleted(mailOP);
+                };
+                if(!m_pSmtpClient.MailFromAsync(mailOP)){
+                    MailCommandCompleted(mailOP);
+                }
             }
             catch(Exception x){
                 Dispose(x);
@@ -593,24 +658,36 @@ namespace LumiSoft.Net.SMTP.Relay
 
         #endregion
 
-        #region method MailFromCallback
+        #region method MailCommandCompleted
 
         /// <summary>
-        /// This method is called when asynchronous MailFrom method completes.
+        /// Is called when MAIL command has completed.
         /// </summary>
-        /// <param name="ar">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
-        private void MailFromCallback(IAsyncResult ar)
+        /// <param name="op">Asynchronous operation.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        private void MailCommandCompleted(SMTP_Client.MailFromAsyncOP op)
         {
-            try{
-                m_pSmtpClient.EndMailFrom(ar);
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
 
-                m_pSmtpClient.BeginRcptTo(
-                    this.To,
-                    IsDsnSupported() ? m_pRelayItem.DSN_Notify : SMTP_DSN_Notify.NotSpecified,
-                    IsDsnSupported() ? m_pRelayItem.OriginalRecipient : null,
-                    new AsyncCallback(this.RcptToCallback),
-                    null
-                );
+            try{
+                if(op.Error != null){
+                    Dispose(op.Error);
+                }
+                else{
+                    SMTP_Client.RcptToAsyncOP rcptOP = new SMTP_Client.RcptToAsyncOP(
+                        this.To,
+                        IsDsnSupported() ? m_pRelayItem.DSN_Notify : SMTP_DSN_Notify.NotSpecified,
+                        IsDsnSupported() ? m_pRelayItem.OriginalRecipient : null
+                    );
+                    rcptOP.CompletedAsync += delegate(object s,EventArgs<SMTP_Client.RcptToAsyncOP> e){
+                        RcptCommandCompleted(rcptOP);
+                    };
+                    if(!m_pSmtpClient.RcptToAsync(rcptOP)){
+                        RcptCommandCompleted(rcptOP);
+                    }
+                }                                
             }
             catch(Exception x){
                 Dispose(x);
@@ -619,18 +696,33 @@ namespace LumiSoft.Net.SMTP.Relay
 
         #endregion
 
-        #region method RcptToCallback
+        #region method RcptCommandCompleted
 
         /// <summary>
-        /// This method is called when asynchronous RcptTo method completes.
+        /// Is called when RCPT command has completed.
         /// </summary>
-        /// <param name="ar">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
-        private void RcptToCallback(IAsyncResult ar)
+        /// <param name="op">Asynchronous operation.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        private void RcptCommandCompleted(SMTP_Client.RcptToAsyncOP op)
         {
-            try{
-                m_pSmtpClient.EndRcptTo(ar);
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
 
-                m_pSmtpClient.BeginSendMessage(m_pRelayItem.MessageStream,new AsyncCallback(this.SendMessageCallback),null);
+            try{
+                if(op.Error != null){
+                    Dispose(op.Error);
+                }
+                else{
+                    // Start sending message.
+                    SMTP_Client.SendMessageAsyncOP sendMsgOP = new SMTP_Client.SendMessageAsyncOP(m_pRelayItem.MessageStream,false);
+                    sendMsgOP.CompletedAsync += delegate(object s,EventArgs<SMTP_Client.SendMessageAsyncOP> e){
+                        MessageSendingCompleted(sendMsgOP);
+                    };
+                    if(!m_pSmtpClient.SendMessageAsync(sendMsgOP)){
+                        MessageSendingCompleted(sendMsgOP);
+                    }
+                }                                
             }
             catch(Exception x){
                 Dispose(x);
@@ -639,23 +731,33 @@ namespace LumiSoft.Net.SMTP.Relay
 
         #endregion
 
-        #region method SendMessageCallback
+        #region method MessageSendingCompleted
 
         /// <summary>
-        /// This method is called when asynchronous SendMessage method completes.
+        /// Is called when message sending has completed.
         /// </summary>
-        /// <param name="ar">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
-        private void SendMessageCallback(IAsyncResult ar)
+        /// <param name="op">Asynchronous operation.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        private void MessageSendingCompleted(SMTP_Client.SendMessageAsyncOP op)
         {
-            try{
-                m_pSmtpClient.EndSendMessage(ar);
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
 
-                // Message relayed successfully.
-                Dispose(null);
+            try{
+                if(op.Error != null){
+                    Dispose(op.Error);
+                }
+                // Message sent sucessfully.
+                else{
+                    Dispose(null);
+                }
             }
             catch(Exception x){
                 Dispose(x);
             }
+
+            op.Dispose();
         }
 
         #endregion
@@ -736,59 +838,6 @@ namespace LumiSoft.Net.SMTP.Relay
             }
 
             return false;
-        }
-
-        #endregion
-// REMOVE ME:
-        #region method GetDomainHosts
-
-        /// <summary>
-        /// Gets specified email domain SMTP hosts. Values are in descending priority order.
-        /// </summary>
-        /// <param name="domain">Domain name. This value can be email address too, then domain parsed automatically.</param>
-        /// <returns>Returns specified email domain SMTP hosts.</returns>
-        /// <exception cref="ArgumentNullException">Is raised when <b>domain</b> is null.</exception>
-        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        /// <exception cref="DNS_ClientException">Is raised when DNS query failure.</exception>
-        private string[] GetDomainHosts(string domain)
-        {
-            if(domain == null){
-                throw new ArgumentNullException("domain");
-            }
-            if(string.IsNullOrEmpty(domain)){
-                throw new ArgumentException("Invalid argument 'domain' value, you need to specify domain value.");
-            }
-
-            // We have email address, parse domain.
-            if(domain.IndexOf("@") > -1){
-                domain = domain.Substring(domain.IndexOf('@') + 1);
-            }
-
-            List<string> retVal = new List<string>();
-
-            // Get MX records.
-            DnsServerResponse response = m_pServer.DnsClient.Query(domain,DNS_QType.MX);
-            if(response.ResponseCode == DNS_RCode.NO_ERROR){
-                foreach(DNS_rr_MX mx in response.GetMXRecords()){
-                    // Block invalid MX records.
-                    if(!string.IsNullOrEmpty(mx.Host)){
-                        retVal.Add(mx.Host);
-                    }
-                }
-            }
-            else{
-                throw new DNS_ClientException(response.ResponseCode);
-            }
-
-            /* RFC 2821 5.
-			    If no MX records are found, but an A RR is found, the A RR is treated as if it 
-                was associated with an implicit MX RR, with a preference of 0, pointing to that host.
-			*/
-            if(retVal.Count == 0){
-                retVal.Add(domain);
-            }
-
-            return retVal.ToArray();
         }
 
         #endregion
