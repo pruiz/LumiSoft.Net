@@ -2068,7 +2068,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// </summary>
         /// <param name="folder">Folder name with path.</param>
         /// <param name="flags">Message flags.</param>
-        /// <param name="internalDate">Message internal data. DateTime.MinValu means server will allocate it.</param>
+        /// <param name="internalDate">Message internal data. DateTime.MinValue means server will allocate it.</param>
         /// <param name="message">Message stream.</param>
         /// <param name="count">Number of bytes send from <b>message</b> stream.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> or <b>stream</b> is null reference.</exception>
@@ -2076,6 +2076,23 @@ namespace LumiSoft.Net.IMAP.Client
         /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void StoreMessage(string folder,IMAP_MessageFlags flags,DateTime internalDate,Stream message,int count)
+        {
+            StoreMessage(folder,IMAP_Utils.MessageFlagsToStringArray(flags),internalDate,message,count);
+        }
+
+        /// <summary>
+        /// Stores specified message to the specified folder.
+        /// </summary>
+        /// <param name="folder">Folder name with path.</param>
+        /// <param name="flags">Message flags. Value null means no flags. For example: new string[]{"\Seen","\Answered"}.</param>
+        /// <param name="internalDate">Message internal data. DateTime.MinValue means server will allocate it.</param>
+        /// <param name="message">Message stream.</param>
+        /// <param name="count">Number of bytes send from <b>message</b> stream.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> or <b>stream</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
+        /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
+        public void StoreMessage(string folder,string[] flags,DateTime internalDate,Stream message,int count)
         {
             if(folder == null){
                 throw new ArgumentNullException("folder");
@@ -2173,8 +2190,15 @@ namespace LumiSoft.Net.IMAP.Client
             command.Append((m_CommandIndex++).ToString("d5"));            
             command.Append(" APPEND");
             command.Append(" " + TextUtils.QuoteString(IMAP_Utils.Encode_IMAP_UTF7_String(folder)));
-            if(flags != IMAP_MessageFlags.None){
-                command.Append(" (" + IMAP_Utils.MessageFlagsToString(flags) + ")");
+            if(flags != null && flags.Length > 0){
+                command.Append(" (");
+                for(int i=0;i<flags.Length;i++){
+                    if(i > 0){
+                        command.Append(" ");
+                    }
+                    command.Append(flags[i]);
+                }                
+                command.Append(")");
             }
             if(internalDate != DateTime.MinValue){
                 command.Append(" " + TextUtils.QuoteString(IMAP_Utils.DateTimeToString(internalDate)));
@@ -2432,6 +2456,21 @@ namespace LumiSoft.Net.IMAP.Client
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
         public void StoreMessageFlags(bool uid,IMAP_SequenceSet seqSet,IMAP_Flags_SetType setType,IMAP_MessageFlags flags)
         {
+            StoreMessageFlags(uid,seqSet,setType,IMAP_Utils.MessageFlagsToStringArray(flags));
+        }
+
+        /// <summary>
+        /// Stores specified message flags to the sepcified messages.
+        /// </summary>
+        /// <param name="uid">Specifies if <b>seqSet</b> contains UIDs or sequence-numbers.</param>
+        /// <param name="seqSet">Messages sequence-set.</param>
+        /// <param name="setType">Specifies how flags are set.</param>
+        /// <param name="flags">Message flags. Value null means no flags. For example: new string[]{"\Seen","\Answered"}.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b> is null reference.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected, not-authenticated or not-selected state).</exception>
+        /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
+        public void StoreMessageFlags(bool uid,IMAP_SequenceSet seqSet,IMAP_Flags_SetType setType,string[] flags)
+        {
             if(seqSet == null){
                 throw new ArgumentNullException("seqSet");
             }
@@ -2522,7 +2561,19 @@ namespace LumiSoft.Net.IMAP.Client
             else{
                 throw new NotSupportedException("Not supported argument 'setType' value '" + setType.ToString() + "'.");
             }
-            command.Append(" (" + IMAP_Utils.MessageFlagsToString(flags) + ")\r\n");
+            if(flags != null && flags.Length > 0){
+                command.Append(" (");
+                for(int i=0;i<flags.Length;i++){
+                    if(i > 0){
+                        command.Append(" ");
+                    }
+                    command.Append(flags[i]);
+                }                
+                command.Append(")\r\n");
+            }
+            else{
+                command.Append(" ()\r\n");
+            }
 
             SendCommand(command.ToString());
 
