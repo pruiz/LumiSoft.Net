@@ -44,12 +44,14 @@ namespace LumiSoft.Net.IMAP
 
 		#endregion
 
-		#region method MessageFlagsToString
+		#region static method MessageFlagsToString
 
 		/// <summary>
 		/// Converts message flags to string. Eg. \SEEN \DELETED .
 		/// </summary>
-		/// <returns></returns>
+        /// <param name="msgFlags">IMAP message flags.</param>
+		/// <returns>Returns message flags as string list.</returns>
+        [Obsolete("Use method 'MessageFlagsToStringArray' instead.")]
 		public static string MessageFlagsToString(IMAP_MessageFlags msgFlags)
 		{
 			string retVal = "";
@@ -73,6 +75,38 @@ namespace LumiSoft.Net.IMAP
 		}
 
 		#endregion
+
+        #region static method MessageFlagsToStringArray
+
+        /// <summary>
+        /// Converts standard IMAP message flags to string array.
+        /// </summary>
+        /// <param name="msgFlags">IMAP message flags.</param>
+        /// <returns>Returns IMAP message flags as string array.</returns>
+        public static string[] MessageFlagsToStringArray(IMAP_MessageFlags msgFlags)
+        {
+            List<string> retVal = new List<string>();
+
+            if(((int)IMAP_MessageFlags.Answered & (int)msgFlags) != 0){
+				retVal.Add("\\ANSWERED");
+			}
+			if(((int)IMAP_MessageFlags.Flagged & (int)msgFlags) != 0){
+				retVal.Add("\\FLAGGED");
+			}
+			if(((int)IMAP_MessageFlags.Deleted & (int)msgFlags) != 0){
+				retVal.Add("\\DELETED");
+			}
+			if(((int)IMAP_MessageFlags.Seen & (int)msgFlags) != 0){
+				retVal.Add("\\SEEN");
+			}
+			if(((int)IMAP_MessageFlags.Draft & (int)msgFlags) != 0){
+				retVal.Add("\\DRAFT");
+			}
+
+            return retVal.ToArray();
+        }
+
+        #endregion
 
         #region static method MessageFlagsAdd
 
