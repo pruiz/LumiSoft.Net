@@ -316,20 +316,22 @@ namespace LumiSoft.Net.DNS.Client
             }
 
             ManualResetEvent wait = new ManualResetEvent(false);
-            Dns_Client.GetHostAddressesAsyncOP op = new Dns_Client.GetHostAddressesAsyncOP(hostNameOrIP);
-            op.CompletedAsync += delegate(object s1,EventArgs<Dns_Client.GetHostAddressesAsyncOP> e1){
-                wait.Set();
-            };
-            if(!this.GetHostAddressesAsync(op)){
-                wait.Set();
-            }
-            wait.WaitOne();
+            using(Dns_Client.GetHostAddressesAsyncOP op = new Dns_Client.GetHostAddressesAsyncOP(hostNameOrIP)){
+                op.CompletedAsync += delegate(object s1,EventArgs<Dns_Client.GetHostAddressesAsyncOP> e1){
+                    wait.Set();
+                };
+                if(!this.GetHostAddressesAsync(op)){
+                    wait.Set();
+                }
+                wait.WaitOne();
+                wait.Close();
 
-            if(op.Error != null){
-                throw op.Error;
-            }
-            else{
-                return op.Addresses;
+                if(op.Error != null){
+                    throw op.Error;
+                }
+                else{
+                    return op.Addresses;
+                }
             }
         }
 
@@ -706,20 +708,22 @@ namespace LumiSoft.Net.DNS.Client
             }
 
             ManualResetEvent wait = new ManualResetEvent(false);
-            Dns_Client.GetHostsAddressesAsyncOP op = new Dns_Client.GetHostsAddressesAsyncOP(hostNames);
-            op.CompletedAsync += delegate(object s1,EventArgs<Dns_Client.GetHostsAddressesAsyncOP> e1){
-                wait.Set();
-            };
-            if(!this.GetHostsAddressesAsync(op)){
-                wait.Set();
-            }
-            wait.WaitOne();
+            using(Dns_Client.GetHostsAddressesAsyncOP op = new Dns_Client.GetHostsAddressesAsyncOP(hostNames)){
+                op.CompletedAsync += delegate(object s1,EventArgs<Dns_Client.GetHostsAddressesAsyncOP> e1){
+                    wait.Set();
+                };
+                if(!this.GetHostsAddressesAsync(op)){
+                    wait.Set();
+                }
+                wait.WaitOne();
+                wait.Close();
 
-            if(op.Error != null){
-                throw op.Error;
-            }
-            else{
-                return op.HostEntries;
+                if(op.Error != null){
+                    throw op.Error;
+                }
+                else{
+                    return op.HostEntries;
+                }
             }
         }
 
@@ -1031,20 +1035,22 @@ namespace LumiSoft.Net.DNS.Client
             }
 
             ManualResetEvent wait = new ManualResetEvent(false);
-            Dns_Client.GetEmailHostsAsyncOP op = new Dns_Client.GetEmailHostsAsyncOP(domain);
-            op.CompletedAsync += delegate(object s1,EventArgs<Dns_Client.GetEmailHostsAsyncOP> e1){
-                wait.Set();
-            };
-            if(!this.GetEmailHostsAsync(op)){
-                wait.Set();
-            }
-            wait.WaitOne();
+            using(Dns_Client.GetEmailHostsAsyncOP op = new Dns_Client.GetEmailHostsAsyncOP(domain)){
+                op.CompletedAsync += delegate(object s1,EventArgs<Dns_Client.GetEmailHostsAsyncOP> e1){
+                    wait.Set();
+                };
+                if(!this.GetEmailHostsAsync(op)){
+                    wait.Set();
+                }
+                wait.WaitOne();
+                wait.Close();
 
-            if(op.Error != null){
-                throw op.Error;
-            }
-            else{
-                return op.Hosts;
+                if(op.Error != null){
+                    throw op.Error;
+                }
+                else{
+                    return op.Hosts;
+                }
             }
         }
 
