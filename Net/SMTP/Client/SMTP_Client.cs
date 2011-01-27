@@ -168,17 +168,19 @@ namespace LumiSoft.Net.SMTP.Client
             }
 
             ManualResetEvent wait = new ManualResetEvent(false);
-            EhloHeloAsyncOP op = new EhloHeloAsyncOP(hostName);
-            op.CompletedAsync += delegate(object s1,EventArgs<EhloHeloAsyncOP> e1){
-                wait.Set();
-            };
-            if(!this.EhloHeloAsync(op)){
-                wait.Set();
-            }
-            wait.WaitOne();
+            using(EhloHeloAsyncOP op = new EhloHeloAsyncOP(hostName)){
+                op.CompletedAsync += delegate(object s1,EventArgs<EhloHeloAsyncOP> e1){
+                    wait.Set();
+                };
+                if(!this.EhloHeloAsync(op)){
+                    wait.Set();
+                }
+                wait.WaitOne();
+                wait.Close();
 
-            if(op.Error != null){
-                throw op.Error;
+                if(op.Error != null){
+                    throw op.Error;
+                }
             }
         }
 
@@ -655,17 +657,19 @@ namespace LumiSoft.Net.SMTP.Client
             }
 
             ManualResetEvent wait = new ManualResetEvent(false);
-            StartTlsAsyncOP op = new StartTlsAsyncOP(certCallback);
-            op.CompletedAsync += delegate(object s1,EventArgs<StartTlsAsyncOP> e1){
-                wait.Set();
-            };
-            if(!this.StartTlsAsync(op)){
-                wait.Set();
-            }
-            wait.WaitOne();
+            using(StartTlsAsyncOP op = new StartTlsAsyncOP(certCallback)){
+                op.CompletedAsync += delegate(object s1,EventArgs<StartTlsAsyncOP> e1){
+                    wait.Set();
+                };
+                if(!this.StartTlsAsync(op)){
+                    wait.Set();
+                }
+                wait.WaitOne();
+                wait.Close();
 
-            if(op.Error != null){
-                throw op.Error;
+                if(op.Error != null){
+                    throw op.Error;
+                }
             }
         }
 
@@ -678,7 +682,7 @@ namespace LumiSoft.Net.SMTP.Client
         /// <summary>
         /// This class represents <see cref="SMTP_Client.StartTlsAsync"/> asynchronous operation.
         /// </summary>
-        public class StartTlsAsyncOP
+        public class StartTlsAsyncOP : IDisposable,IAsyncOP
         {
             private object                              m_pLock         = new object();
             private AsyncOP_State                       m_State         = AsyncOP_State.WaitingForStart;
@@ -1322,17 +1326,19 @@ namespace LumiSoft.Net.SMTP.Client
             }
             
             ManualResetEvent wait = new ManualResetEvent(false);
-            MailFromAsyncOP op = new MailFromAsyncOP(from,messageSize,ret,envid);
-            op.CompletedAsync += delegate(object s1,EventArgs<MailFromAsyncOP> e1){
-                wait.Set();
-            };
-            if(!this.MailFromAsync(op)){
-                wait.Set();
-            }
-            wait.WaitOne();
+            using(MailFromAsyncOP op = new MailFromAsyncOP(from,messageSize,ret,envid)){
+                op.CompletedAsync += delegate(object s1,EventArgs<MailFromAsyncOP> e1){
+                    wait.Set();
+                };
+                if(!this.MailFromAsync(op)){
+                    wait.Set();
+                }
+                wait.WaitOne();
+                wait.Close();
 
-            if(op.Error != null){
-                throw op.Error;
+                if(op.Error != null){
+                    throw op.Error;
+                }
             }
         }
 
@@ -1708,17 +1714,19 @@ namespace LumiSoft.Net.SMTP.Client
             }
             
             ManualResetEvent wait = new ManualResetEvent(false);
-            RcptToAsyncOP op = new RcptToAsyncOP(to,notify,orcpt);
-            op.CompletedAsync += delegate(object s1,EventArgs<RcptToAsyncOP> e1){
-                wait.Set();
-            };
-            if(!this.RcptToAsync(op)){
-                wait.Set();
-            }
-            wait.WaitOne();
+            using(RcptToAsyncOP op = new RcptToAsyncOP(to,notify,orcpt)){
+                op.CompletedAsync += delegate(object s1,EventArgs<RcptToAsyncOP> e1){
+                    wait.Set();
+                };
+                if(!this.RcptToAsync(op)){
+                    wait.Set();
+                }
+                wait.WaitOne();
+                wait.Close();
 
-            if(op.Error != null){
-                throw op.Error;
+                if(op.Error != null){
+                    throw op.Error;
+                }
             }
         }
 
@@ -1731,7 +1739,7 @@ namespace LumiSoft.Net.SMTP.Client
         /// <summary>
         /// This class represents <see cref="SMTP_Client.RcptToAsync"/> asynchronous operation.
         /// </summary>
-        public class RcptToAsyncOP
+        public class RcptToAsyncOP : IDisposable,IAsyncOP
         {
             private object          m_pLock         = new object();
             private AsyncOP_State   m_State         = AsyncOP_State.WaitingForStart;
@@ -2106,17 +2114,19 @@ namespace LumiSoft.Net.SMTP.Client
             }
 
             ManualResetEvent wait = new ManualResetEvent(false);
-            SendMessageAsyncOP op = new SendMessageAsyncOP(stream,useBdatIfPossibe);
-            op.CompletedAsync += delegate(object s1,EventArgs<SendMessageAsyncOP> e1){
-                wait.Set();
-            };
-            if(!this.SendMessageAsync(op)){
-                wait.Set();
-            }
-            wait.WaitOne();
+            using(SendMessageAsyncOP op = new SendMessageAsyncOP(stream,useBdatIfPossibe)){
+                op.CompletedAsync += delegate(object s1,EventArgs<SendMessageAsyncOP> e1){
+                    wait.Set();
+                };
+                if(!this.SendMessageAsync(op)){
+                    wait.Set();
+                }
+                wait.WaitOne();
+                wait.Close();
 
-            if(op.Error != null){
-                throw op.Error;
+                if(op.Error != null){
+                    throw op.Error;
+                }
             }
         }
 
@@ -2682,17 +2692,19 @@ namespace LumiSoft.Net.SMTP.Client
             }
 
             ManualResetEvent wait = new ManualResetEvent(false);
-            RsetAsyncOP op = new RsetAsyncOP();
-            op.CompletedAsync += delegate(object s1,EventArgs<RsetAsyncOP> e1){
-                wait.Set();
-            };
-            if(!this.RsetAsync(op)){
-                wait.Set();
-            }
-            wait.WaitOne();
+            using(RsetAsyncOP op = new RsetAsyncOP()){
+                op.CompletedAsync += delegate(object s1,EventArgs<RsetAsyncOP> e1){
+                    wait.Set();
+                };
+                if(!this.RsetAsync(op)){
+                    wait.Set();
+                }
+                wait.WaitOne();
+                wait.Close();
 
-            if(op.Error != null){
-                throw op.Error;
+                if(op.Error != null){
+                    throw op.Error;
+                }
             }
         }
 
@@ -2992,17 +3004,19 @@ namespace LumiSoft.Net.SMTP.Client
             }
 
             ManualResetEvent wait = new ManualResetEvent(false);
-            NoopAsyncOP op = new NoopAsyncOP();
-            op.CompletedAsync += delegate(object s1,EventArgs<NoopAsyncOP> e1){
-                wait.Set();
-            };
-            if(!this.NoopAsync(op)){
-                wait.Set();
-            }
-            wait.WaitOne();
+            using(NoopAsyncOP op = new NoopAsyncOP()){
+                op.CompletedAsync += delegate(object s1,EventArgs<NoopAsyncOP> e1){
+                    wait.Set();
+                };
+                if(!this.NoopAsync(op)){
+                    wait.Set();
+                }
+                wait.WaitOne();
+                wait.Close();
 
-            if(op.Error != null){
-                throw op.Error;
+                if(op.Error != null){
+                    throw op.Error;
+                }
             }
         }
 
