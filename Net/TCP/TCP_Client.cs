@@ -171,17 +171,19 @@ namespace LumiSoft.Net.TCP
             }
 
             ManualResetEvent wait = new ManualResetEvent(false);
-            ConnectAsyncOP op = new ConnectAsyncOP(localEP,remoteEP,ssl,certCallback);
-            op.CompletedAsync += delegate(object s1,EventArgs<ConnectAsyncOP> e1){
-                wait.Set();
-            };
-            if(!this.ConnectAsync(op)){
-                wait.Set();
-            }
-            wait.WaitOne();
+            using(ConnectAsyncOP op = new ConnectAsyncOP(localEP,remoteEP,ssl,certCallback)){
+                op.CompletedAsync += delegate(object s1,EventArgs<ConnectAsyncOP> e1){
+                    wait.Set();
+                };
+                if(!this.ConnectAsync(op)){
+                    wait.Set();
+                }
+                wait.WaitOne();
+                wait.Close();
 
-            if(op.Error != null){
-                throw op.Error;
+                if(op.Error != null){
+                    throw op.Error;
+                }
             }
         }
 
