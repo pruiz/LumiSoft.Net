@@ -2405,7 +2405,6 @@ namespace LumiSoft.Net.SMTP.Client
                             // We have sent whole message, we are done.
                             if(m_BdatBytesInBuffer == 0){
                                 SetState(AsyncOP_State.Completed);
-                                OnCompletedAsync();
 
                                 return;
                             }
