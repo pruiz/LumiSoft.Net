@@ -405,22 +405,15 @@ namespace LumiSoft.Net
         /// <returns></returns>
         public static bool IsIoCompletionPortsSupported()
         {
-            Socket s = new Socket(AddressFamily.InterNetwork,SocketType.Dgram,ProtocolType.Udp);
             try{                            
-                SocketAsyncEventArgs e = new SocketAsyncEventArgs();
-                e.SetBuffer(new byte[0],0,0);
-                e.RemoteEndPoint = new IPEndPoint(IPAddress.Loopback,111);
-                s.SendToAsync(e);
-
-                return true;
+                using(SocketAsyncEventArgs e = new SocketAsyncEventArgs()){
+                    return true;
+                }
             }
             catch(NotSupportedException nX){
                 string dummy = nX.Message;
                 
                 return false;
-            }
-            finally{
-                s.Close();
             }
         }
 
