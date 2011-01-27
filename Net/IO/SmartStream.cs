@@ -2037,6 +2037,7 @@ namespace LumiSoft.Net.IO
                 throw new InvalidOperationException("EndReadLine is already called for specified 'asyncResult'.");
             }
             ar.AsyncWaitHandle.WaitOne();
+            ar.AsyncWaitHandle.Close();
             ar.IsEndCalled = true;
             
             if(ar.BytesReaded == 0){
@@ -2195,6 +2196,7 @@ namespace LumiSoft.Net.IO
                 throw new InvalidOperationException("EndReadHeader is already called for specified 'asyncResult'.");
             }
             ar.AsyncWaitHandle.WaitOne();
+            ar.AsyncWaitHandle.Close();
             ar.IsEndCalled = true;
             if(ar.Exception != null){
                 throw ar.Exception;
@@ -2328,6 +2330,7 @@ namespace LumiSoft.Net.IO
                 throw new InvalidOperationException("EndReadFixedCount is already called for specified 'asyncResult'.");
             }
             ar.AsyncWaitHandle.WaitOne();
+            ar.AsyncWaitHandle.Close();
             ar.IsEndCalled = true;
             if(ar.Exception != null){
                 throw ar.Exception;
@@ -3093,6 +3096,7 @@ namespace LumiSoft.Net.IO
                 throw new InvalidOperationException("EndRead is already called for specified 'asyncResult'.");
             }
             ar.AsyncWaitHandle.WaitOne();
+            ar.AsyncWaitHandle.Close();
             ar.IsEndCalled = true;
             
             return ar.BytesStored;            
