@@ -126,6 +126,13 @@ namespace LumiSoft.Net.DNS.Client
             }
             m_IsDisposed = true;
 
+            if(m_pReceivers != null){
+                foreach(UDP_DataReceiver receiver in m_pReceivers){
+                    receiver.Dispose();
+                }
+                m_pReceivers = null;
+            }
+
             m_pIPv4Socket.Close();
             m_pIPv4Socket = null;
 
@@ -135,7 +142,7 @@ namespace LumiSoft.Net.DNS.Client
             }
 
             m_pTransactions = null;
-            m_pReceivers = null;
+            
             m_pRandom = null;
         }
 
@@ -289,6 +296,7 @@ namespace LumiSoft.Net.DNS.Client
 
             // Wait transaction to complete.
             wait.WaitOne();
+            wait.Close();
 
             return retVal;
 		}

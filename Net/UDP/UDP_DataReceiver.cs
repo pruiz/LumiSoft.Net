@@ -49,13 +49,16 @@ namespace LumiSoft.Net.UDP
             }
             m_IsDisposed = true;
 
-            m_pSocket     = null;
-            m_pBuffer     = null;
-            m_pSocketArgs = null;
-            m_pEventArgs  = null;
+            m_pSocket = null;
+            m_pBuffer = null;
+            if(m_pSocketArgs != null){
+                m_pSocketArgs.Dispose();
+                m_pSocketArgs = null;
+            }
+            m_pEventArgs = null;
 
             this.PacketReceived = null;
-            this.Error = null;
+            this.Error = null;            
         }
 
         #endregion
@@ -76,37 +79,45 @@ namespace LumiSoft.Net.UDP
                 return;
             }
             m_IsRunning = true;
+            
+            bool isIoCompletionSupported = Net_Utils.IsIoCompletionPortsSupported();
+
+            m_pEventArgs = new UDP_e_PacketReceived();
+            m_pBuffer = new byte[m_BufferSize];
+            
+            if(isIoCompletionSupported){
+                m_pSocketArgs = new SocketAsyncEventArgs();
+                m_pSocketArgs.SetBuffer(m_pBuffer,0,m_BufferSize);
+                m_pSocketArgs.RemoteEndPoint = new IPEndPoint(m_pSocket.AddressFamily == AddressFamily.InterNetwork ? IPAddress.Any : IPAddress.IPv6Any,0);
+                m_pSocketArgs.Completed += delegate(object s1,SocketAsyncEventArgs e1){
+                    if(m_IsDisposed){
+                        return;
+                    }
+
+                    try{
+                        if(m_pSocketArgs.SocketError == SocketError.Success){
+                            OnPacketReceived(m_pBuffer,m_pSocketArgs.BytesTransferred,(IPEndPoint)m_pSocketArgs.RemoteEndPoint);                            
+                        }
+                        else{
+                            OnError(new Exception("Socket error '" + m_pSocketArgs.SocketError + "'."));
+                        }
+
+                        IOCompletionReceive();
+                    }
+                    catch(Exception x){
+                        OnError(x);
+                    }
+                };
+            }
 
             // Move processing to thread pool.
             ThreadPool.QueueUserWorkItem(delegate(object state){
-                try{
-                    m_pEventArgs = new UDP_e_PacketReceived();
-                    m_pBuffer = new byte[m_BufferSize];
+                if(m_IsDisposed){
+                    return;
+                }
 
-                    if(Net_Utils.IsIoCompletionPortsSupported()){
-                        m_pSocketArgs = new SocketAsyncEventArgs();
-                        m_pSocketArgs.SetBuffer(m_pBuffer,0,m_BufferSize);
-                        m_pSocketArgs.RemoteEndPoint = new IPEndPoint(m_pSocket.AddressFamily == AddressFamily.InterNetwork ? IPAddress.Any : IPAddress.IPv6Any,0);
-                        m_pSocketArgs.Completed += delegate(object s1,SocketAsyncEventArgs e1){
-                            if(m_IsDisposed){
-                                return;
-                            }
-
-                            try{
-                                if(m_pSocketArgs.SocketError == SocketError.Success){
-                                    OnPacketReceived(m_pBuffer,m_pSocketArgs.BytesTransferred,(IPEndPoint)m_pSocketArgs.RemoteEndPoint);                            
-                                }
-                                else{
-                                    OnError(new Exception("Socket error '" + m_pSocketArgs.SocketError + "'."));
-                                }
-
-                                IOCompletionReceive();
-                            }
-                            catch(Exception x){
-                                OnError(x);
-                            }
-                        };
-
+                try{ 
+                    if(isIoCompletionSupported){                        
                         IOCompletionReceive();
                     }
                     else{
@@ -247,6 +258,10 @@ namespace LumiSoft.Net.UDP
         /// <param name="x">Exception happened.</param>
         private void OnError(Exception x)
         {
+            if(m_IsDisposed){
+                return;
+            }
+
             if(this.Error != null){
                 this.Error(this,new ExceptionEventArgs(x));
             }

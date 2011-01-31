@@ -239,6 +239,7 @@ namespace LumiSoft.Net.SIP.Stack
                 }                
             }));
             startLock.WaitOne();
+            startLock.Close();
         }
 
         #endregion
@@ -539,6 +540,7 @@ namespace LumiSoft.Net.SIP.Stack
                  
                             // Wait OPTIONS request to complete.
                             completionWaiter.WaitOne();
+                            completionWaiter.Close();
                         }
                         catch{
                         }

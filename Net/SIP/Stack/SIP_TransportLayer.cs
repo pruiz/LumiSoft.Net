@@ -1563,6 +1563,7 @@ namespace LumiSoft.Net.SIP.Stack
                  
             // Wait OPTIONS request to complete.
             completionWaiter.WaitOne();
+            completionWaiter.Close();
 
             if(resolvedEP != null){
                 return resolvedEP;
