@@ -2417,6 +2417,8 @@ namespace LumiSoft.Net.SMTP.Client
                         // BDAT failed.
                         else{
                             m_pException = new SMTP_ClientException(op.ReplyLines);
+
+                            SetState(AsyncOP_State.Completed);
                         }
                     }
                 }
@@ -2572,6 +2574,11 @@ namespace LumiSoft.Net.SMTP.Client
                         SetState(AsyncOP_State.Completed);
                     }
                     else{
+                        // DATA command failed.
+                        if(op.ReplyLines[0].ReplyCode >= 500){
+                            m_pException = new SMTP_ClientException(op.ReplyLines);
+                        }
+
                         SetState(AsyncOP_State.Completed);
                     }
                 }
