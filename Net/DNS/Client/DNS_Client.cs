@@ -18,10 +18,10 @@ namespace LumiSoft.Net.DNS.Client
 	/// </summary>
 	/// <example>
 	/// <code>
-	/// // Set dns servers
+	/// // Optionally set dns servers, by default DNS client uses defaultt NIC DNS servers.
 	/// Dns_Client.DnsServers = new string[]{"194.126.115.18"};
 	/// 
-	/// Dns_Client dns = Dns_Client();
+	/// Dns_Client dns = Dns_Client.Static;
 	/// 
 	/// // Get MX records.
 	/// DnsServerResponse resp = dns.Query("lumisoft.ee",QTYPE.MX);
@@ -37,7 +37,8 @@ namespace LumiSoft.Net.DNS.Client
 	/// </code>
 	/// </example>
 	public class Dns_Client : IDisposable
-    {                
+    {        
+        private static Dns_Client  m_pDnsClient  = null;
         private static IPAddress[] m_DnsServers  = null;
 		private static bool        m_UseDnsCache = true;
         // 
@@ -1909,6 +1910,20 @@ namespace LumiSoft.Net.DNS.Client
 
 
         #region Properties Implementation
+
+        /// <summary>
+        /// Gets static DNS client.
+        /// </summary>
+        public static Dns_Client Static
+        {
+            get{ 
+                if(m_pDnsClient == null){
+                    m_pDnsClient = new Dns_Client();
+                }
+
+                return m_pDnsClient; 
+            }
+        }
 
         /// <summary>
 		/// Gets or sets dns servers.
