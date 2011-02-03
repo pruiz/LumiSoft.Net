@@ -105,6 +105,17 @@ namespace LumiSoft.Net.SMTP.Client
         /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
 		public override void Disconnect()
 		{
+            Disconnect(true);
+        }
+
+        /// <summary>
+		/// Closes connection to SMTP server.
+		/// </summary>
+        /// <param name="sendQuit">If true QUIT command is sent to SMTP server.</param>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
+		public void Disconnect(bool sendQuit)
+		{
             if(this.IsDisposed){
                 throw new ObjectDisposedException(this.GetType().Name);
             }
@@ -113,11 +124,13 @@ namespace LumiSoft.Net.SMTP.Client
             }
 
 			try{
-                // Send QUIT command to server.                
-                WriteLine("QUIT");
+                if(sendQuit){
+                    // Send QUIT command to server.                
+                    WriteLine("QUIT");
 
-                // Read QUIT response.
-                ReadLine();
+                    // Read QUIT response.
+                    ReadLine();
+                }
 			}
 			catch{
 			}
