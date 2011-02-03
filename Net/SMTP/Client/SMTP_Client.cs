@@ -3780,8 +3780,7 @@ namespace LumiSoft.Net.SMTP.Client
                 throw new ArgumentNullException("message");
             }
 
-            Dns_Client dns = new Dns_Client();
-            QuickSendSmartHost(localHost,dns.GetEmailHosts(to)[0].HostName,25,false,from,new string[]{to},message);
+            QuickSendSmartHost(localHost,Dns_Client.Static.GetEmailHosts(to)[0].HostName,25,false,from,new string[]{to},message);
         }
 
         #endregion
