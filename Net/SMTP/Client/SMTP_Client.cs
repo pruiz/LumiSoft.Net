@@ -3374,6 +3374,7 @@ namespace LumiSoft.Net.SMTP.Client
                         }
 
                         m_GreetingText = greetingText.ToString();
+                        m_pEsmtpFeatures = new List<string>();
                         m_pRecipients = new List<string>();
                     }
                     // SMTP server rejected connection.
@@ -3951,13 +3952,11 @@ namespace LumiSoft.Net.SMTP.Client
             }
 
             using(SMTP_Client smtp = new SMTP_Client()){
-                if(!string.IsNullOrEmpty(localHost)){
-                    smtp.LocalHostName = localHost;
-                }
                 smtp.Connect(host,port,ssl);
                 if(!string.IsNullOrEmpty(userName)){
                     smtp.Authenticate(userName,password);
                 }
+                smtp.EhloHelo(localHost != null ? localHost : Dns.GetHostName());
                 smtp.MailFrom(from,-1);
                 foreach(string t in to){
                     smtp.RcptTo(t);
