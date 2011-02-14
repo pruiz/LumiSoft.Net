@@ -1251,8 +1251,8 @@ namespace LumiSoft.Net.SMTP.Client
                     Example:
 					    C: AUTH DIGEST-MD5<CRLF>
 					    S: 334 base64(digestChallange)<CRLF>
-					    C: base64(digestAuthorization)<CRLF>
-                        S: 334 base64(serverResponse)<CRLF>
+					    C: base64(digestResponse)<CRLF>
+                        S: 334 base64(serverDigestRpAuth)<CRLF>
                         C: <CRLF>
 					    S: 235 Ok<CRLF>
                 */
@@ -1265,15 +1265,23 @@ namespace LumiSoft.Net.SMTP.Client
 				if(!line.StartsWith("334")){
 					throw new SMTP_ClientException(line);
 				}
-                                
-                Auth_HttpDigest digestmd5 = new Auth_HttpDigest(Encoding.Default.GetString(Convert.FromBase64String(line.Split(' ')[1])),"AUTHENTICATE");
-                digestmd5.CNonce = Auth_HttpDigest.CreateNonce();
-                digestmd5.Uri = "smtp/" + digestmd5.Realm;
-                digestmd5.UserName = userName;
-                digestmd5.Password = password;
-        
+
+                // Parse server challenge.
+                AUTH_SASL_DigestMD5_Challenge challenge = AUTH_SASL_DigestMD5_Challenge.Parse(Encoding.Default.GetString(Convert.FromBase64String(line.Split(' ')[1])));
+
+                // Construct our response to server challenge.
+                AUTH_SASL_DigestMD5_Response response = new AUTH_SASL_DigestMD5_Response(
+                    challenge,
+                    challenge.Realm[0],
+                    userName,
+                    password,Guid.NewGuid().ToString().Replace("-",""),
+                    1,
+                    challenge.QopOptions[0],
+                    "smtp/" + this.RemoteEndPoint.Address.ToString()
+                );
+
                 // Send authentication info to server.
-				WriteLine(Convert.ToBase64String(Encoding.ASCII.GetBytes(digestmd5.ToAuthorization(false))));
+				WriteLine(Convert.ToBase64String(Encoding.Default.GetBytes(response.ToResponse())));
 
                 // Read server response.
 				line = ReadLine();
@@ -1281,6 +1289,11 @@ namespace LumiSoft.Net.SMTP.Client
 				if(!line.StartsWith("334")){
 					throw new SMTP_ClientException(line);
 				}
+
+                // Check rspauth value.
+                if(!string.Equals(Encoding.Default.GetString(Convert.FromBase64String(line.Split(' ')[1])),response.ToRspauthResponse(userName,password),StringComparison.InvariantCultureIgnoreCase)){
+                    throw new Exception("SMTP server 'rspauth' value mismatch.");
+                }
 
                 // Send empty line.
                 WriteLine("");
