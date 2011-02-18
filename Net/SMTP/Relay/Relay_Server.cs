@@ -43,6 +43,7 @@ namespace LumiSoft.Net.SMTP.Relay
         private TCP_SessionCollection<Relay_Session> m_pSessions             = null;
         private Dictionary<IPAddress,long>           m_pConnectionsPerIP     = null;
         private int                                  m_SessionIdleTimeout    = 30;
+        private TimerEx                              m_pTimerTimeout         = null;
         private Logger                               m_pLogger               = null;
 
         /// <summary>
@@ -88,6 +89,38 @@ namespace LumiSoft.Net.SMTP.Relay
         #endregion
 
 
+        #region Events handling
+
+        #region method m_pTimerTimeout_Elapsed
+
+        /// <summary>
+        /// Is called when we need to check timed out relay sessions.
+        /// </summary>
+        /// <param name="sender">Sender.</param>
+        /// <param name="e">Event data.</param>
+        private void m_pTimerTimeout_Elapsed(object sender,System.Timers.ElapsedEventArgs e)
+        {
+            try{
+                foreach(Relay_Session session in this.Sessions.ToArray()){
+                    try{
+                        if(session.LastActivity.AddSeconds(m_SessionIdleTimeout) < DateTime.Now){
+                            session.Dispose(new Exception("Session idle timeout."));
+                        }
+                    }
+                    catch{
+                    }
+                }
+            }
+            catch(Exception x){
+                OnError(x);
+            }
+        }
+
+        #endregion
+
+        #endregion
+
+
         #region method Start
 
         /// <summary>
@@ -111,10 +144,11 @@ namespace LumiSoft.Net.SMTP.Relay
             Thread tr1 = new Thread(new ThreadStart(this.Run));
             tr1.Start();
 
-            Thread tr2 = new Thread(new ThreadStart(this.Run_CheckTimedOutSessions));
-            tr2.Start();
+            m_pTimerTimeout = new TimerEx(30000);
+            m_pTimerTimeout.Elapsed += new System.Timers.ElapsedEventHandler(m_pTimerTimeout_Elapsed);
+            m_pTimerTimeout.Start();
         }
-
+                
         #endregion
 
         #region method Stop
@@ -140,6 +174,8 @@ namespace LumiSoft.Net.SMTP.Relay
             //m_pSessions.Dispose();
             m_pSessions = null;
             m_pConnectionsPerIP = null;
+            m_pTimerTimeout.Dispose();
+            m_pTimerTimeout = null;
         }
 
         #endregion
@@ -242,42 +278,6 @@ namespace LumiSoft.Net.SMTP.Relay
                             }                            
                         }
                     }                    
-                }
-                catch(Exception x){
-                    OnError(x);
-                }
-            }
-        }
-
-        #endregion
-
-        #region method Run_CheckTimedOutSessions
-
-        /// <summary>
-        /// This method checks timed out relay sessions while server is running.
-        /// </summary>
-        private void Run_CheckTimedOutSessions()
-        {
-            DateTime lastCheck = DateTime.Now;
-            while(this.IsRunning){
-                try{
-                    // Check interval reached.
-                    if(m_SessionIdleTimeout > 0 && lastCheck.AddSeconds(30) < DateTime.Now){
-                        foreach(Relay_Session session in this.Sessions.ToArray()){
-                            try{
-                                if(session.LastActivity.AddSeconds(m_SessionIdleTimeout) < DateTime.Now){
-                                    session.Dispose(new Exception("Session idle timeout."));
-                                }
-                            }
-                            catch{
-                            }
-                        }
-                        lastCheck = DateTime.Now;
-                    }
-                    // Not check interval yet.
-                    else{
-                        Thread.Sleep(1000);
-                    }
                 }
                 catch(Exception x){
                     OnError(x);

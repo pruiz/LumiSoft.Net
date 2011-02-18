@@ -14,908 +14,7 @@ namespace LumiSoft.Net.IO
     public class SmartStream : Stream
     { 
         private delegate void BufferCallback(Exception x);
-
-        //--- Obsolete ----------------------
-
-        #region class ReadLineAsyncOperation
-
-        /// <summary>
-        /// This class implements asynchronous line reading.
-        /// </summary>
-        private class ReadLineAsyncOperation : IAsyncResult
-        {
-            private SmartStream        m_pOwner                 = null;
-            private byte[]             m_pBuffer                = null;
-            private int                m_OffsetInBuffer         = 0;
-            private int                m_MaxCount               = 0;
-            private SizeExceededAction m_SizeExceededAction     = SizeExceededAction.JunkAndThrowException;
-            private AsyncCallback      m_pAsyncCallback         = null;
-            private object             m_pAsyncState            = null;
-            private AutoResetEvent     m_pAsyncWaitHandle       = null;
-            private bool               m_CompletedSynchronously = false;
-            private bool               m_IsCompleted            = false;
-            private bool               m_IsEndCalled            = false;
-            private int                m_BytesReaded            = 0;
-            private int                m_BytesStored            = 0;
-            private Exception          m_pException             = null;
-
-            /// <summary>
-            /// Default constructor.
-            /// </summary>
-            /// <param name="owner">Owner stream.</param>
-            /// <param name="buffer">Buffer where to store data.</param>
-            /// <param name="offset">The location in <b>buffer</b> to begin storing the data.</param>
-            /// <param name="maxCount">Maximum number of bytes to read.</param>
-            /// <param name="exceededAction">Specifies how this method behaves when maximum line size exceeded.</param>
-            /// <param name="callback">The AsyncCallback delegate that is executed when asynchronous operation completes.</param>
-            /// <param name="asyncState">User-defined object that qualifies or contains information about an asynchronous operation.</param>
-            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b>,<b>buffer</b> is null reference.</exception>
-            /// <exception cref="ArgumentOutOfRangeException">Is raised when any of the arguments has out of valid range.</exception>
-            public ReadLineAsyncOperation(SmartStream owner,byte[] buffer,int offset,int maxCount,SizeExceededAction exceededAction,AsyncCallback callback,object asyncState)
-            {
-                if(owner == null){
-                    throw new ArgumentNullException("owner");
-                }
-                if(buffer == null){
-                    throw new ArgumentNullException("buffer");
-                }
-                if(offset < 0){
-                    throw new ArgumentOutOfRangeException("offset","Argument 'offset' value must be >= 0.");
-                }
-                if(offset > buffer.Length){
-                    throw new ArgumentOutOfRangeException("offset","Argument 'offset' value must be < buffer.Length.");
-                }
-                if(maxCount < 0){
-                    throw new ArgumentOutOfRangeException("maxCount","Argument 'maxCount' value must be >= 0.");
-                }
-                if(offset + maxCount > buffer.Length){
-                    throw new ArgumentOutOfRangeException("maxCount","Argument 'maxCount' is bigger than than argument 'buffer' can store.");
-                }
-
-                m_pOwner             = owner;
-                m_pBuffer            = buffer;
-                m_OffsetInBuffer     = offset;
-                m_MaxCount           = maxCount;
-                m_SizeExceededAction = exceededAction;
-                m_pAsyncCallback     = callback;
-                m_pAsyncState        = asyncState;
-
-                m_pAsyncWaitHandle = new AutoResetEvent(false);
-
-                DoLineReading();                                
-            }
-
-
-            #region method Buffering_Completed
-
-            /// <summary>
-            /// Is called when asynchronous read buffer buffering has completed.
-            /// </summary>
-            /// <param name="x">Exception that occured during async operation.</param>
-            private void Buffering_Completed(Exception x)
-            {
-                if(x != null){
-                    m_pException = x;
-                    Completed();
-                }
-                // We reached end of stream, no more data.
-                else if(m_pOwner.BytesInReadBuffer == 0){
-                    Completed();
-                }
-                // Continue line reading.
-                else{
-                    DoLineReading();
-                }
-            }
-
-            #endregion
-
-            #region method DoLineReading
-
-            /// <summary>
-            /// Does line reading.
-            /// </summary>
-            private void DoLineReading()
-            {           
-                try{
-                    while(true){
-                        // Read buffer empty, buff next data block.
-                        if(m_pOwner.BytesInReadBuffer == 0){
-                            // Buffering started asynchronously.
-                            if(m_pOwner.BufferRead(true,this.Buffering_Completed)){
-                                return;
-                            }
-                            // Buffering completed synchronously, continue processing.
-                            else{
-                                // We reached end of stream, no more data.
-                                if(m_pOwner.BytesInReadBuffer == 0){
-                                    Completed();
-                                    return;
-                                }
-                            }
-                        }
-
-                        byte b = m_pOwner.m_pReadBuffer[m_pOwner.m_ReadBufferOffset++];
-                        m_BytesReaded++;
-
-                        // We have LF line.
-                        if(b == '\n'){
-                            break;               
-                        }
-                        // We have CRLF line.
-                        else if(b == '\r' && m_pOwner.Peek() == '\n'){
-                            // Consume LF char.
-                            m_pOwner.ReadByte();
-                            m_BytesReaded++;
-
-                            break;
-                        }
-                        // We have CR line.
-                        else if(b == '\r'){
-                            break;
-                        }
-                        // We have normal line data char.
-                        else{
-                            // Line buffer full.
-                            if(m_BytesStored >= m_MaxCount){
-                                if(m_SizeExceededAction == SizeExceededAction.ThrowException){
-                                    throw new LineSizeExceededException();
-                                }
-                                // Just skip storing.
-                                else{
-                                }
-                            }
-                            else{
-                                m_pBuffer[m_OffsetInBuffer++] = b;
-                                m_BytesStored++;
-                            }
-                        }
-                    }
-                }
-                catch(Exception x){
-                    m_pException = x;                    
-                }
-
-                Completed();
-            }
-
-            #endregion
-
-            #region method Completed
-
-            /// <summary>
-            /// This method must be called when asynchronous operation has completed.
-            /// </summary>
-            private void Completed()
-            {
-                m_IsCompleted = true;
-                m_pAsyncWaitHandle.Set();
-                if(m_pAsyncCallback != null){
-                    m_pAsyncCallback(this);
-                }
-            }
-
-            #endregion
-
-
-            #region Properties implementation
-
-            /// <summary>
-            /// Gets a user-defined object that qualifies or contains information about an asynchronous operation.
-            /// </summary>
-            public object AsyncState
-            {
-                get{ return m_pAsyncState; }
-            }
-
-            /// <summary>
-            /// Gets a WaitHandle that is used to wait for an asynchronous operation to complete.
-            /// </summary>
-            public WaitHandle AsyncWaitHandle
-            {
-                get{ return m_pAsyncWaitHandle; }
-            }
-
-            /// <summary>
-            /// Gets an indication of whether the asynchronous operation completed synchronously.
-            /// </summary>
-            public bool CompletedSynchronously
-            {
-                get{ return m_CompletedSynchronously; }
-            }
-
-            /// <summary>
-            /// Gets an indication whether the asynchronous operation has completed.
-            /// </summary>
-            public bool IsCompleted
-            {
-                get{ return m_IsCompleted; }
-            }
-
-
-            /// <summary>
-            /// Gets or sets if <b>EndReadLine</b> method is called for this asynchronous operation.
-            /// </summary>
-            internal bool IsEndCalled
-            {
-                get{ return m_IsEndCalled; }
-
-                set{ m_IsEndCalled = value; }
-            }
-
-            /// <summary>
-            /// Gets store buffer.
-            /// </summary>
-            internal byte[] Buffer
-            {
-                get{ return m_pBuffer; }
-            }
-
-            /// <summary>
-            /// Gets number of bytes readed from source stream.
-            /// </summary>
-            internal int BytesReaded
-            {
-                get{ return m_BytesReaded; }
-            }
-
-            /// <summary>
-            /// Gets number of bytes stored in to <b>Buffer</b>.
-            /// </summary>
-            internal int BytesStored
-            {
-                get{ return m_BytesStored; }
-            }
-
-            #endregion
-        }
-
-        #endregion
-
-        #region class ReadToTerminatorAsyncOperation
-
-        /// <summary>
-        /// This class implements asynchronous line-based terminated data reader, where terminator is on line itself.
-        /// </summary>
-        private class ReadToTerminatorAsyncOperation : IAsyncResult
-        {
-            private SmartStream        m_pOwner                 = null;
-            private string             m_Terminator             = "";
-            private byte[]             m_pTerminatorBytes       = null;
-            private Stream             m_pStoreStream           = null;
-            private long               m_MaxCount               = 0;            
-            private SizeExceededAction m_SizeExceededAction     = SizeExceededAction.JunkAndThrowException;
-            private AsyncCallback      m_pAsyncCallback         = null;
-            private object             m_pAsyncState            = null;
-            private AutoResetEvent     m_pAsyncWaitHandle       = null;
-            private bool               m_CompletedSynchronously = false;
-            private bool               m_IsCompleted            = false;
-            private bool               m_IsEndCalled            = false;
-            private byte[]             m_pLineBuffer            = null;
-            private long               m_BytesStored            = 0;
-            private Exception          m_pException             = null;
-
-            /// <summary>
-            /// Default constructor.
-            /// </summary>
-            /// <param name="owner">Owner stream.</param>
-            /// <param name="terminator">Data terminator.</param>
-            /// <param name="storeStream">Stream where to store readed header.</param>
-            /// <param name="maxCount">Maximum number of bytes to read. Value 0 means not limited.</param>
-            /// <param name="exceededAction">Specifies how this method behaves when maximum line size exceeded.</param>
-            /// <param name="callback">The AsyncCallback delegate that is executed when asynchronous operation completes.</param>
-            /// <param name="asyncState">User-defined object that qualifies or contains information about an asynchronous operation.</param>
-            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b>,<b>terminator</b> or <b>storeStream</b> is null reference.</exception>
-            public ReadToTerminatorAsyncOperation(SmartStream owner,string terminator,Stream storeStream,long maxCount,SizeExceededAction exceededAction,AsyncCallback callback,object asyncState)
-            {
-                if(owner == null){
-                    throw new ArgumentNullException("owner");
-                }
-                if(terminator == null){
-                    throw new ArgumentNullException("terminator");
-                }
-                if(storeStream == null){
-                    throw new ArgumentNullException("storeStream");
-                }
-                if(maxCount < 0){
-                    throw new ArgumentException("Argument 'maxCount' must be >= 0.");
-                }
-
-                m_pOwner             = owner;
-                m_Terminator         = terminator;
-                m_pTerminatorBytes   = Encoding.ASCII.GetBytes(terminator);
-                m_pStoreStream       = storeStream;
-                m_MaxCount           = maxCount;
-                m_SizeExceededAction = exceededAction;
-                m_pAsyncCallback     = callback;
-                m_pAsyncState        = asyncState;
-
-                m_pAsyncWaitHandle = new AutoResetEvent(false);
-
-                m_pLineBuffer = new byte[32000];
-
-                // Start reading data.
-                m_pOwner.BeginReadLine(m_pLineBuffer,0,m_pLineBuffer.Length - 2,m_SizeExceededAction,new AsyncCallback(this.ReadLine_Completed),null);
-            }
-
-
-            #region mehtod ReadLine_Completed
-
-            /// <summary>
-            /// This method is called when asyynchronous line reading has completed.
-            /// </summary>
-            /// <param name="asyncResult">An IAsyncResult that represents an asynchronous call.</param>
-            private void ReadLine_Completed(IAsyncResult asyncResult)
-            {
-                try{
-                    int storedCount = 0;                    
-                    try{
-                        storedCount = m_pOwner.EndReadLine(asyncResult);
-                    }
-                    catch(LineSizeExceededException lx){
-                        if(m_SizeExceededAction == SizeExceededAction.ThrowException){
-                            throw lx;
-                        }
-                        m_pException = new LineSizeExceededException();
-                        storedCount = 32000 - 2;
-                    }
-
-                    // Source stream closed berore we reached terminator.
-                    if(storedCount == -1){
-                        throw new IncompleteDataException();
-                    }
-
-                    // Check for terminator.
-                    if(Net_Utils.CompareArray(m_pTerminatorBytes,m_pLineBuffer,storedCount)){
-                        Completed();
-                    }
-                    else{
-                        // We have exceeded maximum allowed data count.
-                        if(m_MaxCount > 0 && (m_BytesStored + storedCount + 2) > m_MaxCount){
-                            if(m_SizeExceededAction == SizeExceededAction.ThrowException){
-                                throw new DataSizeExceededException();
-                            }
-                            // Just skip storing.
-                            else{
-                                m_pException = new DataSizeExceededException();
-                            }
-                        }
-                        else{
-                            // Store readed line.
-                            m_pLineBuffer[storedCount++] = (byte)'\r';
-                            m_pLineBuffer[storedCount++] = (byte)'\n';
-                            m_pStoreStream.Write(m_pLineBuffer,0,storedCount);
-                            m_BytesStored += storedCount;                           
-                        }
-
-                        // Strart reading new line.
-                        m_pOwner.BeginReadLine(m_pLineBuffer,0,m_pLineBuffer.Length - 2,m_SizeExceededAction,new AsyncCallback(this.ReadLine_Completed),null);
-                    }
-                }
-                catch(Exception x){
-                    m_pException = x;
-                    Completed();                
-                }
-            }
-
-            #endregion
-
-            #region method Completed
-
-            /// <summary>
-            /// This method must be called when asynchronous operation has completed.
-            /// </summary>
-            private void Completed()
-            {
-                m_IsCompleted = true;
-                m_pAsyncWaitHandle.Set();
-                if(m_pAsyncCallback != null){
-                    m_pAsyncCallback(this);
-                }
-            }
-
-            #endregion
-
-
-            #region Properties implementation
-
-            /// <summary>
-            /// Gets terminator.
-            /// </summary>
-            public string Terminator
-            {
-                get{ return m_Terminator; }
-            }
-
-            /// <summary>
-            /// Gets a user-defined object that qualifies or contains information about an asynchronous operation.
-            /// </summary>
-            public object AsyncState
-            {
-                get{ return m_pAsyncState; }
-            }
-
-            /// <summary>
-            /// Gets a WaitHandle that is used to wait for an asynchronous operation to complete.
-            /// </summary>
-            public WaitHandle AsyncWaitHandle
-            {
-                get{ return m_pAsyncWaitHandle; }
-            }
-
-            /// <summary>
-            /// Gets an indication of whether the asynchronous operation completed synchronously.
-            /// </summary>
-            public bool CompletedSynchronously
-            {
-                get{ return m_CompletedSynchronously; }
-            }
-
-            /// <summary>
-            /// Gets an indication whether the asynchronous operation has completed.
-            /// </summary>
-            public bool IsCompleted
-            {
-                get{ return m_IsCompleted; }
-            }
-
-
-            /// <summary>
-            /// Gets or sets if <b>EndReadLine</b> method is called for this asynchronous operation.
-            /// </summary>
-            internal bool IsEndCalled
-            {
-                get{ return m_IsEndCalled; }
-
-                set{ m_IsEndCalled = value; }
-            }
-
-            /// <summary>
-            /// Gets number of bytes stored in to <b>storeStream</b>.
-            /// </summary>
-            internal long BytesStored
-            {
-                get{ return m_BytesStored; }
-            }
-
-            /// <summary>
-            /// Gets exception happened on asynchronous operation. Returns null if operation was successfull.
-            /// </summary>
-            internal Exception Exception
-            {
-                get{ return m_pException; }
-            }
-
-            #endregion
-
-        }
-
-        #endregion
-
-        #region class ReadToStreamAsyncOperation
-
-        /// <summary>
-        /// This class implements asynchronous read to stream data reader.
-        /// </summary>
-        private class ReadToStreamAsyncOperation : IAsyncResult
-        {
-            private SmartStream        m_pOwner                 = null;
-            private Stream             m_pStoreStream           = null;
-            private long               m_Count                  = 0;
-            private AsyncCallback      m_pAsyncCallback         = null;
-            private object             m_pAsyncState            = null;
-            private AutoResetEvent     m_pAsyncWaitHandle       = null;
-            private bool               m_CompletedSynchronously = false;
-            private bool               m_IsCompleted            = false;
-            private bool               m_IsEndCalled            = false;
-            private long               m_BytesStored            = 0;
-            private Exception          m_pException             = null;
-
-            /// <summary>
-            /// Default constructor.
-            /// </summary>
-            /// <param name="owner">Owner stream.</param>
-            /// <param name="storeStream">Stream where to store readed data.</param>
-            /// <param name="count">Number of bytes to read from source stream.</param>
-            /// <param name="callback">The AsyncCallback delegate that is executed when asynchronous operation completes.</param>
-            /// <param name="asyncState">User-defined object that qualifies or contains information about an asynchronous operation.</param>
-            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> or <b>storeStream</b> is null reference.</exception>
-            /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-            public ReadToStreamAsyncOperation(SmartStream owner,Stream storeStream,long count,AsyncCallback callback,object asyncState)
-            {
-                if(owner == null){
-                    throw new ArgumentNullException("owner");
-                }
-                if(storeStream == null){
-                    throw new ArgumentNullException("storeStream");
-                }
-                if(count < 0){
-                    throw new ArgumentException("Argument 'count' must be >= 0.");
-                }
-
-                m_pOwner             = owner;
-                m_pStoreStream       = storeStream;
-                m_Count              = count;
-                m_pAsyncCallback     = callback;
-                m_pAsyncState        = asyncState;
-
-                m_pAsyncWaitHandle = new AutoResetEvent(false);
-
-                if(m_Count == 0){
-                    Completed();                    
-                }
-                else{
-                    DoDataReading();
-                }
-            }
-
-
-            #region method Buffering_Completed
-
-            /// <summary>
-            /// Is called when asynchronous read buffer buffering has completed.
-            /// </summary>
-            /// <param name="x">Exception that occured during async operation.</param>
-            private void Buffering_Completed(Exception x)
-            {
-                if(x != null){
-                    m_pException = x;
-                    Completed();
-                }
-                // We reached end of stream, no more data.
-                else if(m_pOwner.BytesInReadBuffer == 0){
-                    m_pException = new IncompleteDataException();
-                    Completed();
-                }
-                // Continue line reading.
-                else{
-                    DoDataReading();
-                }
-            }
-
-            #endregion
-
-            #region method DoReading
-
-            /// <summary>
-            /// Does data reading.
-            /// </summary>
-            private void DoDataReading()
-            {
-                try{
-                    while(true){
-                        // Read buffer empty, buff next data block.
-                        if(m_pOwner.BytesInReadBuffer == 0){
-                            // Buffering started asynchronously.
-                            if(m_pOwner.BufferRead(true,this.Buffering_Completed)){
-                                return;
-                            }
-                            // Buffering completed synchronously, continue processing.
-                            else{
-                                // We reached end of stream, no more data.
-                                if(m_pOwner.BytesInReadBuffer == 0){
-                                    throw new IncompleteDataException();
-                                }
-                            }
-                        }
-                    
-                        int countToRead = (int)Math.Min(m_Count - m_BytesStored,m_pOwner.BytesInReadBuffer);                
-                        m_pStoreStream.Write(m_pOwner.m_pReadBuffer,m_pOwner.m_ReadBufferOffset,countToRead);
-                        m_BytesStored += countToRead;
-                        m_pOwner.m_ReadBufferOffset += countToRead;
-   
-                        // We have readed all data.
-                        if(m_Count == m_BytesStored){
-                            Completed();
-                            return;
-                        }
-                    }
-                }
-                catch(Exception x){
-                    m_pException = x;
-                    Completed();
-                }
-            }
-
-            #endregion
-
-            #region method Completed
-
-            /// <summary>
-            /// This method must be called when asynchronous operation has completed.
-            /// </summary>
-            private void Completed()
-            {
-                m_IsCompleted = true;
-                m_pAsyncWaitHandle.Set();
-                if(m_pAsyncCallback != null){
-                    m_pAsyncCallback(this);
-                }
-            }
-
-            #endregion
-
-
-            #region Properties implementation
-
-            /// <summary>
-            /// Gets a user-defined object that qualifies or contains information about an asynchronous operation.
-            /// </summary>
-            public object AsyncState
-            {
-                get{ return m_pAsyncState; }
-            }
-
-            /// <summary>
-            /// Gets a WaitHandle that is used to wait for an asynchronous operation to complete.
-            /// </summary>
-            public WaitHandle AsyncWaitHandle
-            {
-                get{ return m_pAsyncWaitHandle; }
-            }
-
-            /// <summary>
-            /// Gets an indication of whether the asynchronous operation completed synchronously.
-            /// </summary>
-            public bool CompletedSynchronously
-            {
-                get{ return m_CompletedSynchronously; }
-            }
-
-            /// <summary>
-            /// Gets an indication whether the asynchronous operation has completed.
-            /// </summary>
-            public bool IsCompleted
-            {
-                get{ return m_IsCompleted; }
-            }
-
-
-            /// <summary>
-            /// Gets or sets if <b>EndReadLine</b> method is called for this asynchronous operation.
-            /// </summary>
-            internal bool IsEndCalled
-            {
-                get{ return m_IsEndCalled; }
-
-                set{ m_IsEndCalled = value; }
-            }
-
-            /// <summary>
-            /// Gets number of bytes stored in to <b>storeStream</b>.
-            /// </summary>
-            internal long BytesStored
-            {
-                get{ return m_BytesStored; }
-            }
-
-            /// <summary>
-            /// Gets exception happened on asynchronous operation. Returns null if operation was successfull.
-            /// </summary>
-            internal Exception Exception
-            {
-                get{ return m_pException; }
-            }
-
-            #endregion
-
-        }
-
-        #endregion
-
-        #region class ReadAsyncOperation
-
-        /// <summary>
-        /// This class implements asynchronous data reader.
-        /// </summary>
-        private class ReadAsyncOperation : IAsyncResult
-        {
-            private SmartStream        m_pOwner                 = null;
-            private byte[]             m_pBuffer                = null;
-            private int                m_OffsetInBuffer         = 0;
-            private int                m_MaxSize                = 0;
-            private AsyncCallback      m_pAsyncCallback         = null;
-            private object             m_pAsyncState            = null;
-            private AutoResetEvent     m_pAsyncWaitHandle       = null;
-            private bool               m_CompletedSynchronously = false;
-            private bool               m_IsCompleted            = false;
-            private bool               m_IsEndCalled            = false;
-            private int                m_BytesStored            = 0;
-            private Exception          m_pException             = null;
-
-            /// <summary>
-            /// Default constructor.
-            /// </summary>
-            /// <param name="owner">Owner stream.</param>
-            /// <param name="buffer">Buffer where to store data.</param>
-            /// <param name="offset">The location in <b>buffer</b> to begin storing the data.</param>
-            /// <param name="maxSize">Maximum number of bytes to read.</param>
-            /// <param name="callback">The AsyncCallback delegate that is executed when asynchronous operation completes.</param>
-            /// <param name="asyncState">User-defined object that qualifies or contains information about an asynchronous operation.</param>
-            public ReadAsyncOperation(SmartStream owner,byte[] buffer,int offset,int maxSize,AsyncCallback callback,object asyncState)
-            {
-                if(owner == null){
-                    throw new ArgumentNullException("owner");
-                }
-                if(buffer == null){
-                    throw new ArgumentNullException("buffer");
-                }
-                if(offset < 0){
-                    throw new ArgumentOutOfRangeException("offset","Argument 'offset' value must be >= 0.");
-                }
-                if(offset > buffer.Length){
-                    throw new ArgumentOutOfRangeException("offset","Argument 'offset' value must be < buffer.Length.");
-                }
-                if(maxSize < 0){
-                    throw new ArgumentOutOfRangeException("maxSize","Argument 'maxSize' value must be >= 0.");
-                }
-                if(offset + maxSize > buffer.Length){
-                    throw new ArgumentOutOfRangeException("maxSize","Argument 'maxSize' is bigger than than argument 'buffer' can store.");
-                }
-
-                m_pOwner             = owner;
-                m_pBuffer            = buffer;
-                m_OffsetInBuffer     = offset;
-                m_MaxSize            = maxSize;
-                m_pAsyncCallback     = callback;
-                m_pAsyncState        = asyncState;
-
-                m_pAsyncWaitHandle = new AutoResetEvent(false);
-
-                DoRead();
-            }
-
-
-            #region method Buffering_Completed
-
-            /// <summary>
-            /// Is called when asynchronous read buffer buffering has completed.
-            /// </summary>
-            /// <param name="x">Exception that occured during async operation.</param>
-            private void Buffering_Completed(Exception x)
-            {
-                if(x != null){
-                    m_pException = x;
-                    Completed();
-                }
-                // We reached end of stream, no more data.
-                else if(m_pOwner.BytesInReadBuffer == 0){
-                    Completed();
-                }
-                // Continue data reading.
-                else{
-                    DoRead();
-                }
-            }
-
-            #endregion
-
-            #region method DoRead
-
-            /// <summary>
-            /// Does asynchronous data reading.
-            /// </summary>
-            private void DoRead()
-            {
-                try{
-                    // Read buffer empty, buff next data block.
-                    if(m_pOwner.BytesInReadBuffer == 0){
-                        // Buffering started asynchronously.
-                        if(m_pOwner.BufferRead(true,this.Buffering_Completed)){
-                            return;
-                        }
-                        // Buffering completed synchronously, continue processing.
-                        else{
-                            // We reached end of stream, no more data.
-                            if(m_pOwner.BytesInReadBuffer == 0){
-                                Completed();
-                                return;
-                            }
-                        }
-                    }
-
-                    int readedCount = Math.Min(m_MaxSize,m_pOwner.BytesInReadBuffer);
-                    Array.Copy(m_pOwner.m_pReadBuffer,m_pOwner.m_ReadBufferOffset,m_pBuffer,m_OffsetInBuffer,readedCount);
-                    m_pOwner.m_ReadBufferOffset += readedCount;
-                    m_pOwner.m_LastActivity = DateTime.Now;
-                    m_BytesStored += readedCount;
-
-                    Completed();
-                }
-                catch(Exception x){
-                    m_pException = x;
-                    Completed();
-                }
-            }
-
-            #endregion
-
-            #region method Completed
-
-            /// <summary>
-            /// This method must be called when asynchronous operation has completed.
-            /// </summary>
-            private void Completed()
-            {
-                m_IsCompleted = true;
-                m_pAsyncWaitHandle.Set();
-                if(m_pAsyncCallback != null){
-                    m_pAsyncCallback(this);
-                }
-            }
-
-            #endregion
-
-
-            #region Properties implementation
-
-            /// <summary>
-            /// Gets a user-defined object that qualifies or contains information about an asynchronous operation.
-            /// </summary>
-            public object AsyncState
-            {
-                get{ return m_pAsyncState; }
-            }
-
-            /// <summary>
-            /// Gets a WaitHandle that is used to wait for an asynchronous operation to complete.
-            /// </summary>
-            public WaitHandle AsyncWaitHandle
-            {
-                get{ return m_pAsyncWaitHandle; }
-            }
-
-            /// <summary>
-            /// Gets an indication of whether the asynchronous operation completed synchronously.
-            /// </summary>
-            public bool CompletedSynchronously
-            {
-                get{ return m_CompletedSynchronously; }
-            }
-
-            /// <summary>
-            /// Gets an indication whether the asynchronous operation has completed.
-            /// </summary>
-            public bool IsCompleted
-            {
-                get{ return m_IsCompleted; }
-            }
-
-
-            /// <summary>
-            /// Gets or sets if <b>EndReadLine</b> method is called for this asynchronous operation.
-            /// </summary>
-            internal bool IsEndCalled
-            {
-                get{ return m_IsEndCalled; }
-
-                set{ m_IsEndCalled = value; }
-            }
-
-            /// <summary>
-            /// Gets store buffer.
-            /// </summary>
-            internal byte[] Buffer
-            {
-                get{ return m_pBuffer; }
-            }
-
-            /// <summary>
-            /// Gets number of bytes stored in to <b>Buffer</b>.
-            /// </summary>
-            internal int BytesStored
-            {
-                get{ return m_BytesStored; }
-            }
-
-            #endregion
-        }
-
-        #endregion
-
-        //-----------------------------------
-
-
+                
         #region class ReadLineAsyncOP
 
         /// <summary>
@@ -1970,86 +1069,7 @@ namespace LumiSoft.Net.IO
         //  *) timeout support for sync versions
         //  *) WriteHeader SmartStream buffers !!! we may not do this if stream wont support seeking.
         
-
-        #region method BeginReadLine
-
-        /// <summary>
-        /// Begins an asynchronous line reading from the source stream.
-        /// </summary>
-        /// <param name="buffer">Buffer where to store readed line data.</param>
-        /// <param name="offset">The location in <b>buffer</b> to begin storing the data.</param>
-        /// <param name="maxCount">Maximum number of bytes to read.</param>
-        /// <param name="exceededAction">Specifies how this method behaves when maximum line size exceeded.</param>
-        /// <param name="callback">The AsyncCallback delegate that is executed when asynchronous operation completes.</param>
-        /// <param name="state">An object that contains any additional user-defined data.</param>
-        /// <returns>An IAsyncResult that represents the asynchronous call.</returns>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
-        /// <exception cref="ArgumentNullException">Is raised when <b>buffer</b> is null reference.</exception>
-        /// <exception cref="ArgumentOutOfRangeException">is raised when any of the arguments has invalid value.</exception>
-        public IAsyncResult BeginReadLine(byte[] buffer,int offset,int maxCount,SizeExceededAction exceededAction,AsyncCallback callback,object state)
-        {
-            if(m_IsDisposed){
-                throw new ObjectDisposedException(this.GetType().Name);
-            }
-            if(buffer == null){
-                throw new ArgumentNullException("buffer");
-            }
-            if(offset < 0){
-                throw new ArgumentOutOfRangeException("offset","Argument 'offset' value must be >= 0.");
-            }
-            if(offset > buffer.Length){
-                throw new ArgumentOutOfRangeException("offset","Argument 'offset' value must be < buffer.Length.");
-            }
-            if(maxCount < 0){
-                throw new ArgumentOutOfRangeException("maxCount","Argument 'maxCount' value must be >= 0.");
-            }
-            if(offset + maxCount > buffer.Length){
-                throw new ArgumentOutOfRangeException("maxCount","Argument 'maxCount' is bigger than than argument 'buffer' can store.");
-            }
-
-            return new ReadLineAsyncOperation(this,buffer,offset,maxCount,exceededAction,callback,state);
-        }
-
-        #endregion
-
-        #region method EndReadLine
-
-        /// <summary>
-        /// Handles the end of an asynchronous line reading.
-        /// </summary>
-        /// <param name="asyncResult">An IAsyncResult that represents an asynchronous call.</param>
-        /// <returns>Returns number of bytes stored to <b>buffer</b>. Returns -1 if no more data, end of stream reached.</returns>
-        /// <exception cref="ArgumentNullException">Is raised when <b>asyncResult</b> is null reference.</exception>
-        /// <exception cref="ArgumentException">Is raised when invalid <b>asyncResult</b> passed to this method.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when <b>EndReadLine</b> has already been called for specified <b>asyncResult</b>.</exception>
-        /// <exception cref="LineSizeExceededException">Is raised when <b>maxCount</b> value is exceeded.</exception>
-        public int EndReadLine(IAsyncResult asyncResult)
-        {
-            if(asyncResult == null){
-                throw new ArgumentNullException("asyncResult");
-            }
-            if(!(asyncResult is ReadLineAsyncOperation)){
-                throw new ArgumentException("Argument 'asyncResult' was not returned by a call to the BeginReadLine method.");
-            }
-
-            ReadLineAsyncOperation ar = (ReadLineAsyncOperation)asyncResult;
-            if(ar.IsEndCalled){
-                throw new InvalidOperationException("EndReadLine is already called for specified 'asyncResult'.");
-            }
-            ar.AsyncWaitHandle.WaitOne();
-            ar.AsyncWaitHandle.Close();
-            ar.IsEndCalled = true;
-            
-            if(ar.BytesReaded == 0){
-                return -1;
-            }
-            else{
-                return ar.BytesStored;
-            }
-        }
-
-        #endregion
-                
+                                
         #region method ReadLine
 
         /// <summary>
@@ -3504,6 +2524,987 @@ namespace LumiSoft.Net.IO
                 // Clear read buffer.
                 m_ReadBufferOffset = 0;
                 m_ReadBufferCount  = 0;
+            }
+        }
+
+        #endregion
+
+
+        //------- Obsolete
+
+        #region class ReadLineAsyncOperation
+
+        /// <summary>
+        /// This class implements asynchronous line reading.
+        /// </summary>
+        private class ReadLineAsyncOperation : IAsyncResult
+        {
+            private SmartStream        m_pOwner                 = null;
+            private byte[]             m_pBuffer                = null;
+            private int                m_OffsetInBuffer         = 0;
+            private int                m_MaxCount               = 0;
+            private SizeExceededAction m_SizeExceededAction     = SizeExceededAction.JunkAndThrowException;
+            private AsyncCallback      m_pAsyncCallback         = null;
+            private object             m_pAsyncState            = null;
+            private AutoResetEvent     m_pAsyncWaitHandle       = null;
+            private bool               m_CompletedSynchronously = false;
+            private bool               m_IsCompleted            = false;
+            private bool               m_IsEndCalled            = false;
+            private int                m_BytesReaded            = 0;
+            private int                m_BytesStored            = 0;
+            private Exception          m_pException             = null;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="owner">Owner stream.</param>
+            /// <param name="buffer">Buffer where to store data.</param>
+            /// <param name="offset">The location in <b>buffer</b> to begin storing the data.</param>
+            /// <param name="maxCount">Maximum number of bytes to read.</param>
+            /// <param name="exceededAction">Specifies how this method behaves when maximum line size exceeded.</param>
+            /// <param name="callback">The AsyncCallback delegate that is executed when asynchronous operation completes.</param>
+            /// <param name="asyncState">User-defined object that qualifies or contains information about an asynchronous operation.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b>,<b>buffer</b> is null reference.</exception>
+            /// <exception cref="ArgumentOutOfRangeException">Is raised when any of the arguments has out of valid range.</exception>
+            public ReadLineAsyncOperation(SmartStream owner,byte[] buffer,int offset,int maxCount,SizeExceededAction exceededAction,AsyncCallback callback,object asyncState)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+                if(buffer == null){
+                    throw new ArgumentNullException("buffer");
+                }
+                if(offset < 0){
+                    throw new ArgumentOutOfRangeException("offset","Argument 'offset' value must be >= 0.");
+                }
+                if(offset > buffer.Length){
+                    throw new ArgumentOutOfRangeException("offset","Argument 'offset' value must be < buffer.Length.");
+                }
+                if(maxCount < 0){
+                    throw new ArgumentOutOfRangeException("maxCount","Argument 'maxCount' value must be >= 0.");
+                }
+                if(offset + maxCount > buffer.Length){
+                    throw new ArgumentOutOfRangeException("maxCount","Argument 'maxCount' is bigger than than argument 'buffer' can store.");
+                }
+
+                m_pOwner             = owner;
+                m_pBuffer            = buffer;
+                m_OffsetInBuffer     = offset;
+                m_MaxCount           = maxCount;
+                m_SizeExceededAction = exceededAction;
+                m_pAsyncCallback     = callback;
+                m_pAsyncState        = asyncState;
+
+                m_pAsyncWaitHandle = new AutoResetEvent(false);
+
+                DoLineReading();                                
+            }
+
+
+            #region method Buffering_Completed
+
+            /// <summary>
+            /// Is called when asynchronous read buffer buffering has completed.
+            /// </summary>
+            /// <param name="x">Exception that occured during async operation.</param>
+            private void Buffering_Completed(Exception x)
+            {
+                if(x != null){
+                    m_pException = x;
+                    Completed();
+                }
+                // We reached end of stream, no more data.
+                else if(m_pOwner.BytesInReadBuffer == 0){
+                    Completed();
+                }
+                // Continue line reading.
+                else{
+                    DoLineReading();
+                }
+            }
+
+            #endregion
+
+            #region method DoLineReading
+
+            /// <summary>
+            /// Does line reading.
+            /// </summary>
+            private void DoLineReading()
+            {           
+                try{
+                    while(true){
+                        // Read buffer empty, buff next data block.
+                        if(m_pOwner.BytesInReadBuffer == 0){
+                            // Buffering started asynchronously.
+                            if(m_pOwner.BufferRead(true,this.Buffering_Completed)){
+                                return;
+                            }
+                            // Buffering completed synchronously, continue processing.
+                            else{
+                                // We reached end of stream, no more data.
+                                if(m_pOwner.BytesInReadBuffer == 0){
+                                    Completed();
+                                    return;
+                                }
+                            }
+                        }
+
+                        byte b = m_pOwner.m_pReadBuffer[m_pOwner.m_ReadBufferOffset++];
+                        m_BytesReaded++;
+
+                        // We have LF line.
+                        if(b == '\n'){
+                            break;               
+                        }
+                        // We have CRLF line.
+                        else if(b == '\r' && m_pOwner.Peek() == '\n'){
+                            // Consume LF char.
+                            m_pOwner.ReadByte();
+                            m_BytesReaded++;
+
+                            break;
+                        }
+                        // We have CR line.
+                        else if(b == '\r'){
+                            break;
+                        }
+                        // We have normal line data char.
+                        else{
+                            // Line buffer full.
+                            if(m_BytesStored >= m_MaxCount){
+                                if(m_SizeExceededAction == SizeExceededAction.ThrowException){
+                                    throw new LineSizeExceededException();
+                                }
+                                // Just skip storing.
+                                else{
+                                }
+                            }
+                            else{
+                                m_pBuffer[m_OffsetInBuffer++] = b;
+                                m_BytesStored++;
+                            }
+                        }
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;                    
+                }
+
+                Completed();
+            }
+
+            #endregion
+
+            #region method Completed
+
+            /// <summary>
+            /// This method must be called when asynchronous operation has completed.
+            /// </summary>
+            private void Completed()
+            {
+                m_IsCompleted = true;
+                m_pAsyncWaitHandle.Set();
+                if(m_pAsyncCallback != null){
+                    m_pAsyncCallback(this);
+                }
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets a user-defined object that qualifies or contains information about an asynchronous operation.
+            /// </summary>
+            public object AsyncState
+            {
+                get{ return m_pAsyncState; }
+            }
+
+            /// <summary>
+            /// Gets a WaitHandle that is used to wait for an asynchronous operation to complete.
+            /// </summary>
+            public WaitHandle AsyncWaitHandle
+            {
+                get{ return m_pAsyncWaitHandle; }
+            }
+
+            /// <summary>
+            /// Gets an indication of whether the asynchronous operation completed synchronously.
+            /// </summary>
+            public bool CompletedSynchronously
+            {
+                get{ return m_CompletedSynchronously; }
+            }
+
+            /// <summary>
+            /// Gets an indication whether the asynchronous operation has completed.
+            /// </summary>
+            public bool IsCompleted
+            {
+                get{ return m_IsCompleted; }
+            }
+
+
+            /// <summary>
+            /// Gets or sets if <b>EndReadLine</b> method is called for this asynchronous operation.
+            /// </summary>
+            internal bool IsEndCalled
+            {
+                get{ return m_IsEndCalled; }
+
+                set{ m_IsEndCalled = value; }
+            }
+
+            /// <summary>
+            /// Gets store buffer.
+            /// </summary>
+            internal byte[] Buffer
+            {
+                get{ return m_pBuffer; }
+            }
+
+            /// <summary>
+            /// Gets number of bytes readed from source stream.
+            /// </summary>
+            internal int BytesReaded
+            {
+                get{ return m_BytesReaded; }
+            }
+
+            /// <summary>
+            /// Gets number of bytes stored in to <b>Buffer</b>.
+            /// </summary>
+            internal int BytesStored
+            {
+                get{ return m_BytesStored; }
+            }
+
+            #endregion
+        }
+
+        #endregion
+
+        #region class ReadToTerminatorAsyncOperation
+
+        /// <summary>
+        /// This class implements asynchronous line-based terminated data reader, where terminator is on line itself.
+        /// </summary>
+        private class ReadToTerminatorAsyncOperation : IAsyncResult
+        {
+            private SmartStream        m_pOwner                 = null;
+            private string             m_Terminator             = "";
+            private byte[]             m_pTerminatorBytes       = null;
+            private Stream             m_pStoreStream           = null;
+            private long               m_MaxCount               = 0;            
+            private SizeExceededAction m_SizeExceededAction     = SizeExceededAction.JunkAndThrowException;
+            private AsyncCallback      m_pAsyncCallback         = null;
+            private object             m_pAsyncState            = null;
+            private AutoResetEvent     m_pAsyncWaitHandle       = null;
+            private bool               m_CompletedSynchronously = false;
+            private bool               m_IsCompleted            = false;
+            private bool               m_IsEndCalled            = false;
+            private byte[]             m_pLineBuffer            = null;
+            private long               m_BytesStored            = 0;
+            private Exception          m_pException             = null;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="owner">Owner stream.</param>
+            /// <param name="terminator">Data terminator.</param>
+            /// <param name="storeStream">Stream where to store readed header.</param>
+            /// <param name="maxCount">Maximum number of bytes to read. Value 0 means not limited.</param>
+            /// <param name="exceededAction">Specifies how this method behaves when maximum line size exceeded.</param>
+            /// <param name="callback">The AsyncCallback delegate that is executed when asynchronous operation completes.</param>
+            /// <param name="asyncState">User-defined object that qualifies or contains information about an asynchronous operation.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b>,<b>terminator</b> or <b>storeStream</b> is null reference.</exception>
+            public ReadToTerminatorAsyncOperation(SmartStream owner,string terminator,Stream storeStream,long maxCount,SizeExceededAction exceededAction,AsyncCallback callback,object asyncState)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+                if(terminator == null){
+                    throw new ArgumentNullException("terminator");
+                }
+                if(storeStream == null){
+                    throw new ArgumentNullException("storeStream");
+                }
+                if(maxCount < 0){
+                    throw new ArgumentException("Argument 'maxCount' must be >= 0.");
+                }
+
+                m_pOwner             = owner;
+                m_Terminator         = terminator;
+                m_pTerminatorBytes   = Encoding.ASCII.GetBytes(terminator);
+                m_pStoreStream       = storeStream;
+                m_MaxCount           = maxCount;
+                m_SizeExceededAction = exceededAction;
+                m_pAsyncCallback     = callback;
+                m_pAsyncState        = asyncState;
+
+                m_pAsyncWaitHandle = new AutoResetEvent(false);
+
+                m_pLineBuffer = new byte[32000];
+
+                // Start reading data.
+                m_pOwner.BeginReadLine(m_pLineBuffer,0,m_pLineBuffer.Length - 2,m_SizeExceededAction,new AsyncCallback(this.ReadLine_Completed),null);
+            }
+
+
+            #region mehtod ReadLine_Completed
+
+            /// <summary>
+            /// This method is called when asyynchronous line reading has completed.
+            /// </summary>
+            /// <param name="asyncResult">An IAsyncResult that represents an asynchronous call.</param>
+            private void ReadLine_Completed(IAsyncResult asyncResult)
+            {
+                try{
+                    int storedCount = 0;                    
+                    try{
+                        storedCount = m_pOwner.EndReadLine(asyncResult);
+                    }
+                    catch(LineSizeExceededException lx){
+                        if(m_SizeExceededAction == SizeExceededAction.ThrowException){
+                            throw lx;
+                        }
+                        m_pException = new LineSizeExceededException();
+                        storedCount = 32000 - 2;
+                    }
+
+                    // Source stream closed berore we reached terminator.
+                    if(storedCount == -1){
+                        throw new IncompleteDataException();
+                    }
+
+                    // Check for terminator.
+                    if(Net_Utils.CompareArray(m_pTerminatorBytes,m_pLineBuffer,storedCount)){
+                        Completed();
+                    }
+                    else{
+                        // We have exceeded maximum allowed data count.
+                        if(m_MaxCount > 0 && (m_BytesStored + storedCount + 2) > m_MaxCount){
+                            if(m_SizeExceededAction == SizeExceededAction.ThrowException){
+                                throw new DataSizeExceededException();
+                            }
+                            // Just skip storing.
+                            else{
+                                m_pException = new DataSizeExceededException();
+                            }
+                        }
+                        else{
+                            // Store readed line.
+                            m_pLineBuffer[storedCount++] = (byte)'\r';
+                            m_pLineBuffer[storedCount++] = (byte)'\n';
+                            m_pStoreStream.Write(m_pLineBuffer,0,storedCount);
+                            m_BytesStored += storedCount;                           
+                        }
+
+                        // Strart reading new line.
+                        m_pOwner.BeginReadLine(m_pLineBuffer,0,m_pLineBuffer.Length - 2,m_SizeExceededAction,new AsyncCallback(this.ReadLine_Completed),null);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    Completed();                
+                }
+            }
+
+            #endregion
+
+            #region method Completed
+
+            /// <summary>
+            /// This method must be called when asynchronous operation has completed.
+            /// </summary>
+            private void Completed()
+            {
+                m_IsCompleted = true;
+                m_pAsyncWaitHandle.Set();
+                if(m_pAsyncCallback != null){
+                    m_pAsyncCallback(this);
+                }
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets terminator.
+            /// </summary>
+            public string Terminator
+            {
+                get{ return m_Terminator; }
+            }
+
+            /// <summary>
+            /// Gets a user-defined object that qualifies or contains information about an asynchronous operation.
+            /// </summary>
+            public object AsyncState
+            {
+                get{ return m_pAsyncState; }
+            }
+
+            /// <summary>
+            /// Gets a WaitHandle that is used to wait for an asynchronous operation to complete.
+            /// </summary>
+            public WaitHandle AsyncWaitHandle
+            {
+                get{ return m_pAsyncWaitHandle; }
+            }
+
+            /// <summary>
+            /// Gets an indication of whether the asynchronous operation completed synchronously.
+            /// </summary>
+            public bool CompletedSynchronously
+            {
+                get{ return m_CompletedSynchronously; }
+            }
+
+            /// <summary>
+            /// Gets an indication whether the asynchronous operation has completed.
+            /// </summary>
+            public bool IsCompleted
+            {
+                get{ return m_IsCompleted; }
+            }
+
+
+            /// <summary>
+            /// Gets or sets if <b>EndReadLine</b> method is called for this asynchronous operation.
+            /// </summary>
+            internal bool IsEndCalled
+            {
+                get{ return m_IsEndCalled; }
+
+                set{ m_IsEndCalled = value; }
+            }
+
+            /// <summary>
+            /// Gets number of bytes stored in to <b>storeStream</b>.
+            /// </summary>
+            internal long BytesStored
+            {
+                get{ return m_BytesStored; }
+            }
+
+            /// <summary>
+            /// Gets exception happened on asynchronous operation. Returns null if operation was successfull.
+            /// </summary>
+            internal Exception Exception
+            {
+                get{ return m_pException; }
+            }
+
+            #endregion
+
+        }
+
+        #endregion
+
+        #region class ReadToStreamAsyncOperation
+
+        /// <summary>
+        /// This class implements asynchronous read to stream data reader.
+        /// </summary>
+        private class ReadToStreamAsyncOperation : IAsyncResult
+        {
+            private SmartStream        m_pOwner                 = null;
+            private Stream             m_pStoreStream           = null;
+            private long               m_Count                  = 0;
+            private AsyncCallback      m_pAsyncCallback         = null;
+            private object             m_pAsyncState            = null;
+            private AutoResetEvent     m_pAsyncWaitHandle       = null;
+            private bool               m_CompletedSynchronously = false;
+            private bool               m_IsCompleted            = false;
+            private bool               m_IsEndCalled            = false;
+            private long               m_BytesStored            = 0;
+            private Exception          m_pException             = null;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="owner">Owner stream.</param>
+            /// <param name="storeStream">Stream where to store readed data.</param>
+            /// <param name="count">Number of bytes to read from source stream.</param>
+            /// <param name="callback">The AsyncCallback delegate that is executed when asynchronous operation completes.</param>
+            /// <param name="asyncState">User-defined object that qualifies or contains information about an asynchronous operation.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> or <b>storeStream</b> is null reference.</exception>
+            /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+            public ReadToStreamAsyncOperation(SmartStream owner,Stream storeStream,long count,AsyncCallback callback,object asyncState)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+                if(storeStream == null){
+                    throw new ArgumentNullException("storeStream");
+                }
+                if(count < 0){
+                    throw new ArgumentException("Argument 'count' must be >= 0.");
+                }
+
+                m_pOwner             = owner;
+                m_pStoreStream       = storeStream;
+                m_Count              = count;
+                m_pAsyncCallback     = callback;
+                m_pAsyncState        = asyncState;
+
+                m_pAsyncWaitHandle = new AutoResetEvent(false);
+
+                if(m_Count == 0){
+                    Completed();                    
+                }
+                else{
+                    DoDataReading();
+                }
+            }
+
+
+            #region method Buffering_Completed
+
+            /// <summary>
+            /// Is called when asynchronous read buffer buffering has completed.
+            /// </summary>
+            /// <param name="x">Exception that occured during async operation.</param>
+            private void Buffering_Completed(Exception x)
+            {
+                if(x != null){
+                    m_pException = x;
+                    Completed();
+                }
+                // We reached end of stream, no more data.
+                else if(m_pOwner.BytesInReadBuffer == 0){
+                    m_pException = new IncompleteDataException();
+                    Completed();
+                }
+                // Continue line reading.
+                else{
+                    DoDataReading();
+                }
+            }
+
+            #endregion
+
+            #region method DoReading
+
+            /// <summary>
+            /// Does data reading.
+            /// </summary>
+            private void DoDataReading()
+            {
+                try{
+                    while(true){
+                        // Read buffer empty, buff next data block.
+                        if(m_pOwner.BytesInReadBuffer == 0){
+                            // Buffering started asynchronously.
+                            if(m_pOwner.BufferRead(true,this.Buffering_Completed)){
+                                return;
+                            }
+                            // Buffering completed synchronously, continue processing.
+                            else{
+                                // We reached end of stream, no more data.
+                                if(m_pOwner.BytesInReadBuffer == 0){
+                                    throw new IncompleteDataException();
+                                }
+                            }
+                        }
+                    
+                        int countToRead = (int)Math.Min(m_Count - m_BytesStored,m_pOwner.BytesInReadBuffer);                
+                        m_pStoreStream.Write(m_pOwner.m_pReadBuffer,m_pOwner.m_ReadBufferOffset,countToRead);
+                        m_BytesStored += countToRead;
+                        m_pOwner.m_ReadBufferOffset += countToRead;
+   
+                        // We have readed all data.
+                        if(m_Count == m_BytesStored){
+                            Completed();
+                            return;
+                        }
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    Completed();
+                }
+            }
+
+            #endregion
+
+            #region method Completed
+
+            /// <summary>
+            /// This method must be called when asynchronous operation has completed.
+            /// </summary>
+            private void Completed()
+            {
+                m_IsCompleted = true;
+                m_pAsyncWaitHandle.Set();
+                if(m_pAsyncCallback != null){
+                    m_pAsyncCallback(this);
+                }
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets a user-defined object that qualifies or contains information about an asynchronous operation.
+            /// </summary>
+            public object AsyncState
+            {
+                get{ return m_pAsyncState; }
+            }
+
+            /// <summary>
+            /// Gets a WaitHandle that is used to wait for an asynchronous operation to complete.
+            /// </summary>
+            public WaitHandle AsyncWaitHandle
+            {
+                get{ return m_pAsyncWaitHandle; }
+            }
+
+            /// <summary>
+            /// Gets an indication of whether the asynchronous operation completed synchronously.
+            /// </summary>
+            public bool CompletedSynchronously
+            {
+                get{ return m_CompletedSynchronously; }
+            }
+
+            /// <summary>
+            /// Gets an indication whether the asynchronous operation has completed.
+            /// </summary>
+            public bool IsCompleted
+            {
+                get{ return m_IsCompleted; }
+            }
+
+
+            /// <summary>
+            /// Gets or sets if <b>EndReadLine</b> method is called for this asynchronous operation.
+            /// </summary>
+            internal bool IsEndCalled
+            {
+                get{ return m_IsEndCalled; }
+
+                set{ m_IsEndCalled = value; }
+            }
+
+            /// <summary>
+            /// Gets number of bytes stored in to <b>storeStream</b>.
+            /// </summary>
+            internal long BytesStored
+            {
+                get{ return m_BytesStored; }
+            }
+
+            /// <summary>
+            /// Gets exception happened on asynchronous operation. Returns null if operation was successfull.
+            /// </summary>
+            internal Exception Exception
+            {
+                get{ return m_pException; }
+            }
+
+            #endregion
+
+        }
+
+        #endregion
+
+        #region class ReadAsyncOperation
+
+        /// <summary>
+        /// This class implements asynchronous data reader.
+        /// </summary>
+        private class ReadAsyncOperation : IAsyncResult
+        {
+            private SmartStream        m_pOwner                 = null;
+            private byte[]             m_pBuffer                = null;
+            private int                m_OffsetInBuffer         = 0;
+            private int                m_MaxSize                = 0;
+            private AsyncCallback      m_pAsyncCallback         = null;
+            private object             m_pAsyncState            = null;
+            private AutoResetEvent     m_pAsyncWaitHandle       = null;
+            private bool               m_CompletedSynchronously = false;
+            private bool               m_IsCompleted            = false;
+            private bool               m_IsEndCalled            = false;
+            private int                m_BytesStored            = 0;
+            private Exception          m_pException             = null;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="owner">Owner stream.</param>
+            /// <param name="buffer">Buffer where to store data.</param>
+            /// <param name="offset">The location in <b>buffer</b> to begin storing the data.</param>
+            /// <param name="maxSize">Maximum number of bytes to read.</param>
+            /// <param name="callback">The AsyncCallback delegate that is executed when asynchronous operation completes.</param>
+            /// <param name="asyncState">User-defined object that qualifies or contains information about an asynchronous operation.</param>
+            public ReadAsyncOperation(SmartStream owner,byte[] buffer,int offset,int maxSize,AsyncCallback callback,object asyncState)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+                if(buffer == null){
+                    throw new ArgumentNullException("buffer");
+                }
+                if(offset < 0){
+                    throw new ArgumentOutOfRangeException("offset","Argument 'offset' value must be >= 0.");
+                }
+                if(offset > buffer.Length){
+                    throw new ArgumentOutOfRangeException("offset","Argument 'offset' value must be < buffer.Length.");
+                }
+                if(maxSize < 0){
+                    throw new ArgumentOutOfRangeException("maxSize","Argument 'maxSize' value must be >= 0.");
+                }
+                if(offset + maxSize > buffer.Length){
+                    throw new ArgumentOutOfRangeException("maxSize","Argument 'maxSize' is bigger than than argument 'buffer' can store.");
+                }
+
+                m_pOwner             = owner;
+                m_pBuffer            = buffer;
+                m_OffsetInBuffer     = offset;
+                m_MaxSize            = maxSize;
+                m_pAsyncCallback     = callback;
+                m_pAsyncState        = asyncState;
+
+                m_pAsyncWaitHandle = new AutoResetEvent(false);
+
+                DoRead();
+            }
+
+
+            #region method Buffering_Completed
+
+            /// <summary>
+            /// Is called when asynchronous read buffer buffering has completed.
+            /// </summary>
+            /// <param name="x">Exception that occured during async operation.</param>
+            private void Buffering_Completed(Exception x)
+            {
+                if(x != null){
+                    m_pException = x;
+                    Completed();
+                }
+                // We reached end of stream, no more data.
+                else if(m_pOwner.BytesInReadBuffer == 0){
+                    Completed();
+                }
+                // Continue data reading.
+                else{
+                    DoRead();
+                }
+            }
+
+            #endregion
+
+            #region method DoRead
+
+            /// <summary>
+            /// Does asynchronous data reading.
+            /// </summary>
+            private void DoRead()
+            {
+                try{
+                    // Read buffer empty, buff next data block.
+                    if(m_pOwner.BytesInReadBuffer == 0){
+                        // Buffering started asynchronously.
+                        if(m_pOwner.BufferRead(true,this.Buffering_Completed)){
+                            return;
+                        }
+                        // Buffering completed synchronously, continue processing.
+                        else{
+                            // We reached end of stream, no more data.
+                            if(m_pOwner.BytesInReadBuffer == 0){
+                                Completed();
+                                return;
+                            }
+                        }
+                    }
+
+                    int readedCount = Math.Min(m_MaxSize,m_pOwner.BytesInReadBuffer);
+                    Array.Copy(m_pOwner.m_pReadBuffer,m_pOwner.m_ReadBufferOffset,m_pBuffer,m_OffsetInBuffer,readedCount);
+                    m_pOwner.m_ReadBufferOffset += readedCount;
+                    m_pOwner.m_LastActivity = DateTime.Now;
+                    m_BytesStored += readedCount;
+
+                    Completed();
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    Completed();
+                }
+            }
+
+            #endregion
+
+            #region method Completed
+
+            /// <summary>
+            /// This method must be called when asynchronous operation has completed.
+            /// </summary>
+            private void Completed()
+            {
+                m_IsCompleted = true;
+                m_pAsyncWaitHandle.Set();
+                if(m_pAsyncCallback != null){
+                    m_pAsyncCallback(this);
+                }
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets a user-defined object that qualifies or contains information about an asynchronous operation.
+            /// </summary>
+            public object AsyncState
+            {
+                get{ return m_pAsyncState; }
+            }
+
+            /// <summary>
+            /// Gets a WaitHandle that is used to wait for an asynchronous operation to complete.
+            /// </summary>
+            public WaitHandle AsyncWaitHandle
+            {
+                get{ return m_pAsyncWaitHandle; }
+            }
+
+            /// <summary>
+            /// Gets an indication of whether the asynchronous operation completed synchronously.
+            /// </summary>
+            public bool CompletedSynchronously
+            {
+                get{ return m_CompletedSynchronously; }
+            }
+
+            /// <summary>
+            /// Gets an indication whether the asynchronous operation has completed.
+            /// </summary>
+            public bool IsCompleted
+            {
+                get{ return m_IsCompleted; }
+            }
+
+
+            /// <summary>
+            /// Gets or sets if <b>EndReadLine</b> method is called for this asynchronous operation.
+            /// </summary>
+            internal bool IsEndCalled
+            {
+                get{ return m_IsEndCalled; }
+
+                set{ m_IsEndCalled = value; }
+            }
+
+            /// <summary>
+            /// Gets store buffer.
+            /// </summary>
+            internal byte[] Buffer
+            {
+                get{ return m_pBuffer; }
+            }
+
+            /// <summary>
+            /// Gets number of bytes stored in to <b>Buffer</b>.
+            /// </summary>
+            internal int BytesStored
+            {
+                get{ return m_BytesStored; }
+            }
+
+            #endregion
+        }
+
+        #endregion
+
+
+        #region method BeginReadLine
+
+        /// <summary>
+        /// Begins an asynchronous line reading from the source stream.
+        /// </summary>
+        /// <param name="buffer">Buffer where to store readed line data.</param>
+        /// <param name="offset">The location in <b>buffer</b> to begin storing the data.</param>
+        /// <param name="maxCount">Maximum number of bytes to read.</param>
+        /// <param name="exceededAction">Specifies how this method behaves when maximum line size exceeded.</param>
+        /// <param name="callback">The AsyncCallback delegate that is executed when asynchronous operation completes.</param>
+        /// <param name="state">An object that contains any additional user-defined data.</param>
+        /// <returns>An IAsyncResult that represents the asynchronous call.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>buffer</b> is null reference.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">is raised when any of the arguments has invalid value.</exception>
+        [Obsolete("Use method 'ReadLine' instead.")]
+        public IAsyncResult BeginReadLine(byte[] buffer,int offset,int maxCount,SizeExceededAction exceededAction,AsyncCallback callback,object state)
+        {
+            if(m_IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(buffer == null){
+                throw new ArgumentNullException("buffer");
+            }
+            if(offset < 0){
+                throw new ArgumentOutOfRangeException("offset","Argument 'offset' value must be >= 0.");
+            }
+            if(offset > buffer.Length){
+                throw new ArgumentOutOfRangeException("offset","Argument 'offset' value must be < buffer.Length.");
+            }
+            if(maxCount < 0){
+                throw new ArgumentOutOfRangeException("maxCount","Argument 'maxCount' value must be >= 0.");
+            }
+            if(offset + maxCount > buffer.Length){
+                throw new ArgumentOutOfRangeException("maxCount","Argument 'maxCount' is bigger than than argument 'buffer' can store.");
+            }
+
+            return new ReadLineAsyncOperation(this,buffer,offset,maxCount,exceededAction,callback,state);
+        }
+
+        #endregion
+
+        #region method EndReadLine
+
+        /// <summary>
+        /// Handles the end of an asynchronous line reading.
+        /// </summary>
+        /// <param name="asyncResult">An IAsyncResult that represents an asynchronous call.</param>
+        /// <returns>Returns number of bytes stored to <b>buffer</b>. Returns -1 if no more data, end of stream reached.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>asyncResult</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when invalid <b>asyncResult</b> passed to this method.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when <b>EndReadLine</b> has already been called for specified <b>asyncResult</b>.</exception>
+        /// <exception cref="LineSizeExceededException">Is raised when <b>maxCount</b> value is exceeded.</exception>        
+        [Obsolete("Use method 'ReadLine' instead.")]
+        public int EndReadLine(IAsyncResult asyncResult)
+        {
+            if(asyncResult == null){
+                throw new ArgumentNullException("asyncResult");
+            }
+            if(!(asyncResult is ReadLineAsyncOperation)){
+                throw new ArgumentException("Argument 'asyncResult' was not returned by a call to the BeginReadLine method.");
+            }
+
+            ReadLineAsyncOperation ar = (ReadLineAsyncOperation)asyncResult;
+            if(ar.IsEndCalled){
+                throw new InvalidOperationException("EndReadLine is already called for specified 'asyncResult'.");
+            }
+            ar.AsyncWaitHandle.WaitOne();
+            ar.AsyncWaitHandle.Close();
+            ar.IsEndCalled = true;
+            
+            if(ar.BytesReaded == 0){
+                return -1;
+            }
+            else{
+                return ar.BytesStored;
             }
         }
 
