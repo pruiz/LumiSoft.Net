@@ -48,6 +48,7 @@ namespace LumiSoft.Net.DNS.Client
         private Socket                                m_pIPv6Socket   = null;
         private List<UDP_DataReceiver>                m_pReceivers    = null;
         private Random                                m_pRandom       = null;
+        private DNS_ClientCache                       m_pCache        = null;
 
 		/// <summary>
 		/// Static constructor.
@@ -94,6 +95,7 @@ namespace LumiSoft.Net.DNS.Client
 
             m_pReceivers = new List<UDP_DataReceiver>();
             m_pRandom = new Random();
+            m_pCache = new DNS_ClientCache();
 
             // Create UDP data receivers.
             for(int i=0;i<5;i++){
@@ -145,6 +147,9 @@ namespace LumiSoft.Net.DNS.Client
             m_pTransactions = null;
             
             m_pRandom = null;
+
+            m_pCache.Dispose();
+            m_pCache = null;
         }
 
         #endregion
@@ -1630,7 +1635,7 @@ namespace LumiSoft.Net.DNS.Client
                     if(transaction.State == DNS_ClientTransactionState.Active){
                         // Cache query.
                         if(m_UseDnsCache && serverResponse.ResponseCode == DNS_RCode.NO_ERROR){
-	                        DnsCache.AddToCache(transaction.QName,(int)transaction.QType,serverResponse);
+	                        m_pCache.AddToCache(transaction.QName,(int)transaction.QType,serverResponse);
 		                }
                         
                         transaction.ProcessResponse(serverResponse);
@@ -1963,6 +1968,14 @@ namespace LumiSoft.Net.DNS.Client
 
 			set{ m_UseDnsCache = value; }
 		}
+
+        /// <summary>
+        /// Gets DNS cache.
+        /// </summary>
+        public DNS_ClientCache Cache
+        {
+            get{ return m_pCache; }
+        }
 
 		#endregion
 

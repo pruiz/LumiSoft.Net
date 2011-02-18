@@ -50,6 +50,7 @@ namespace LumiSoft.Net.DNS.Client
 	/// <summary>
 	/// This class implements dns query cache.
 	/// </summary>
+    [Obsolete("Use DNS_Client.Cache instead.")]
 	public class DnsCache
 	{
 		private static Hashtable m_pCache    = null;

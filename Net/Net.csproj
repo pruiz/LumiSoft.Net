@@ -1,7 +1,7 @@
 ﻿<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="3.5">
   <PropertyGroup>
     <ProjectType>Local</ProjectType>
-    <ProductVersion>9.0.30729</ProductVersion>
+    <ProductVersion>9.0.21022</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{7AB36CCF-5FFD-4780-A54E-A102ECA028B5}</ProjectGuid>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -109,6 +109,7 @@
     <Compile Include="AsyncOP.cs" />
     <None Include="Media\Codec\Audio\ILBC.cs" />
     <Compile Include="AsyncOP_State.cs" />
+    <Compile Include="DNS\Client\DNS_ClientCache.cs" />
     <Compile Include="DNS\Client\DNS_ClientTransaction.cs" />
     <Compile Include="DNS\Client\DNS_ClientTransactionState.cs" />
     <Compile Include="HostEntry.cs" />
@@ -489,7 +490,7 @@
     <Compile Include="DNS\DNS_rr_CNAME.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="DNS\Client\DnsCache.cs">
+    <Compile Include="_Obsolete\DnsCache.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="DNS\DNS_rr.cs">
@@ -786,7 +787,6 @@
     <None Include="AUTH\AuthType.cs">
       <SubType>Code</SubType>
     </None>
-    <None Include="FTP\Server\readme.txt" />
     <Compile Include="_Obsolete\SocketServerSession.cs">
       <SubType>Code</SubType>
     </Compile>

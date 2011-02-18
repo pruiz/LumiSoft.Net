@@ -125,7 +125,7 @@ namespace LumiSoft.Net.DNS.Client
                 try{
                     // Use DNS cache if allowed.
 			        if(Dns_Client.UseDnsCache){ 
-	                    DnsServerResponse response = DnsCache.GetFromCache(m_QName,(int)m_QType);
+	                    DnsServerResponse response = m_pOwner.Cache.GetFromCache(m_QName,(int)m_QType);
 				        if(response != null){
 					        m_pResponse = response;
 
