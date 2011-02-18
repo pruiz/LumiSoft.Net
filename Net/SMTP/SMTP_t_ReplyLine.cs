@@ -64,7 +64,7 @@ namespace LumiSoft.Net.SMTP
             }
             
             bool isLastLine = true;            
-            if(line.Length > 4){
+            if(line.Length > 3){
                 isLastLine = (line[3] == ' ');
             }
 
