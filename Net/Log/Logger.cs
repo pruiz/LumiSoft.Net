@@ -147,7 +147,7 @@ namespace LumiSoft.Net.Log
         /// <param name="remoteEP">Remote IP endpoint.</param>
         public void AddText(string id,GenericIdentity userIdentity,string text,IPEndPoint localEP,IPEndPoint remoteEP)
         {
-            OnWriteLog(new LogEntry(LogEntryType.Read,id,userIdentity,0,text,localEP,remoteEP,(byte[])null));
+            OnWriteLog(new LogEntry(LogEntryType.Text,id,userIdentity,0,text,localEP,remoteEP,(byte[])null));
         }
 
         #endregion
