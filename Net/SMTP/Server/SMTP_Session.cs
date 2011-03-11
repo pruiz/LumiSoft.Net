@@ -54,7 +54,10 @@ namespace LumiSoft.Net.SMTP.Server
             m_pUser            = null;
             m_pFrom            = null;
             m_pTo              = null;
-            m_pMessageStream   = null;
+            if(m_pMessageStream != null){
+                m_pMessageStream.Dispose();
+                m_pMessageStream = null;
+            }
         }
 
         #endregion

@@ -714,6 +714,21 @@ namespace LumiSoft.Net.DNS.Client
         /// <exception cref="IOException">Is raised when IO reletaed error happens.</exception>
         public HostEntry[] GetHostsAddresses(string[] hostNames)
         {
+            return GetHostsAddresses(hostNames,false);
+        }
+
+        /// <summary>
+        /// Resolving multiple host IPv4 and IPv6 addresses.
+        /// </summary>
+        /// <param name="hostNames">Host names to resolve.</param>
+        /// <param name="resolveAny">If true, as long as one host name is resolved, no error returned.</param>
+        /// <returns>Returns host entries.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>hostNames</b> is null reference.</exception>
+        /// <exception cref="DNS_ClientException">Is raised when DNS server returns error.</exception>
+        /// <exception cref="IOException">Is raised when IO reletaed error happens.</exception>
+        public HostEntry[] GetHostsAddresses(string[] hostNames,bool resolveAny)
+        {
             if(m_IsDisposed){
                 throw new ObjectDisposedException(this.GetType().Name);
             }
@@ -722,7 +737,7 @@ namespace LumiSoft.Net.DNS.Client
             }
 
             ManualResetEvent wait = new ManualResetEvent(false);
-            using(Dns_Client.GetHostsAddressesAsyncOP op = new Dns_Client.GetHostsAddressesAsyncOP(hostNames)){
+            using(Dns_Client.GetHostsAddressesAsyncOP op = new Dns_Client.GetHostsAddressesAsyncOP(hostNames,resolveAny)){
                 op.CompletedAsync += delegate(object s1,EventArgs<Dns_Client.GetHostsAddressesAsyncOP> e1){
                     wait.Set();
                 };
@@ -756,25 +771,39 @@ namespace LumiSoft.Net.DNS.Client
             private AsyncOP_State                           m_State          = AsyncOP_State.WaitingForStart;
             private Exception                               m_pException     = null;
             private string[]                                m_pHostNames     = null;
+            private bool                                    m_ResolveAny     = false;
             private Dictionary<int,GetHostAddressesAsyncOP> m_pIpLookupQueue = null;
             private HostEntry[]                             m_pHostEntries   = null;
             private bool                                    m_RiseCompleted  = false;
+            private int                                     m_ResolvedCount  = 0;
 
             /// <summary>
             /// Default constructor.
             /// </summary>
             /// <param name="hostNames">Host names to resolve.</param>
             /// <exception cref="ArgumentNullException">Is raised when <b>hostNames</b> is null reference.</exception>
-            public GetHostsAddressesAsyncOP(string[] hostNames)
+            public GetHostsAddressesAsyncOP(string[] hostNames) : this(hostNames,false)
+            {
+            }
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="hostNames">Host names to resolve.</param>
+            /// <param name="resolveAny">If true, as long as one host name is resolved, no error returned.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>hostNames</b> is null reference.</exception>
+            public GetHostsAddressesAsyncOP(string[] hostNames,bool resolveAny)
             {
                 if(hostNames == null){
                     throw new ArgumentNullException("hostNames");
                 }
 
                 m_pHostNames = hostNames;
+                m_ResolveAny = resolveAny;
 
                 m_pIpLookupQueue = new Dictionary<int,GetHostAddressesAsyncOP>();
             }
+
 
             #region method Dispose
 
@@ -887,14 +916,34 @@ namespace LumiSoft.Net.DNS.Client
             {
                 lock(m_pLock){
                     if(op.Error != null){
-                        m_pException = op.Error;
+                        // We wanted any of the host names to resolve:
+                        //  *) We have already one resolved host name.
+                        //  *) We have more names to resolve, so next may succeed.
+                        if(m_ResolveAny && (m_ResolvedCount > 0 || m_pIpLookupQueue.Count > 1)){
+                        }
+                        else{
+                            m_pException = op.Error;
+                        }
                     }
                     else{
                         m_pHostEntries[index] = new HostEntry(op.HostNameOrIP,op.Addresses,null);
+                        m_ResolvedCount++;
                     }
 
                     m_pIpLookupQueue.Remove(index);
                     if(m_pIpLookupQueue.Count == 0){
+                        // We wanted resolve any, so some host names may not be resolved and are null, remove them from response.
+                        if(m_ResolveAny){
+                            List<HostEntry> retVal = new List<HostEntry>();
+                            foreach(HostEntry host in m_pHostEntries){
+                                if(host != null){
+                                    retVal.Add(host);
+                                }
+                            }
+
+                            m_pHostEntries = retVal.ToArray();
+                        }
+
                         SetState(AsyncOP_State.Completed);
                     }
                 }
@@ -965,9 +1014,9 @@ namespace LumiSoft.Net.DNS.Client
                     }
                     if(m_pException != null){
                         throw m_pException;
-                    }                    
+                    }
 
-                    return m_pHostEntries; 
+                    return m_pHostEntries;                    
                 }
             }
 
@@ -1251,7 +1300,7 @@ namespace LumiSoft.Net.DNS.Client
 
                                     // We have MX records which A or AAAA records not provided in DNS response, lookup them.
                                     if(lookupQueue.Count > 0){
-                                        GetHostsAddressesAsyncOP op = new GetHostsAddressesAsyncOP(lookupQueue.ToArray());
+                                        GetHostsAddressesAsyncOP op = new GetHostsAddressesAsyncOP(lookupQueue.ToArray(),true);
                                         // This event is raised when lookup completes asynchronously.
                                         op.CompletedAsync += delegate(object s2,EventArgs<GetHostsAddressesAsyncOP> e2){
                                             LookupCompleted(op,name_to_index_map);
@@ -1369,17 +1418,37 @@ namespace LumiSoft.Net.DNS.Client
                 if(op == null){
                     throw new ArgumentNullException("op");
                 }
-
+                                
                 if(op.Error != null){
-                    m_pException = op.Error;
+                    // If we have any resolved DNS, we don't return error if any.
+                    bool anyResolved = false;
+                    foreach(HostEntry host in m_pHosts){
+                        if(host != null){
+                            anyResolved = true;
+
+                            break;
+                        }
+                    }
+                    if(!anyResolved){
+                        m_pException = op.Error;
+                    }
                 }
                 else{
                     foreach(HostEntry host in op.HostEntries){
                         m_pHosts[name_to_index[host.HostName]] = host;
-                    }
-                }
+                    }                   
+                }                
 
                 op.Dispose();
+
+                // Remove unresolved DNS entries from response.
+                List<HostEntry> retVal = new List<HostEntry>();
+                foreach(HostEntry host in m_pHosts){
+                    if(host != null){
+                        retVal.Add(host);
+                    }
+                }
+                m_pHosts = retVal.ToArray();
 
                 SetState(AsyncOP_State.Completed);
             }
