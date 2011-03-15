@@ -51,7 +51,7 @@ namespace LumiSoft.Net.SMTP.Client
 	///		smtp.Connect("hostName",WellKnownPorts.SMTP); 
     ///		smtp.EhloHelo("mail.domain.com");
     ///     // Authenticate if target server requires.
-    ///     // smtp.Authenticate("user","password");
+    ///     // smtp.Auth(smtp.AuthGetStrongestMethod("user","password"));
     ///     smtp.MailFrom("sender@domain.com");
     ///     // Repeat this for all recipients.
     ///     smtp.RcptTo("to@domain.com");
@@ -641,7 +641,7 @@ namespace LumiSoft.Net.SMTP.Client
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
         /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected or is already secure connection.</exception>
         /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
-        /// <remarks>After sucessfult STARTTLS all SMTP session data(EHLO,MAIL FROM, ....) will be reset.
+        /// <remarks>After successful STARTTLS all SMTP session data(EHLO,MAIL FROM, ....) will be reset.
         /// If unknwon(not SMTP error) error happens during STARTTLS negotiation, SMTP client should disconnect.</remarks>
         public void StartTLS()
         {
@@ -655,7 +655,7 @@ namespace LumiSoft.Net.SMTP.Client
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
         /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected or is already secure connection.</exception>
         /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
-        /// <remarks>After sucessfult STARTTLS all SMTP session data(EHLO,MAIL FROM, ....) will be reset.
+        /// <remarks>After successful STARTTLS all SMTP session data(EHLO,MAIL FROM, ....) will be reset.
         /// If unknwon(not SMTP error) error happens during STARTTLS negotiation, SMTP client should disconnect.</remarks>
         public void StartTLS(RemoteCertificateValidationCallback certCallback)
         {
@@ -1015,7 +1015,7 @@ namespace LumiSoft.Net.SMTP.Client
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
         /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected or connection is already secure.</exception>
         /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
-        /// <remarks>After sucessfult STARTTLS all SMTP session data(EHLO,MAIL FROM, ....) will be reset.
+        /// <remarks>After successful STARTTLS all SMTP session data(EHLO,MAIL FROM, ....) will be reset.
         /// If unknwon(not SMTP error) error happens during STARTTLS negotiation, SMTP client should disconnect.</remarks>
         public bool StartTlsAsync(StartTlsAsyncOP op)
         {
@@ -1040,24 +1040,22 @@ namespace LumiSoft.Net.SMTP.Client
 
         #endregion
 
-        #region method BeginAuthenticate
+        #region method AuthGetStrongestMethod
 
         /// <summary>
-        /// Internal helper method for asynchronous Authenticate method.
+        /// Gets strongest authentication method which we can support from SMTP server.
+        /// Preference order DIGEST-MD5 -> CRAM-MD5 -> LOGIN -> PLAIN.
         /// </summary>
-        private delegate void AuthenticateDelegate(string userName,string password);
-
-        /// <summary>
-        /// Starts authentication.
-        /// </summary>
-		/// <param name="userName">User login name.</param>
-		/// <param name="password">Password.</param>
-        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
-        /// <param name="state">User data.</param>
-        /// <returns>An IAsyncResult that references the asynchronous operation.</returns>
+        /// <param name="userName">User name.</param>
+        /// <param name="password">User password.</param>
+        /// <returns>Returns authentication method.</returns>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected or is already authenticated.</exception>
-        public IAsyncResult BeginAuthenticate(string userName,string password,AsyncCallback callback,object state)
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected .</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>userName</b> or <b>password</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="NotSupportedException">Is raised when SMTP server won't support authentication or we 
+        /// don't support any of the server authentication mechanisms.</exception>
+        public AUTH_SASL_Client AuthGetStrongestMethod(string userName,string password)
         {
             if(this.IsDisposed){
                 throw new ObjectDisposedException(this.GetType().Name);
@@ -1065,70 +1063,345 @@ namespace LumiSoft.Net.SMTP.Client
             if(!this.IsConnected){
 				throw new InvalidOperationException("You must connect first.");
 			}
-			if(this.IsAuthenticated){
-				throw new InvalidOperationException("Session is already authenticated.");
-			}
 
-            AuthenticateDelegate asyncMethod = new AuthenticateDelegate(this.Authenticate);
-            AsyncResultState asyncState = new AsyncResultState(this,asyncMethod,callback,state);
-            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(userName,password,new AsyncCallback(asyncState.CompletedCallback),null));
-
-            return asyncState;
+            List<string> authMethods = new List<string>(this.SaslAuthMethods);
+            if(authMethods.Count == 0){
+                throw new NotSupportedException("SMTP server does not support authentication.");
+            }
+            else if(authMethods.Contains("DIGEST-MD5")){
+                return new AUTH_SASL_Client_DigestMd5("SMTP",this.RemoteEndPoint.Address.ToString(),userName,password);
+            }
+            else if(authMethods.Contains("CRAM-MD5")){
+                return new AUTH_SASL_Client_CramMd5(userName,password);
+            }
+            else if(authMethods.Contains("LOGIN")){
+                return new AUTH_SASL_Client_Login(userName,password);
+            }
+            else if(authMethods.Contains("PLAIN")){
+                return new AUTH_SASL_Client_Plain(userName,password);
+            }
+            else{
+                throw new NotSupportedException("We don't support any of the SMTP server authentication methods.");
+            }
         }
 
         #endregion
 
-        #region method EndAuthenticate
+        #region method Auth
 
         /// <summary>
-        /// Ends a pending asynchronous authentication request.
+        /// Sends AUTH command to SMTP server.
         /// </summary>
-        /// <param name="asyncResult">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
+        /// <param name="sasl">SASL authentication. You can use method <see cref="AuthGetStrongestMethod"/> to get strongest supported authentication.</param>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
-        /// <exception cref="ArgumentNullException">Is raised when <b>asyncResult</b> is null.</exception>
-        /// <exception cref="ArgumentException">Is raised when invalid <b>asyncResult</b> passed to this method.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected or is already authenticated.</exception>
         /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
-        public void EndAuthenticate(IAsyncResult asyncResult)
-        {
+        public void Auth(AUTH_SASL_Client sasl)
+        {            
             if(this.IsDisposed){
                 throw new ObjectDisposedException(this.GetType().Name);
             }
-            if(asyncResult == null){
-                throw new ArgumentNullException("asyncResult");
+            if(!this.IsConnected){
+				throw new InvalidOperationException("You must connect first.");
+			}
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Connection is already authenticated.");
+            }
+            if(sasl == null){
+                throw new ArgumentNullException("sasl");
             }
 
-            AsyncResultState castedAsyncResult = asyncResult as AsyncResultState;
-            if(castedAsyncResult == null || castedAsyncResult.AsyncObject != this){
-                throw new ArgumentException("Argument 'asyncResult' was not returned by a call to the BeginAuthenticate method.");
-            }
-            if(castedAsyncResult.IsEndCalled){
-                throw new InvalidOperationException("BeginAuthenticate was previously called for the asynchronous connection.");
-            }
-             
-            castedAsyncResult.IsEndCalled = true;
-            if(castedAsyncResult.AsyncDelegate is AuthenticateDelegate){
-                ((AuthenticateDelegate)castedAsyncResult.AsyncDelegate).EndInvoke(castedAsyncResult.AsyncResult);
-            }
-            else{
-                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginAuthenticate method.");
+            ManualResetEvent wait = new ManualResetEvent(false);
+            using(AuthAsyncOP op = new AuthAsyncOP(sasl)){
+                op.CompletedAsync += delegate(object s1,EventArgs<AuthAsyncOP> e1){
+                    wait.Set();
+                };
+                if(!this.AuthAsync(op)){
+                    wait.Set();
+                }
+                wait.WaitOne();
+                wait.Close();
+
+                if(op.Error != null){
+                    throw op.Error;
+                }
             }
         }
 
         #endregion
 
-        #region method Authenticate
+        #region method AuthAsync
+
+        #region class AuthAsyncOP
 
         /// <summary>
-        /// Authenticates user. Authenticate method chooses strongest possible authentication method supported by server, 
-        /// preference order DIGEST-MD5 -> CRAM-MD5 -> LOGIN.
+        /// This class represents <see cref="SMTP_Client.AuthAsync"/> asynchronous operation.
         /// </summary>
-        /// <param name="userName">User login name.</param>
-        /// <param name="password">Password.</param>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected or is already authenticated.</exception>
-        /// <exception cref="ArgumentNullException">Is raised when <b>userName</b> is null.</exception>
-        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
-        public void Authenticate(string userName,string password)
+        public class AuthAsyncOP : IDisposable,IAsyncOP
+        {
+            private object           m_pLock         = new object();
+            private AsyncOP_State    m_State         = AsyncOP_State.WaitingForStart;
+            private Exception        m_pException    = null;
+            private SMTP_Client      m_pSmtpClient   = null;
+            private AUTH_SASL_Client m_pSASL         = null;
+            private bool             m_RiseCompleted = false;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="sasl">SASL authentication. You can use method <see cref="AuthGetStrongestMethod"/> to get strongest supported authentication.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>sasl</b> is null reference.</exception>
+            public AuthAsyncOP(AUTH_SASL_Client sasl)
+            {
+                if(sasl == null){
+                    throw new ArgumentNullException("sasl");
+                }
+
+                m_pSASL = sasl;
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resource being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+                
+                m_pException  = null;
+                m_pSmtpClient = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner SMTP client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            internal bool Start(SMTP_Client owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+
+                m_pSmtpClient = owner;
+
+                SetState(AsyncOP_State.Active);
+
+                try{
+                    /* RFC 4954 4. The AUTH Command.
+
+                        AUTH mechanism [initial-response]
+
+                        Arguments:
+                            mechanism: A string identifying a [SASL] authentication mechanism.
+
+                            initial-response: An optional initial client response.  If
+                            present, this response MUST be encoded as described in Section
+                            4 of [BASE64] or contain a single character "=".
+                    */
+
+                    byte[] buffer = Encoding.UTF8.GetBytes("AUTH " + m_pSASL.Name + "\r\n");
+
+                    // Log
+                    m_pSmtpClient.LogAddWrite(buffer.Length,"AUTH " + m_pSASL.Name);
+
+                    // Start command sending.
+                    m_pSmtpClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.AuthCommandSendingCompleted,null);
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method AuthCommandSendingCompleted
+
+            /// <summary>
+            /// Is called when AUTH command sending has finished.
+            /// </summary>
+            /// <param name="ar">Asynchronous result.</param>
+            private void AuthCommandSendingCompleted(IAsyncResult ar)
+            {
+                try{
+                    m_pSmtpClient.TcpStream.EndWrite(ar);
+
+                    // Read SMTP server response.
+                    ReadResponseAsyncOP readResponseOP = new ReadResponseAsyncOP();
+                    readResponseOP.CompletedAsync += delegate(object s,EventArgs<ReadResponseAsyncOP> e){
+                        AuthReadResponseCompleted(readResponseOP);
+                    };
+                    if(!m_pSmtpClient.ReadResponseAsync(readResponseOP)){
+                        AuthReadResponseCompleted(readResponseOP);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);
+                }
+            }
+
+            #endregion
+
+            #region method AuthReadResponseCompleted
+
+            /// <summary>
+            /// Is called when SMTP server response reading has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            private void AuthReadResponseCompleted(ReadResponseAsyncOP op)
+            {
+                try{
+                    // Continue authenticating.
+                    if(op.ReplyLines[0].ReplyCode == 334){
+                        // 334 base64Data, we need to decode it.
+                        byte[] serverResponse = Convert.FromBase64String(op.ReplyLines[0].Text);
+
+                        byte[] clientResponse = m_pSASL.Continue(serverResponse);
+
+                        // We need just send SASL returned auth-response as base64.
+                        byte[] buffer = Encoding.UTF8.GetBytes(Convert.ToBase64String(clientResponse) + "\r\n");
+
+                        // Log
+                        m_pSmtpClient.LogAddWrite(buffer.Length,Convert.ToBase64String(clientResponse));
+
+                        // Start auth-data sending.
+                        m_pSmtpClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.AuthCommandSendingCompleted,null);
+                    }
+                    // Authentication suceeded.
+                    else if(op.ReplyLines[0].ReplyCode == 235){
+                        SetState(AsyncOP_State.Completed);
+                    }
+                    // Authentication rejected.
+                    else{
+                        m_pException = new SMTP_ClientException(op.ReplyLines);
+                        SetState(AsyncOP_State.Completed);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSmtpClient.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);
+                }
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<AuthAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<AuthAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Starts sending AUTH command to SMTP server.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="AuthAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected or connection is already authenticated.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        public bool AuthAsync(AuthAsyncOP op)
         {
             if(this.IsDisposed){
                 throw new ObjectDisposedException(this.GetType().Name);
@@ -1137,182 +1410,20 @@ namespace LumiSoft.Net.SMTP.Client
                 throw new InvalidOperationException("You must connect first.");
             }
             if(this.IsAuthenticated){
-                throw new InvalidOperationException("Session is already authenticated.");
+                throw new InvalidOperationException("Connection is already authenticated.");
             }
-            if(string.IsNullOrEmpty(userName)){
-                throw new ArgumentNullException("userName");
+            if(op == null){
+                throw new ArgumentNullException("op");
             }
-            if(password == null){
-                password = "";
-            }
-                        
-            // Choose authentication method, we consider LOGIN as default.
-            string authMethod = "LOGIN";
-            List<string> authMethods = new List<string>(this.SaslAuthMethods);
-            if(authMethods.Contains("DIGEST-MD5")){
-                authMethod = "DIGEST-MD5";
-            }
-            else if(authMethods.Contains("CRAM-MD5")){
-                authMethod = "CRAM-MD5";
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
             }
 
-            #region AUTH LOGIN
-
-            if(authMethod == "LOGIN"){
-                /* LOGIN
-			          Example:
-			            C: AUTH LOGIN<CRLF>
-			            S: 334 VXNlcm5hbWU6<CRLF>   VXNlcm5hbWU6 = base64("USERNAME")
-			            C: base64(username)<CRLF>
-			            S: 334 UGFzc3dvcmQ6<CRLF>   UGFzc3dvcmQ6 = base64("PASSWORD")
-			            C: base64(password)<CRLF>
-			            S: 235 Ok<CRLF>
-			    */
-
-                WriteLine("AUTH LOGIN");
-
-                // Read server response.
-                string line = ReadLine();
-                // Response line must start with 334 or otherwise it's error response.
-				if(!line.StartsWith("334")){
-					throw new SMTP_ClientException(line);
-				}
-
-                // Send user name to server.
-                WriteLine(Convert.ToBase64String(Encoding.ASCII.GetBytes(userName)));
-
-                // Read server response.
-                line = ReadLine();
-                // Response line must start with 334 or otherwise it's error response.
-				if(!line.StartsWith("334")){
-					throw new SMTP_ClientException(line);
-				}
-
-                // Send password to server.
-                WriteLine(Convert.ToBase64String(Encoding.ASCII.GetBytes(password)));
-
-                // Read server response.
-                line = ReadLine();
-                // Response line must start with 334 or otherwise it's error response.
-				if(!line.StartsWith("235")){
-					throw new SMTP_ClientException(line);
-				}
-
-                m_pAuthdUserIdentity = new GenericIdentity(userName,"LOGIN");
-            }
-
-            #endregion
-
-            #region AUTH CRAM-MD5
-
-            else if(authMethod == "CRAM-MD5"){
-                /* CRAM-M5
-                    Description:
-                        HMACMD5 key is "password".
-                 
-			        Example:
-					    C: AUTH CRAM-MD5<CRLF>
-					    S: 334 base64(md5_calculation_hash)<CRLF>
-					    C: base64(username password_hash)<CRLF>
-					    S: 235 Ok<CRLF>
-			    */
-                
-                WriteLine("AUTH CRAM-MD5");
-
-                // Read server response.
-                string line = ReadLine();
-                // Response line must start with 334 or otherwise it's error response.
-				if(!line.StartsWith("334")){
-					throw new SMTP_ClientException(line);
-				}
-                 								
-				HMACMD5 kMd5         = new HMACMD5(Encoding.ASCII.GetBytes(password));
-				string  passwordHash = Net_Utils.ToHex(kMd5.ComputeHash(Convert.FromBase64String(line.Split(' ')[1]))).ToLower();
-				
-                // Send authentication info to server.
-				WriteLine(Convert.ToBase64String(Encoding.ASCII.GetBytes(userName + " " + passwordHash)));
-
-                // Read server response.
-				line = ReadLine();
-				// Response line must start with 235 or otherwise it's error response
-				if(!line.StartsWith("235")){
-					throw new SMTP_ClientException(line);
-				}
-         
-                m_pAuthdUserIdentity = new GenericIdentity(userName,"CRAM-MD5");
-            }
-
-            #endregion
-
-            #region AUTH DIGEST-MD5
-
-            else if(authMethod == "DIGEST-MD5"){
-                /*
-                    Example:
-					    C: AUTH DIGEST-MD5<CRLF>
-					    S: 334 base64(digestChallange)<CRLF>
-					    C: base64(digestResponse)<CRLF>
-                        S: 334 base64(serverDigestRpAuth)<CRLF>
-                        C: <CRLF>
-					    S: 235 Ok<CRLF>
-                */
-
-                WriteLine("AUTH DIGEST-MD5");
-
-                // Read server response.
-                string line = ReadLine();
-                // Response line must start with 334 or otherwise it's error response.
-				if(!line.StartsWith("334")){
-					throw new SMTP_ClientException(line);
-				}
-
-                // Parse server challenge.
-                AUTH_SASL_DigestMD5_Challenge challenge = AUTH_SASL_DigestMD5_Challenge.Parse(Encoding.Default.GetString(Convert.FromBase64String(line.Split(' ')[1])));
-
-                // Construct our response to server challenge.
-                AUTH_SASL_DigestMD5_Response response = new AUTH_SASL_DigestMD5_Response(
-                    challenge,
-                    challenge.Realm[0],
-                    userName,
-                    password,Guid.NewGuid().ToString().Replace("-",""),
-                    1,
-                    challenge.QopOptions[0],
-                    "smtp/" + this.RemoteEndPoint.Address.ToString()
-                );
-
-                // Send authentication info to server.
-				WriteLine(Convert.ToBase64String(Encoding.Default.GetBytes(response.ToResponse())));
-
-                // Read server response.
-				line = ReadLine();
-				// Response line must start with 334 or otherwise it's error response.
-				if(!line.StartsWith("334")){
-					throw new SMTP_ClientException(line);
-				}
-
-                // Check rspauth value.
-                if(!string.Equals(Encoding.Default.GetString(Convert.FromBase64String(line.Split(' ')[1])),response.ToRspauthResponse(userName,password),StringComparison.InvariantCultureIgnoreCase)){
-                    throw new Exception("SMTP server 'rspauth' value mismatch.");
-                }
-
-                // Send empty line.
-                WriteLine("");
-
-                // Read server response.
-				line = ReadLine();
-				// Response line must start with 235 or otherwise it's error response.
-				if(!line.StartsWith("235")){
-					throw new SMTP_ClientException(line);
-				}
-
-                m_pAuthdUserIdentity = new GenericIdentity(userName,"DIGEST-MD5");
-            }
-
-            #endregion
+            return op.Start(this);
         }
 
         #endregion
-                
+
         #region method MailFrom
 
         /// <summary>
@@ -4157,7 +4268,284 @@ namespace LumiSoft.Net.SMTP.Client
         #endregion
 
                 
-        //------- OBSOLETE
+        //------- OBSOLETE  
+
+        #region method Authenticate
+
+        /// <summary>
+        /// Authenticates user. Authenticate method chooses strongest possible authentication method supported by server, 
+        /// preference order DIGEST-MD5 -> CRAM-MD5 -> LOGIN.
+        /// </summary>
+        /// <param name="userName">User login name.</param>
+        /// <param name="password">Password.</param>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected or is already authenticated.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>userName</b> is null.</exception>
+        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
+        [Obsolete("Use method 'Auth' instead.")]
+        public void Authenticate(string userName,string password)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("You must connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Session is already authenticated.");
+            }
+            if(string.IsNullOrEmpty(userName)){
+                throw new ArgumentNullException("userName");
+            }
+            if(password == null){
+                password = "";
+            }
+                        
+            // Choose authentication method, we consider LOGIN as default.
+            string authMethod = "LOGIN";
+            List<string> authMethods = new List<string>(this.SaslAuthMethods);
+            if(authMethods.Contains("DIGEST-MD5")){
+                authMethod = "DIGEST-MD5";
+            }
+            else if(authMethods.Contains("CRAM-MD5")){
+                authMethod = "CRAM-MD5";
+            }
+
+            #region AUTH LOGIN
+
+            if(authMethod == "LOGIN"){
+                /* LOGIN
+			          Example:
+			            C: AUTH LOGIN<CRLF>
+			            S: 334 VXNlcm5hbWU6<CRLF>   VXNlcm5hbWU6 = base64("USERNAME")
+			            C: base64(username)<CRLF>
+			            S: 334 UGFzc3dvcmQ6<CRLF>   UGFzc3dvcmQ6 = base64("PASSWORD")
+			            C: base64(password)<CRLF>
+			            S: 235 Ok<CRLF>
+			    */
+
+                WriteLine("AUTH LOGIN");
+
+                // Read server response.
+                string line = ReadLine();
+                // Response line must start with 334 or otherwise it's error response.
+				if(!line.StartsWith("334")){
+					throw new SMTP_ClientException(line);
+				}
+
+                // Send user name to server.
+                WriteLine(Convert.ToBase64String(Encoding.ASCII.GetBytes(userName)));
+
+                // Read server response.
+                line = ReadLine();
+                // Response line must start with 334 or otherwise it's error response.
+				if(!line.StartsWith("334")){
+					throw new SMTP_ClientException(line);
+				}
+
+                // Send password to server.
+                WriteLine(Convert.ToBase64String(Encoding.ASCII.GetBytes(password)));
+
+                // Read server response.
+                line = ReadLine();
+                // Response line must start with 334 or otherwise it's error response.
+				if(!line.StartsWith("235")){
+					throw new SMTP_ClientException(line);
+				}
+
+                m_pAuthdUserIdentity = new GenericIdentity(userName,"LOGIN");
+            }
+
+            #endregion
+
+            #region AUTH CRAM-MD5
+
+            else if(authMethod == "CRAM-MD5"){
+                /* CRAM-M5
+                    Description:
+                        HMACMD5 key is "password".
+                 
+			        Example:
+					    C: AUTH CRAM-MD5<CRLF>
+					    S: 334 base64(md5_calculation_hash)<CRLF>
+					    C: base64(username password_hash)<CRLF>
+					    S: 235 Ok<CRLF>
+			    */
+                
+                WriteLine("AUTH CRAM-MD5");
+
+                // Read server response.
+                string line = ReadLine();
+                // Response line must start with 334 or otherwise it's error response.
+				if(!line.StartsWith("334")){
+					throw new SMTP_ClientException(line);
+				}
+                 								
+				HMACMD5 kMd5         = new HMACMD5(Encoding.ASCII.GetBytes(password));
+				string  passwordHash = Net_Utils.ToHex(kMd5.ComputeHash(Convert.FromBase64String(line.Split(' ')[1]))).ToLower();
+				
+                // Send authentication info to server.
+				WriteLine(Convert.ToBase64String(Encoding.ASCII.GetBytes(userName + " " + passwordHash)));
+
+                // Read server response.
+				line = ReadLine();
+				// Response line must start with 235 or otherwise it's error response
+				if(!line.StartsWith("235")){
+					throw new SMTP_ClientException(line);
+				}
+         
+                m_pAuthdUserIdentity = new GenericIdentity(userName,"CRAM-MD5");
+            }
+
+            #endregion
+
+            #region AUTH DIGEST-MD5
+
+            else if(authMethod == "DIGEST-MD5"){
+                /*
+                    Example:
+					    C: AUTH DIGEST-MD5<CRLF>
+					    S: 334 base64(digestChallange)<CRLF>
+					    C: base64(digestResponse)<CRLF>
+                        S: 334 base64(serverDigestRpAuth)<CRLF>
+                        C: <CRLF>
+					    S: 235 Ok<CRLF>
+                */
+
+                WriteLine("AUTH DIGEST-MD5");
+
+                // Read server response.
+                string line = ReadLine();
+                // Response line must start with 334 or otherwise it's error response.
+				if(!line.StartsWith("334")){
+					throw new SMTP_ClientException(line);
+				}
+
+                // Parse server challenge.
+                AUTH_SASL_DigestMD5_Challenge challenge = AUTH_SASL_DigestMD5_Challenge.Parse(Encoding.Default.GetString(Convert.FromBase64String(line.Split(' ')[1])));
+
+                // Construct our response to server challenge.
+                AUTH_SASL_DigestMD5_Response response = new AUTH_SASL_DigestMD5_Response(
+                    challenge,
+                    challenge.Realm[0],
+                    userName,
+                    password,Guid.NewGuid().ToString().Replace("-",""),
+                    1,
+                    challenge.QopOptions[0],
+                    "smtp/" + this.RemoteEndPoint.Address.ToString()
+                );
+
+                // Send authentication info to server.
+				WriteLine(Convert.ToBase64String(Encoding.Default.GetBytes(response.ToResponse())));
+
+                // Read server response.
+				line = ReadLine();
+				// Response line must start with 334 or otherwise it's error response.
+				if(!line.StartsWith("334")){
+					throw new SMTP_ClientException(line);
+				}
+
+                // Check rspauth value.
+                if(!string.Equals(Encoding.Default.GetString(Convert.FromBase64String(line.Split(' ')[1])),response.ToRspauthResponse(userName,password),StringComparison.InvariantCultureIgnoreCase)){
+                    throw new Exception("SMTP server 'rspauth' value mismatch.");
+                }
+
+                // Send empty line.
+                WriteLine("");
+
+                // Read server response.
+				line = ReadLine();
+				// Response line must start with 235 or otherwise it's error response.
+				if(!line.StartsWith("235")){
+					throw new SMTP_ClientException(line);
+				}
+
+                m_pAuthdUserIdentity = new GenericIdentity(userName,"DIGEST-MD5");
+            }
+
+            #endregion
+        }
+
+        #endregion
+
+        #region method BeginAuthenticate
+
+        /// <summary>
+        /// Internal helper method for asynchronous Authenticate method.
+        /// </summary>
+        [Obsolete("Use method 'AuthAsync' instead.")]
+        private delegate void AuthenticateDelegate(string userName,string password);
+
+        /// <summary>
+        /// Starts authentication.
+        /// </summary>
+		/// <param name="userName">User login name.</param>
+		/// <param name="password">Password.</param>
+        /// <param name="callback">Callback to call when the asynchronous operation is complete.</param>
+        /// <param name="state">User data.</param>
+        /// <returns>An IAsyncResult that references the asynchronous operation.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected or is already authenticated.</exception>
+        [Obsolete("Use method 'AuthAsync' instead.")]
+        public IAsyncResult BeginAuthenticate(string userName,string password,AsyncCallback callback,object state)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+				throw new InvalidOperationException("You must connect first.");
+			}
+			if(this.IsAuthenticated){
+				throw new InvalidOperationException("Session is already authenticated.");
+			}
+
+            AuthenticateDelegate asyncMethod = new AuthenticateDelegate(this.Authenticate);
+            AsyncResultState asyncState = new AsyncResultState(this,asyncMethod,callback,state);
+            asyncState.SetAsyncResult(asyncMethod.BeginInvoke(userName,password,new AsyncCallback(asyncState.CompletedCallback),null));
+
+            return asyncState;
+        }
+
+        #endregion
+
+        #region method EndAuthenticate
+
+        /// <summary>
+        /// Ends a pending asynchronous authentication request.
+        /// </summary>
+        /// <param name="asyncResult">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>asyncResult</b> is null.</exception>
+        /// <exception cref="ArgumentException">Is raised when invalid <b>asyncResult</b> passed to this method.</exception>
+        /// <exception cref="SMTP_ClientException">Is raised when SMTP server returns error.</exception>
+        [Obsolete("Use method 'AuthAsync' instead.")]
+        public void EndAuthenticate(IAsyncResult asyncResult)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(asyncResult == null){
+                throw new ArgumentNullException("asyncResult");
+            }
+
+            AsyncResultState castedAsyncResult = asyncResult as AsyncResultState;
+            if(castedAsyncResult == null || castedAsyncResult.AsyncObject != this){
+                throw new ArgumentException("Argument 'asyncResult' was not returned by a call to the BeginAuthenticate method.");
+            }
+            if(castedAsyncResult.IsEndCalled){
+                throw new InvalidOperationException("BeginAuthenticate was previously called for the asynchronous connection.");
+            }
+             
+            castedAsyncResult.IsEndCalled = true;
+            if(castedAsyncResult.AsyncDelegate is AuthenticateDelegate){
+                ((AuthenticateDelegate)castedAsyncResult.AsyncDelegate).EndInvoke(castedAsyncResult.AsyncResult);
+            }
+            else{
+                throw new ArgumentException("Argument asyncResult was not returned by a call to the BeginAuthenticate method.");
+            }
+        }
+
+        #endregion
 
         #region method BeginNoop
 
