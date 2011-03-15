@@ -109,6 +109,11 @@
     <Compile Include="AsyncOP.cs" />
     <None Include="Media\Codec\Audio\ILBC.cs" />
     <Compile Include="AsyncOP_State.cs" />
+    <Compile Include="AUTH\AUTH_SASL_Client.cs" />
+    <Compile Include="AUTH\AUTH_SASL_Client_CramMd5.cs" />
+    <Compile Include="AUTH\AUTH_SASL_Client_DigestMd5.cs" />
+    <Compile Include="AUTH\AUTH_SASL_Client_Login.cs" />
+    <Compile Include="AUTH\AUTH_SASL_Client_Plain.cs" />
     <Compile Include="DNS\Client\DNS_ClientCache.cs" />
     <Compile Include="DNS\Client\DNS_ClientTransaction.cs" />
     <Compile Include="DNS\Client\DNS_ClientTransactionState.cs" />
