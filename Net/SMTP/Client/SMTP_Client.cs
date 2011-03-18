@@ -4078,7 +4078,7 @@ namespace LumiSoft.Net.SMTP.Client
             using(SMTP_Client smtp = new SMTP_Client()){
                 smtp.Connect(host,port,ssl);
                 if(!string.IsNullOrEmpty(userName)){
-                    smtp.Authenticate(userName,password);
+                    smtp.Auth(smtp.AuthGetStrongestMethod(userName,password));
                 }
                 smtp.EhloHelo(localHost != null ? localHost : Dns.GetHostName());
                 smtp.MailFrom(from,-1);
