@@ -5,7 +5,7 @@ using System.Text;
 namespace LumiSoft.Net.AUTH
 {
     /// <summary>
-    /// This base class for client SASL authentication mechanisms.
+    /// This base class for client SASL authentication mechanisms. Defined in RFC 4422.
     /// </summary>
     public abstract class AUTH_SASL_Client
     {
