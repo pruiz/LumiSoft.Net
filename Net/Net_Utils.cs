@@ -396,14 +396,14 @@ namespace LumiSoft.Net
 
         #endregion
 
-
-        #region static method IsIoCompletionPortsSupported
+               
+        #region static method IsSocketAsyncSupported
 
         /// <summary>
-        /// Gets if IO completion ports supported by OS.
+        /// Gets if socket async methods supported by OS.
         /// </summary>
-        /// <returns></returns>
-        public static bool IsIoCompletionPortsSupported()
+        /// <returns>returns ture if supported, otherwise false.</returns>
+        public static bool IsSocketAsyncSupported()
         {
             try{                            
                 using(SocketAsyncEventArgs e = new SocketAsyncEventArgs()){
@@ -922,6 +922,32 @@ namespace LumiSoft.Net
             }
             else{
                 return System.Text.Encoding.Default.GetString(hash);
+            }
+        }
+
+        #endregion
+
+
+        //--- Obsolte ------------------------------------------------------------------
+        
+        #region static method IsIoCompletionPortsSupported
+
+        /// <summary>
+        /// Gets if IO completion ports supported by OS.
+        /// </summary>
+        /// <returns></returns>
+        [Obsolete("Use method 'IsSocketAsyncSupported' instead.")]
+        public static bool IsIoCompletionPortsSupported()
+        {
+            try{                            
+                using(SocketAsyncEventArgs e = new SocketAsyncEventArgs()){
+                    return true;
+                }
+            }
+            catch(NotSupportedException nX){
+                string dummy = nX.Message;
+                
+                return false;
             }
         }
 
