@@ -550,7 +550,13 @@ namespace LumiSoft.Net.SMTP.Relay
                     }
                     // Authentication requested, start authenticating.
                     else if(!string.IsNullOrEmpty(m_pActiveTarget.UserName)){
-                        m_pSmtpClient.BeginAuthenticate(m_pActiveTarget.UserName,m_pActiveTarget.Password,new AsyncCallback(this.AuthenticateCallback),null);
+                        SMTP_Client.AuthAsyncOP authOP = new SMTP_Client.AuthAsyncOP(m_pSmtpClient.AuthGetStrongestMethod(m_pActiveTarget.UserName,m_pActiveTarget.Password));                        
+                        authOP.CompletedAsync += delegate(object s,EventArgs<SMTP_Client.AuthAsyncOP> e){
+                            AuthCommandCompleted(authOP);
+                        };
+                        if(!m_pSmtpClient.AuthAsync(authOP)){
+                            AuthCommandCompleted(authOP);
+                        }
                     }
                     // Start MAIL command.
                     else{
@@ -619,37 +625,45 @@ namespace LumiSoft.Net.SMTP.Relay
 
         #endregion
 
-        #region method AuthenticateCallback
+        #region method AuthCommandCompleted
 
         /// <summary>
-        /// This method is called when asynchronous <b>Authenticate</b> method completes.
+        /// Is called when AUTH command has completed.
         /// </summary>
-        /// <param name="ar">An IAsyncResult that stores state information and any user defined data for this asynchronous operation.</param>
-        private void AuthenticateCallback(IAsyncResult ar)
+        /// <param name="op">Asynchronous operation.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        private void AuthCommandCompleted(SMTP_Client.AuthAsyncOP op)
         {
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+
             try{
-                m_pSmtpClient.EndAuthenticate(ar);
+                if(op.Error != null){
+                    Dispose(op.Error);
+                }
+                else{
+                    long messageSize = -1;
+                    try{
+                        messageSize = m_pRelayItem.MessageStream.Length - m_pRelayItem.MessageStream.Position;
+                    }
+                    catch{
+                        // Stream doesn't support seeking.
+                    }
 
-                long messageSize = -1;
-                try{
-                    messageSize = m_pRelayItem.MessageStream.Length - m_pRelayItem.MessageStream.Position;
-                }
-                catch{
-                    // Stream doesn't support seeking.
-                }
-
-                SMTP_Client.MailFromAsyncOP mailOP = new SMTP_Client.MailFromAsyncOP(
-                    this.From,
-                    messageSize,
-                    IsDsnSupported() ? m_pRelayItem.DSN_Ret : SMTP_DSN_Ret.NotSpecified,
-                    IsDsnSupported() ? m_pRelayItem.EnvelopeID : null
-                );
-                mailOP.CompletedAsync += delegate(object s,EventArgs<SMTP_Client.MailFromAsyncOP> e){
-                    MailCommandCompleted(mailOP);
-                };
-                if(!m_pSmtpClient.MailFromAsync(mailOP)){
-                    MailCommandCompleted(mailOP);
-                }
+                    SMTP_Client.MailFromAsyncOP mailOP = new SMTP_Client.MailFromAsyncOP(
+                        this.From,
+                        messageSize,
+                        IsDsnSupported() ? m_pRelayItem.DSN_Ret : SMTP_DSN_Ret.NotSpecified,
+                        IsDsnSupported() ? m_pRelayItem.EnvelopeID : null
+                    );
+                    mailOP.CompletedAsync += delegate(object s,EventArgs<SMTP_Client.MailFromAsyncOP> e){
+                        MailCommandCompleted(mailOP);
+                    };
+                    if(!m_pSmtpClient.MailFromAsync(mailOP)){
+                        MailCommandCompleted(mailOP);
+                    }
+                }                                
             }
             catch(Exception x){
                 Dispose(x);
