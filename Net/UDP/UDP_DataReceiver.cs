@@ -80,7 +80,7 @@ namespace LumiSoft.Net.UDP
             }
             m_IsRunning = true;
             
-            bool isIoCompletionSupported = Net_Utils.IsIoCompletionPortsSupported();
+            bool isIoCompletionSupported = Net_Utils.IsSocketAsyncSupported();
 
             m_pEventArgs = new UDP_e_PacketReceived();
             m_pBuffer = new byte[m_BufferSize];

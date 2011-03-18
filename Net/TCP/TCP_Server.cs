@@ -134,7 +134,7 @@ namespace LumiSoft.Net.TCP
                     try{
                         #region IO completion ports
 
-                        if(Net_Utils.IsIoCompletionPortsSupported()){
+                        if(Net_Utils.IsSocketAsyncSupported()){
                             m_pSocketArgs = new SocketAsyncEventArgs();
                             m_pSocketArgs.Completed += delegate(object s1,SocketAsyncEventArgs e1){
                                 if(m_IsDisposed){
