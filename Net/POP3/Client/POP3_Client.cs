@@ -4,9 +4,12 @@ using System.Net;
 using System.Net.Sockets;
 using System.Collections.Generic;
 using System.Security.Principal;
+using System.Threading;
+using System.Text;
 
 using LumiSoft.Net.IO;
 using LumiSoft.Net.TCP;
+using LumiSoft.Net.AUTH;
 
 namespace LumiSoft.Net.POP3.Client
 {
@@ -385,6 +388,348 @@ namespace LumiSoft.Net.POP3.Client
 
 		#endregion
 
+        #region method Authenticate
+
+        /// <summary>
+        /// Sends AUTH command to POP3 server.
+        /// </summary>
+        /// <param name="sasl">SASL authentication.</param>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when POP3 client is not connected or is already authenticated.</exception>
+        /// <exception cref="POP3_ClientException">Is raised when POP3 server returns error.</exception>
+        public void Authenticate(AUTH_SASL_Client sasl)
+        {            
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+				throw new InvalidOperationException("You must connect first.");
+			}
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Connection is already authenticated.");
+            }
+            if(sasl == null){
+                throw new ArgumentNullException("sasl");
+            }
+
+            ManualResetEvent wait = new ManualResetEvent(false);
+            using(AuthAsyncOP op = new AuthAsyncOP(sasl)){
+                op.CompletedAsync += delegate(object s1,EventArgs<AuthAsyncOP> e1){
+                    wait.Set();
+                };
+                if(!this.AuthAsync(op)){
+                    wait.Set();
+                }
+                wait.WaitOne();
+                wait.Close();
+
+                if(op.Error != null){
+                    throw op.Error;
+                }
+            }
+        }
+
+        #endregion
+
+        #region method AuthAsync
+
+        #region class AuthAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="POP3_Client.AuthAsync"/> asynchronous operation.
+        /// </summary>
+        public class AuthAsyncOP : IDisposable,IAsyncOP
+        {
+            private object           m_pLock         = new object();
+            private AsyncOP_State    m_State         = AsyncOP_State.WaitingForStart;
+            private Exception        m_pException    = null;
+            private POP3_Client      m_pPop3Client   = null;
+            private AUTH_SASL_Client m_pSASL         = null;
+            private bool             m_RiseCompleted = false;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="sasl">SASL authentication.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>sasl</b> is null reference.</exception>
+            public AuthAsyncOP(AUTH_SASL_Client sasl)
+            {
+                if(sasl == null){
+                    throw new ArgumentNullException("sasl");
+                }
+
+                m_pSASL = sasl;
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resource being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+                
+                m_pException  = null;
+                m_pPop3Client = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner POP3 client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            internal bool Start(POP3_Client owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+
+                m_pPop3Client = owner;
+
+                SetState(AsyncOP_State.Active);
+
+                try{
+                    /* RFC 5034 4. The AUTH Command.
+
+                        AUTH mechanism [initial-response]
+
+                        Arguments:
+
+                        mechanism: A string identifying a SASL authentication mechanism.
+                        
+                        initial-response: An optional initial client response, as
+                                          defined in Section 3 of [RFC4422].  If present, this response
+                                          MUST be encoded as Base64 (specified in Section 4 of
+                                          [RFC4648]), or consist only of the single character "=", which
+                                          represents an empty initial response.
+                    */
+
+                    byte[] buffer = Encoding.UTF8.GetBytes("AUTH " + m_pSASL.Name + "\r\n");
+
+                    // Log
+                    m_pPop3Client.LogAddWrite(buffer.Length,"AUTH " + m_pSASL.Name);
+
+                    // Start command sending.
+                    m_pPop3Client.TcpStream.BeginWrite(buffer,0,buffer.Length,this.AuthCommandSendingCompleted,null);
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pPop3Client.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method AuthCommandSendingCompleted
+
+            /// <summary>
+            /// Is called when AUTH command sending has finished.
+            /// </summary>
+            /// <param name="ar">Asynchronous result.</param>
+            private void AuthCommandSendingCompleted(IAsyncResult ar)
+            {
+                try{
+                    m_pPop3Client.TcpStream.EndWrite(ar);
+
+                    // Read POP3 server response.
+                    SmartStream.ReadLineAsyncOP op = new SmartStream.ReadLineAsyncOP(new byte[8000],SizeExceededAction.JunkAndThrowException);
+                    op.Completed += delegate(object s,EventArgs<SmartStream.ReadLineAsyncOP> e){
+                        AuthReadResponseCompleted(op);
+                    };
+                    if(m_pPop3Client.TcpStream.ReadLine(op,true)){
+                        AuthReadResponseCompleted(op);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pPop3Client.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);
+                }
+            }
+
+            #endregion
+
+            #region method AuthReadResponseCompleted
+            
+            /// <summary>
+            /// Is called when POP3 server response reading has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            private void AuthReadResponseCompleted(SmartStream.ReadLineAsyncOP op)
+            {
+                try{
+                    // Log
+                    m_pPop3Client.LogAddRead(op.BytesInBuffer,op.LineUtf8);
+                                        
+                    // Authentication suceeded.
+                    if(string.Equals(op.LineUtf8.Split(new char[]{' '},2)[0],"+OK",StringComparison.InvariantCultureIgnoreCase)){
+                        SetState(AsyncOP_State.Completed);
+                    }
+                    // Continue authenticating.
+                    else if(op.LineUtf8.StartsWith("+")){
+                        // + base64Data, we need to decode it.
+                        byte[] serverResponse = Convert.FromBase64String(op.LineUtf8.Split(new char[]{' '},2)[1]);
+
+                        byte[] clientResponse = m_pSASL.Continue(serverResponse);
+
+                        // We need just send SASL returned auth-response as base64.
+                        byte[] buffer = Encoding.UTF8.GetBytes(Convert.ToBase64String(clientResponse) + "\r\n");
+
+                        // Log
+                        m_pPop3Client.LogAddWrite(buffer.Length,Convert.ToBase64String(clientResponse));
+
+                        // Start auth-data sending.
+                        m_pPop3Client.TcpStream.BeginWrite(buffer,0,buffer.Length,this.AuthCommandSendingCompleted,null);
+                    }
+                    // Authentication rejected.
+                    else{
+                        m_pException = new POP3_ClientException(op.LineUtf8);
+                        SetState(AsyncOP_State.Completed);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pPop3Client.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);
+                }
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<AuthAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<AuthAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Starts sending AUTH command to POP3 server.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="AuthAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when POP3 client is not connected or connection is already authenticated.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        public bool AuthAsync(AuthAsyncOP op)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("You must connect first.");
+            }
+            if(this.IsAuthenticated){
+                throw new InvalidOperationException("Connection is already authenticated.");
+            }
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+
+            return op.Start(this);
+        }
+
+        #endregion
 
         #region method BeginNoop
 
@@ -1017,6 +1362,9 @@ namespace LumiSoft.Net.POP3.Client
         }
 
 		#endregion
+
+
+        //--- Obsolete -------------------------------------------------------------------
 
 	}
 }
