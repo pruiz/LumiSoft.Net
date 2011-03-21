@@ -73,7 +73,7 @@ namespace LumiSoft.Net.AUTH
                     S: a002 OK "Authenticated"
             */
 
-            if(clientResponse.Length > 0){
+            if(clientResponse.Length == 0){
                 return new byte[0];
             }
             // Parse response
