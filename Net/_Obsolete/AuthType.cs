@@ -5,6 +5,7 @@ namespace LumiSoft.Net.AUTH
 	/// <summary>
 	/// Authentication type.
 	/// </summary>
+    [Obsolete("Will be removed.")]
 	public enum AuthType
 	{
 		/// <summary>

@@ -789,7 +789,7 @@
     <Compile Include="TextUtils.cs">
       <SubType>Code</SubType>
     </Compile>
-    <None Include="AUTH\AuthType.cs">
+    <None Include="_Obsolete\AuthType.cs">
       <SubType>Code</SubType>
     </None>
     <Compile Include="_Obsolete\SocketServerSession.cs">
