@@ -586,7 +586,7 @@ namespace LumiSoft.Net.POP3.Server
 
             string mechanism = cmdText;
 
-            /* MS specfic or someone knows where in RFC let me know about this.
+            /* MS specific or someone knows where in RFC let me know about this.
                 Empty AUTH commands causes authentication mechanisms listing. 
              
                 C: AUTH
@@ -613,11 +613,11 @@ namespace LumiSoft.Net.POP3.Server
                 return;
             }
 
-            string clientResponse = "";
+            byte[] clientResponse = new byte[0];
             AUTH_SASL_ServerMechanism auth = this.Authentications[mechanism];
             auth.Reset();
             while(true){
-                string serverResponse = auth.Continue(clientResponse);
+                byte[] serverResponse = auth.Continue(clientResponse);
                 // Authentication completed.
                 if(auth.IsCompleted){
                     if(auth.IsAuthenticated){
@@ -641,11 +641,11 @@ namespace LumiSoft.Net.POP3.Server
                 // Authentication continues.
                 else{
                     // Send server challange.
-                    if(string.IsNullOrEmpty(serverResponse)){
+                    if(serverResponse.Length == 0){
                         WriteLine("+ ");
                     }
                     else{
-                        WriteLine("+ " + Convert.ToBase64String(Encoding.UTF8.GetBytes(serverResponse)));
+                        WriteLine("+ " + Convert.ToBase64String(serverResponse));
                     }
 
                     // Read client response. 
@@ -654,21 +654,20 @@ namespace LumiSoft.Net.POP3.Server
                     if(readLineOP.Error != null){
                         throw readLineOP.Error;
                     }
-                    clientResponse = readLineOP.LineUtf8;
                     // Log
                     if(this.Server.Logger != null){
                         this.Server.Logger.AddRead(this.ID,this.AuthenticatedUserIdentity,readLineOP.BytesInBuffer,"base64 auth-data",this.LocalEndPoint,this.RemoteEndPoint);
                     }
 
                     // Client canceled authentication.
-                    if(clientResponse == "*"){
+                    if(readLineOP.LineUtf8 == "*"){
                         WriteLine("-ERR Authentication canceled.");
                         return;
                     }
                     // We have base64 client response, decode it.
                     else{
                         try{
-                            clientResponse = Encoding.UTF8.GetString(Convert.FromBase64String(clientResponse));
+                            clientResponse = Convert.FromBase64String(readLineOP.LineUtf8);
                         }
                         catch{
                             WriteLine("-ERR Invalid client response '" + clientResponse + "'.");

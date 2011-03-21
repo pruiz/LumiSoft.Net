@@ -36,7 +36,7 @@ namespace LumiSoft.Net.AUTH
         /// <param name="clientResponse">Client sent SASL response.</param>
         /// <returns>Retunrns challange response what must be sent to client or null if authentication has completed.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>clientRespone</b> is null reference.</exception>
-        public abstract string Continue(string clientResponse);
+        public abstract byte[] Continue(byte[] clientResponse);
 
         #endregion
 

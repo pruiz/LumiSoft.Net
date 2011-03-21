@@ -50,7 +50,7 @@ namespace LumiSoft.Net.AUTH
         /// <param name="clientResponse">Client sent SASL response.</param>
         /// <returns>Retunrns challange response what must be sent to client or null if authentication has completed.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>clientResponse</b> is null reference.</exception>
-        public override string Continue(string clientResponse)
+        public override byte[] Continue(byte[] clientResponse)
         {
             if(clientResponse == null){
                 throw new ArgumentNullException("clientResponse");
@@ -66,23 +66,23 @@ namespace LumiSoft.Net.AUTH
             */
 
             // User name provided, so skip that state.
-            if(m_State == 0 && !string.IsNullOrEmpty(clientResponse)){
+            if(m_State == 0 && clientResponse.Length > 0){
                 m_State++;
             }
 
-            if(m_State == 0 && string.IsNullOrEmpty(clientResponse)){
+            if(m_State == 0){
                 m_State++;
 
-                return "UserName:";
+                return Encoding.ASCII.GetBytes("UserName:");
             }
             else if(m_State == 1){
                 m_State++;
-                m_UserName = clientResponse;
+                m_UserName = Encoding.UTF8.GetString(clientResponse);
             
-                return "Password:";
+                return Encoding.ASCII.GetBytes("Password:");
             }
             else{
-                m_Password = clientResponse;
+                m_Password = Encoding.UTF8.GetString(clientResponse);
 
                 AUTH_e_Authenticate result = OnAuthenticate("",m_UserName,m_Password);
                 m_IsAuthenticated = result.IsAuthenticated;

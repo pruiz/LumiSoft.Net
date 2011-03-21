@@ -52,7 +52,7 @@ namespace LumiSoft.Net.AUTH
         /// <param name="clientResponse">Client sent SASL response.</param>
         /// <returns>Retunrns challange response what must be sent to client or null if authentication has completed.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>clientResponse</b> is null reference.</exception>
-        public override string Continue(string clientResponse)
+        public override byte[] Continue(byte[] clientResponse)
         {
             if(clientResponse == null){
                 throw new ArgumentNullException("clientResponse");
@@ -79,17 +79,17 @@ namespace LumiSoft.Net.AUTH
                 
                 AUTH_SASL_DigestMD5_Challenge callenge = new AUTH_SASL_DigestMD5_Challenge(new string[]{m_Realm},m_Nonce,new string[]{"auth"},false);
      
-                return callenge.ToChallenge();
+                return Encoding.UTF8.GetBytes(callenge.ToChallenge());
             }
             else if(m_State == 1){
                 m_State++;
 
                 try{
-                    AUTH_SASL_DigestMD5_Response response = AUTH_SASL_DigestMD5_Response.Parse(clientResponse);
+                    AUTH_SASL_DigestMD5_Response response = AUTH_SASL_DigestMD5_Response.Parse(Encoding.UTF8.GetString(clientResponse));
 
                     // Check realm and nonce value.
                     if(m_Realm != response.Realm || m_Nonce != response.Nonce){
-                        return "rspauth=\"\"";
+                        return Encoding.UTF8.GetBytes("rspauth=\"\"");
                     }
 
                     m_UserName = response.UserName;
@@ -98,7 +98,7 @@ namespace LumiSoft.Net.AUTH
                         if(response.Authenticate(result.UserName,result.Password)){
                             m_IsAuthenticated = true;
 
-                            return response.ToRspauthResponse(result.UserName,result.Password);
+                            return Encoding.UTF8.GetBytes(response.ToRspauthResponse(result.UserName,result.Password));
                         }
                     }
                 }
@@ -106,7 +106,7 @@ namespace LumiSoft.Net.AUTH
                     // Authentication failed, just reject request.
                 }
 
-                return "rspauth=\"\"";
+                return Encoding.UTF8.GetBytes("rspauth=\"\"");
             }
             else{
                 m_IsCompleted = true;
