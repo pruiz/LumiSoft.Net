@@ -111,7 +111,7 @@ namespace LumiSoft.Net.AUTH
                 Per RFC 2831 2.1.1. Only [nonce algorithm] parameters are required.
             */
             if(string.IsNullOrEmpty(retVal.Nonce)){
-                throw new ParseException("The challenge-string doesn't contain required parameter 'none' value.");
+                throw new ParseException("The challenge-string doesn't contain required parameter 'nonce' value.");
             }
             if(string.IsNullOrEmpty(retVal.Algorithm)){
                 throw new ParseException("The challenge-string doesn't contain required parameter 'algorithm' value.");
