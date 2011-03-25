@@ -388,7 +388,7 @@ namespace LumiSoft.Net.POP3.Client
 
 		#endregion
 
-        #region method Authenticate
+        #region method Auth
 
         /// <summary>
         /// Sends AUTH command to POP3 server.
@@ -397,7 +397,7 @@ namespace LumiSoft.Net.POP3.Client
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
         /// <exception cref="InvalidOperationException">Is raised when POP3 client is not connected or is already authenticated.</exception>
         /// <exception cref="POP3_ClientException">Is raised when POP3 server returns error.</exception>
-        public void Authenticate(AUTH_SASL_Client sasl)
+        public void Auth(AUTH_SASL_Client sasl)
         {            
             if(this.IsDisposed){
                 throw new ObjectDisposedException(this.GetType().Name);
