@@ -21,6 +21,7 @@ namespace LumiSoft.Net.DNS.Client
         private DNS_QType                  m_QType         = 0;
         private TimerEx                    m_pTimeoutTimer = null;
         private DnsServerResponse          m_pResponse     = null;
+        private int                        m_ResponseCount = 0;
 
         /// <summary>
         /// Default constructor.
@@ -176,9 +177,14 @@ namespace LumiSoft.Net.DNS.Client
                     if(this.State != DNS_ClientTransactionState.Active){
                         return;
                     }
+                    m_ResponseCount++;
 
                     // Late arriving response or retransmitted response, just skip it.
                     if(m_pResponse != null){
+                        return;
+                    }
+                    // If server refused to complete query and we more active queries to other servers, skip that response.
+                    if(response.ResponseCode == DNS_RCode.REFUSED && m_ResponseCount < Dns_Client.DnsServers.Length){
                         return;
                     }
 
