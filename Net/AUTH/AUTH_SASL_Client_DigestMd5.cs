@@ -117,7 +117,7 @@ namespace LumiSoft.Net.AUTH
 
                 // Check rspauth value.
                 if(!string.Equals(Encoding.UTF8.GetString(serverResponse),m_pResponse.ToRspauthResponse(m_UserName,m_Password),StringComparison.InvariantCultureIgnoreCase)){
-                    throw new Exception("SMTP server 'rspauth' value mismatch with local 'rspauth' value.");
+                    throw new Exception("Server server 'rspauth' value mismatch with local 'rspauth' value.");
                 }
 
                 return new byte[0];
