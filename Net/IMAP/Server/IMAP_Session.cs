@@ -3622,7 +3622,7 @@ namespace LumiSoft.Net.IMAP.Server
                 r.ReadWord();
 
                 string charset = r.ReadWord();
-                if((!string.Equals(charset,"US-ASCII",StringComparison.InvariantCultureIgnoreCase) || string.Equals(charset,"UTF-8",StringComparison.InvariantCultureIgnoreCase))){
+                if(!(string.Equals(charset,"US-ASCII",StringComparison.InvariantCultureIgnoreCase) || string.Equals(charset,"UTF-8",StringComparison.InvariantCultureIgnoreCase))){
                     WriteLine(cmdTag + " NO [BADCHARSET (US-ASCII UTF-8)] Not supported charset.");
 
                     return;
