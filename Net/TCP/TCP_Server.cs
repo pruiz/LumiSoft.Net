@@ -554,8 +554,10 @@ namespace LumiSoft.Net.TCP
                         // Create TCP connection acceptors.
                         for(int i=0;i<10;i++){
                             TCP_Acceptor acceptor = new TCP_Server<T>.TCP_Acceptor(socket);
+                            acceptor.Tags["bind"] = bind;
                             acceptor.ConnectionAccepted += delegate(object s1,EventArgs<Socket> e1){
-                                ProcessConnection(e1.Value,bind);
+                                // NOTE: We may not use 'bind' variable here, foreach changes it's value before we reach here.
+                                ProcessConnection(e1.Value,(IPBindInfo)acceptor.Tags["bind"]);
                             };
                             acceptor.Error += delegate(object s1,ExceptionEventArgs e1){
                                 OnError(e1.Exception);
