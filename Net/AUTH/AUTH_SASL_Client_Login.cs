@@ -105,7 +105,7 @@ namespace LumiSoft.Net.AUTH
         /// <summary>
         /// Gets user login name.
         /// </summary>
-        public string UserName
+        public override string UserName
         {
             get{ return m_UserName; }
         }

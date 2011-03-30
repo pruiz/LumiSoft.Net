@@ -49,6 +49,14 @@ namespace LumiSoft.Net.AUTH
             get;
         }
 
+        /// <summary>
+        /// Gets user login name.
+        /// </summary>
+        public abstract string UserName
+        {
+            get;
+        }
+
         #endregion
     }
 }
