@@ -1317,6 +1317,8 @@ namespace LumiSoft.Net.SMTP.Client
                     }
                     // Authentication suceeded.
                     else if(op.ReplyLines[0].ReplyCode == 235){
+                        m_pSmtpClient.m_pAuthdUserIdentity = new GenericIdentity(m_pSASL.UserName,m_pSASL.Name);
+
                         SetState(AsyncOP_State.Completed);
                     }
                     // Authentication rejected.

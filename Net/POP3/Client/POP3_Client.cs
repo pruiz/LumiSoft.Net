@@ -608,6 +608,8 @@ namespace LumiSoft.Net.POP3.Client
                                         
                     // Authentication suceeded.
                     if(string.Equals(op.LineUtf8.Split(new char[]{' '},2)[0],"+OK",StringComparison.InvariantCultureIgnoreCase)){
+                        m_pPop3Client.m_pAuthdUserIdentity = new GenericIdentity(m_pSASL.UserName,m_pSASL.Name);
+
                         SetState(AsyncOP_State.Completed);
                     }
                     // Continue authenticating.
