@@ -1273,11 +1273,19 @@ namespace LumiSoft.Net.DNS.Client
                         if(e1.Value.State == DNS_ClientTransactionState.Completed){
                             // No errors.
                             if(e1.Value.Response.ResponseCode == DNS_RCode.NO_ERROR){
-                                DNS_rr_MX[] mxRecords = e1.Value.Response.GetMXRecords();
+                                List<DNS_rr_MX> mxRecords = new List<DNS_rr_MX>();
+                                foreach(DNS_rr_MX mx in e1.Value.Response.GetMXRecords()){
+                                    // Skip invalid MX records.
+                                    if(string.IsNullOrEmpty(mx.Host)){
+                                    }
+                                    else{
+                                        mxRecords.Add(mx);
+                                    }
+                                }
 
                                 // Use MX records.
-                                if(mxRecords.Length > 0){
-                                    m_pHosts = new HostEntry[mxRecords.Length];
+                                if(mxRecords.Count > 0){
+                                    m_pHosts = new HostEntry[mxRecords.Count];
 
                                     // Create name to index map, so we can map asynchronous A/AAAA lookup results back to MX priority index.
                                     Dictionary<string,int> name_to_index_map = new Dictionary<string,int>();
@@ -1574,82 +1582,7 @@ namespace LumiSoft.Net.DNS.Client
         }
 
         #endregion
-
-
-        #region [obsolete] static method Resolve
-
-        /// <summary>
-        /// Resolves host names to IP addresses.
-        /// </summary>
-        /// <param name="hosts">Host names to resolve.</param>
-        /// <returns>Returns specified hosts IP addresses.</returns>
-        /// <exception cref="ArgumentNullException">Is raised when <b>hosts</b> is null.</exception>
-        [Obsolete("Use Dns_Client.GetHostAddresses instead.")]
-        public static IPAddress[] Resolve(string[] hosts)
-        {
-            if(hosts == null){
-                throw new ArgumentNullException("hosts");
-            }
-
-            List<IPAddress> retVal = new List<IPAddress>();
-            foreach(string host in hosts){
-                IPAddress[] addresses = Resolve(host);
-                foreach(IPAddress ip in addresses){
-                    if(!retVal.Contains(ip)){
-                        retVal.Add(ip);
-                    }
-                }
-            }
-
-            return retVal.ToArray();
-        }
-
-		/// <summary>
-		/// Resolves host name to IP addresses.
-		/// </summary>
-		/// <param name="host">Host name or IP address.</param>
-		/// <returns>Return specified host IP addresses.</returns>
-        /// <exception cref="ArgumentNullException">Is raised when <b>host</b> is null.</exception>
-        [Obsolete("Use Dns_Client.GetHostAddresses instead.")]
-		public static IPAddress[] Resolve(string host)
-		{
-            if(host == null){
-                throw new ArgumentNullException("host");
-            }
-
-			// If hostName_IP is IP
-			try{
-				return new IPAddress[]{IPAddress.Parse(host)};
-			}
-			catch{
-			}
-
-			// This is probably NetBios name
-			if(host.IndexOf(".") == -1){
-				return System.Net.Dns.GetHostEntry(host).AddressList;
-			}
-			else{
-				// hostName_IP must be host name, try to resolve it's IP
-				using(Dns_Client dns = new Dns_Client()){
-				    DnsServerResponse resp = dns.Query(host,DNS_QType.A);
-				    if(resp.ResponseCode == DNS_RCode.NO_ERROR){
-					    DNS_rr_A[] records = resp.GetARecords();
-					    IPAddress[] retVal = new IPAddress[records.Length];
-					    for(int i=0;i<records.Length;i++){
-						    retVal[i] = records[i].IP;
-					    }
-
-					    return retVal;
-				    }
-				    else{
-					    throw new Exception(resp.ResponseCode.ToString());
-				    }
-                }
-			}
-		}
-
-		#endregion
-
+                        
 
         #region method Send
 
@@ -1983,7 +1916,7 @@ namespace LumiSoft.Net.DNS.Client
         #endregion
 
 
-        #region Properties Implementation
+        #region Properties implementation
 
         /// <summary>
         /// Gets static DNS client.
@@ -2045,6 +1978,83 @@ namespace LumiSoft.Net.DNS.Client
         {
             get{ return m_pCache; }
         }
+
+		#endregion
+
+
+        //--- OBSOLETE --------------------
+
+        #region [obsolete] static method Resolve
+
+        /// <summary>
+        /// Resolves host names to IP addresses.
+        /// </summary>
+        /// <param name="hosts">Host names to resolve.</param>
+        /// <returns>Returns specified hosts IP addresses.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>hosts</b> is null.</exception>
+        [Obsolete("Use Dns_Client.GetHostAddresses instead.")]
+        public static IPAddress[] Resolve(string[] hosts)
+        {
+            if(hosts == null){
+                throw new ArgumentNullException("hosts");
+            }
+
+            List<IPAddress> retVal = new List<IPAddress>();
+            foreach(string host in hosts){
+                IPAddress[] addresses = Resolve(host);
+                foreach(IPAddress ip in addresses){
+                    if(!retVal.Contains(ip)){
+                        retVal.Add(ip);
+                    }
+                }
+            }
+
+            return retVal.ToArray();
+        }
+
+		/// <summary>
+		/// Resolves host name to IP addresses.
+		/// </summary>
+		/// <param name="host">Host name or IP address.</param>
+		/// <returns>Return specified host IP addresses.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>host</b> is null.</exception>
+        [Obsolete("Use Dns_Client.GetHostAddresses instead.")]
+		public static IPAddress[] Resolve(string host)
+		{
+            if(host == null){
+                throw new ArgumentNullException("host");
+            }
+
+			// If hostName_IP is IP
+			try{
+				return new IPAddress[]{IPAddress.Parse(host)};
+			}
+			catch{
+			}
+
+			// This is probably NetBios name
+			if(host.IndexOf(".") == -1){
+				return System.Net.Dns.GetHostEntry(host).AddressList;
+			}
+			else{
+				// hostName_IP must be host name, try to resolve it's IP
+				using(Dns_Client dns = new Dns_Client()){
+				    DnsServerResponse resp = dns.Query(host,DNS_QType.A);
+				    if(resp.ResponseCode == DNS_RCode.NO_ERROR){
+					    DNS_rr_A[] records = resp.GetARecords();
+					    IPAddress[] retVal = new IPAddress[records.Length];
+					    for(int i=0;i<records.Length;i++){
+						    retVal[i] = records[i].IP;
+					    }
+
+					    return retVal;
+				    }
+				    else{
+					    throw new Exception(resp.ResponseCode.ToString());
+				    }
+                }
+			}
+		}
 
 		#endregion
 
