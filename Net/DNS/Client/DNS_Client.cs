@@ -915,34 +915,41 @@ namespace LumiSoft.Net.DNS.Client
             private void GetHostAddressesCompleted(GetHostAddressesAsyncOP op,int index)
             {
                 lock(m_pLock){
-                    if(op.Error != null){
-                        // We wanted any of the host names to resolve:
-                        //  *) We have already one resolved host name.
-                        //  *) We have more names to resolve, so next may succeed.
-                        if(m_ResolveAny && (m_ResolvedCount > 0 || m_pIpLookupQueue.Count > 1)){
+                    try{
+                        if(op.Error != null){
+                            // We wanted any of the host names to resolve:
+                            //  *) We have already one resolved host name.
+                            //  *) We have more names to resolve, so next may succeed.
+                            if(m_ResolveAny && (m_ResolvedCount > 0 || m_pIpLookupQueue.Count > 1)){
+                            }
+                            else{
+                                m_pException = op.Error;
+                            }
                         }
                         else{
-                            m_pException = op.Error;
+                            m_pHostEntries[index] = new HostEntry(op.HostNameOrIP,op.Addresses,null);
+                            m_ResolvedCount++;
                         }
-                    }
-                    else{
-                        m_pHostEntries[index] = new HostEntry(op.HostNameOrIP,op.Addresses,null);
-                        m_ResolvedCount++;
-                    }
 
-                    m_pIpLookupQueue.Remove(index);
-                    if(m_pIpLookupQueue.Count == 0){
-                        // We wanted resolve any, so some host names may not be resolved and are null, remove them from response.
-                        if(m_ResolveAny){
-                            List<HostEntry> retVal = new List<HostEntry>();
-                            foreach(HostEntry host in m_pHostEntries){
-                                if(host != null){
-                                    retVal.Add(host);
+                        m_pIpLookupQueue.Remove(index);
+                        if(m_pIpLookupQueue.Count == 0){
+                            // We wanted resolve any, so some host names may not be resolved and are null, remove them from response.
+                            if(m_ResolveAny){
+                                List<HostEntry> retVal = new List<HostEntry>();
+                                foreach(HostEntry host in m_pHostEntries){
+                                    if(host != null){
+                                        retVal.Add(host);
+                                    }
                                 }
+
+                                m_pHostEntries = retVal.ToArray();
                             }
 
-                            m_pHostEntries = retVal.ToArray();
+                            SetState(AsyncOP_State.Completed);
                         }
+                    }
+                    catch(Exception x){
+                        m_pException = x;
 
                         SetState(AsyncOP_State.Completed);
                     }
