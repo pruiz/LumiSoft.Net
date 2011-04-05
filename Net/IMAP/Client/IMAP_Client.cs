@@ -774,6 +774,8 @@ namespace LumiSoft.Net.IMAP.Client
                     }
                     // Authentication suceeded.
                     else if(string.Equals(op.LineUtf8.Split(new char[]{' '},3)[1],"OK",StringComparison.InvariantCultureIgnoreCase)){
+                        m_pImapClient.m_pAuthenticatedUser = new GenericIdentity(m_pSASL.UserName,m_pSASL.Name);
+
                         SetState(AsyncOP_State.Completed);
                     }
                     // Authentication rejected.
@@ -2715,13 +2717,10 @@ namespace LumiSoft.Net.IMAP.Client
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected, not-authenticated or not-selected state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
-        public int[] Search(bool uid,string charset,string criteria)
+        public int[] Search(bool uid,Encoding charset,IMAP_Search_Key criteria)
         {
             if(criteria == null){
                 throw new ArgumentNullException("criteria");
-            }
-            if(criteria == string.Empty){
-                throw new ArgumentException("Argument 'criteria' value must be specified.","criteria");
             }
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
@@ -2732,20 +2731,97 @@ namespace LumiSoft.Net.IMAP.Client
             if(m_pSelectedFolder == null){
                 throw new InvalidOperationException("Not selected state, you need to select some folder first.");
             }
-
-            StringBuilder command = new StringBuilder();
-            command.Append((m_CommandIndex++).ToString("d5"));
+            
+            // Build IMAP command.
+            List<IMAP_Client_CmdPart> commandParts = new List<IMAP_Client_CmdPart>();
+            commandParts.Add(new IMAP_Client_CmdPart(IMAP_Client_CmdPart_Type.Constant,(m_CommandIndex++).ToString("d5")));
             if(uid){
-                command.Append(" UID");
+                commandParts.Add(new IMAP_Client_CmdPart(IMAP_Client_CmdPart_Type.Constant," UID"));
             }
-            command.Append(" SEARCH");
-            if(!string.IsNullOrEmpty(charset)){
-                command.Append(" CHARSET " + charset);
+            commandParts.Add(new IMAP_Client_CmdPart(IMAP_Client_CmdPart_Type.Constant," SEARCH"));
+            if(charset != null){
+                commandParts.Add(new IMAP_Client_CmdPart(IMAP_Client_CmdPart_Type.Constant," CHARSET " + charset.WebName.ToUpper()));
             }
-            command.Append(" " + criteria + "\r\n");
+            commandParts.Add(new IMAP_Client_CmdPart(IMAP_Client_CmdPart_Type.Constant," "));
+            criteria.ToCmdParts(commandParts);
+            commandParts.Add(new IMAP_Client_CmdPart(IMAP_Client_CmdPart_Type.Constant,"\r\n"));
+            
+            // Charset not specified, ASCII is IMAP default charset.
+            if(charset == null){
+                charset = Encoding.ASCII;
+            }
+           
+            // Join and send non literal command parts. For literal part we need to wait "+ Continue ..."
+            // response from server, before we may send literal data.
+            MemoryStream cmdBuffer = new MemoryStream();
+            foreach(IMAP_Client_CmdPart cmdPart in commandParts){
+                if(cmdPart.Type == IMAP_Client_CmdPart_Type.Constant){
+                    // Append to command buffer.
+                    byte[] buffer = Encoding.ASCII.GetBytes(cmdPart.Value);
+                    cmdBuffer.Write(buffer,0,buffer.Length);
+                }
+                else{
+                    // See if we need to send string as IMAP literal or quoted string.
+                    bool sendAsLiteral = false;
+                    foreach(char c in cmdPart.Value){
+                        if(c > 127 || Char.IsControl(c)){
+                            sendAsLiteral = true;
 
-            SendCommand(command.ToString());
+                            break;
+                        }
+                    }
 
+                    if(sendAsLiteral){
+                        /* RFC 3501.
+                            literal = "{" number "}" CRLF *CHAR8
+                                       ; Number represents the number of CHAR8s
+                         
+                            NOTE: Literal data is sent only when server responds "+ Continue ..."
+                        */
+
+                        // Append to command buffer.
+                        byte[] buffer = Encoding.ASCII.GetBytes("{" + charset.GetByteCount(cmdPart.Value) + "}\r\n");
+                        cmdBuffer.Write(buffer,0,buffer.Length);
+
+                        // Log
+                        LogAddWrite(cmdBuffer.Length,charset.GetString(cmdBuffer.ToArray(),0,(int)cmdBuffer.Length - 2));
+
+                        // Send current command buffer to IMAP server.
+                        cmdBuffer.Position = 0;
+                        this.TcpStream.WriteStream(cmdBuffer);
+                        cmdBuffer.SetLength(0);
+
+                        // Read IMAP server response.
+                        IMAP_r_ServerStatus response1 = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null);
+                        if(!response1.ResponseCode.Equals("+",StringComparison.InvariantCultureIgnoreCase)){
+                            throw new IMAP_ClientException(response1.ResponseCode,response1.ResponseText);
+                        }
+
+                        // Get literal data.
+                        buffer = charset.GetBytes(cmdPart.Value);
+
+                        // Log
+                        LogAddWrite(cmdBuffer.Length,charset.GetString(cmdBuffer.ToArray()));
+
+                        // Send literal data to server.
+                        this.TcpStream.Write(buffer,0,buffer.Length);
+                    }
+                    else{
+                        // Append to command buffer.
+                        byte[] buffer = Encoding.ASCII.GetBytes(TextUtils.QuoteString(cmdPart.Value));
+                        cmdBuffer.Write(buffer,0,buffer.Length);
+                    }
+                }                
+            }
+
+            // Log
+            LogAddWrite(cmdBuffer.Length,charset.GetString(cmdBuffer.ToArray(),0,(int)cmdBuffer.Length - 2));
+
+            // Send current command buffer to IMAP server.
+            cmdBuffer.Position = 0;       
+            this.TcpStream.WriteStream(cmdBuffer);
+
+            // Read IMAP server response.
             List<int> retVal = new List<int>();
             IMAP_r_ServerStatus response = ReadResponse(null,null,retVal,null,null,null,null,null,null,null,null,null,null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
@@ -2754,7 +2830,7 @@ namespace LumiSoft.Net.IMAP.Client
            
             return retVal.ToArray();
         }
-
+                
         #endregion
                 
         #region method StoreMessageFlags
@@ -3720,6 +3796,65 @@ namespace LumiSoft.Net.IMAP.Client
 
         #endregion
                 
+        #endregion
+
+
+        //--- OBSOLETE
+
+        #region method Search
+
+        /// <summary>
+        /// Searches message what matches specified search criteria.
+        /// </summary>
+        /// <param name="uid">If true then UID SERACH, otherwise normal SEARCH.</param>
+        /// <param name="charset">Charset used in search criteria. Value null means ASCII. The UTF-8 is reccomended value non ASCII searches.</param>
+        /// <param name="criteria">Search criteria.</param>
+        /// <returns>Returns search expression matehced messages sequence-numbers or UIDs(This depends on argument <b>uid</b> value).</returns>
+        /// <exception cref="ArgumentNullException">Is rised when <b>criteria</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected, not-authenticated or not-selected state).</exception>
+        /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
+        [Obsolete("Use Search(bool uid,Encoding charset,IMAP_Search_Key criteria) instead.")]
+        public int[] Search(bool uid,string charset,string criteria)
+        {
+            if(criteria == null){
+                throw new ArgumentNullException("criteria");
+            }
+            if(criteria == string.Empty){
+                throw new ArgumentException("Argument 'criteria' value must be specified.","criteria");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(!this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }
+            if(m_pSelectedFolder == null){
+                throw new InvalidOperationException("Not selected state, you need to select some folder first.");
+            }
+
+            StringBuilder command = new StringBuilder();
+            command.Append((m_CommandIndex++).ToString("d5"));
+            if(uid){
+                command.Append(" UID");
+            }
+            command.Append(" SEARCH");
+            if(!string.IsNullOrEmpty(charset)){
+                command.Append(" CHARSET " + charset);
+            }
+            command.Append(" " + criteria + "\r\n");
+
+            SendCommand(command.ToString());
+
+            List<int> retVal = new List<int>();
+            IMAP_r_ServerStatus response = ReadResponse(null,null,retVal,null,null,null,null,null,null,null,null,null,null);
+            if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
+                throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
+            }
+           
+            return retVal.ToArray();
+        }
+
         #endregion
     }
 }
