@@ -119,6 +119,10 @@
     <Compile Include="DNS\Client\DNS_ClientTransactionState.cs" />
     <Compile Include="HostEntry.cs" />
     <Compile Include="IAsyncOP.cs" />
+    <Compile Include="IMAP\Client\IMAP_Client_CmdPart.cs" />
+    <Compile Include="IMAP\Client\IMAP_Client_CmdPart_Type.cs" />
+    <Compile Include="IMAP\IMAP_t_LiteralString.cs" />
+    <Compile Include="IMAP\IMAP_t_QuotedString.cs" />
     <Compile Include="Media\_WaveIn.cs" />
     <Compile Include="SMTP\SMTP_t_ReplyLine.cs" />
     <Compile Include="UDP\UDP_DataReceiver.cs" />

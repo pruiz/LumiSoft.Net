@@ -1,11 +1,13 @@
 ﻿using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Text;
+using LumiSoft.Net.IMAP.Client;
 
 namespace LumiSoft.Net.IMAP
 {
     /// <summary>
-    /// This class is base class for IMAP SEARCH searck-key. Defined in RFC 3501 6.4.4.
+    /// This class is base class for IMAP SEARCH search-key. Defined in RFC 3501 6.4.4.
     /// </summary>
     public abstract class IMAP_Search_Key
     {
@@ -181,6 +183,18 @@ namespace LumiSoft.Net.IMAP
                 }
             }
         }
+
+        #endregion
+
+
+        #region internal abstract method ToCmdParts
+
+        /// <summary>
+        /// Stores IMAP search-key command parts to the specified array.
+        /// </summary>
+        /// <param name="list">Array where to store command parts.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>list</b> is null reference.</exception>
+        internal abstract void ToCmdParts(List<IMAP_Client_CmdPart> list);
 
         #endregion
     }

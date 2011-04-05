@@ -1,6 +1,8 @@
 ﻿using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Text;
+using LumiSoft.Net.IMAP.Client;
 
 namespace LumiSoft.Net.IMAP
 {
@@ -72,6 +74,32 @@ namespace LumiSoft.Net.IMAP
             retVal.Append(")");
 
             return retVal.ToString();
+        }
+
+        #endregion
+
+
+        #region internal override method ToCmdParts
+
+        /// <summary>
+        /// Stores IMAP search-key command parts to the specified array.
+        /// </summary>
+        /// <param name="list">Array where to store command parts.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>list</b> is null reference.</exception>
+        internal override void ToCmdParts(List<IMAP_Client_CmdPart> list)
+        {
+            if(list == null){
+                throw new ArgumentNullException("list");
+            }
+
+            list.Add(new IMAP_Client_CmdPart(IMAP_Client_CmdPart_Type.Constant,"("));
+            for(int i=0;i<m_pKeys.Count;i++){
+                if(i > 0){
+                    list.Add(new IMAP_Client_CmdPart(IMAP_Client_CmdPart_Type.Constant," "));
+                }
+                m_pKeys[i].ToCmdParts(list);
+            }
+            list.Add(new IMAP_Client_CmdPart(IMAP_Client_CmdPart_Type.Constant,")"));
         }
 
         #endregion

@@ -553,5 +553,91 @@ namespace LumiSoft.Net.IMAP
 
         #endregion
 
-	}
+
+        #region static method MustUseLiteralString
+
+        /// <summary>
+        /// Gets if specified string must be sent as IMAP literal-string or quoted-string.
+        /// </summary>
+        /// <param name="value">String value.</param>
+        /// <param name="utf8StringSupported">Specifies if RFC 5738 IMAP UTF-8 string is supported.</param>
+        /// <returns>Returns true if string must be sent as literal-string, otherwise quoted-string.</returns>
+        public static bool MustUseLiteralString(string value,bool utf8StringSupported)
+        {
+            if(value != null){
+                foreach(char c in value){
+                    if(!utf8StringSupported && c > 126){
+                        return true;
+                    }
+                    else if(char.IsControl(c)){
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        #endregion
+
+        #region static method ImapStringToByte
+
+        /// <summary>
+        /// Converts IMAP string to byte[].
+        /// </summary>
+        /// <param name="charset">Charset to use for string encodings.</param>
+        /// <param name="utf8StringSupported">Specifies if RFC 5738 IMAP UTF-8 string is supported.</param>
+        /// <param name="value">String value.</param>
+        /// <returns>Returns IMAP string as byte[].</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>charset</b> is null reference.</exception>
+        public static byte[] ImapStringToByte(Encoding charset,bool utf8StringSupported,string value)
+        {
+            if(charset == null){
+                throw new ArgumentNullException("charset");
+            }
+
+            if(value == null){
+                return Encoding.ASCII.GetBytes("NIL");
+            }
+            else if(value == ""){
+                return Encoding.ASCII.GetBytes("\"\"");
+            }
+
+            bool has8BitChars    = false;
+            bool hasControlChars = false;
+            foreach(char c in value){
+                if(c > 127){
+                    has8BitChars = true;
+                }
+                else if(char.IsControl(c)){
+                    hasControlChars = true;
+                }
+            }
+
+            // We must use IMAP literal string.
+            if(hasControlChars || (!utf8StringSupported && has8BitChars)){
+                byte[] buffer2 = charset.GetBytes(value);
+                byte[] buffer1 = Encoding.ASCII.GetBytes("{" + buffer2.Length + "}\r\n");
+                
+                byte[] buffer = new byte[buffer1.Length + buffer2.Length];
+                Array.Copy(buffer1,buffer,buffer1.Length);
+                Array.Copy(buffer2,0,buffer,buffer1.Length,buffer2.Length);
+
+                return buffer;
+            }
+            // Use IMAP utf8-quoted string. RFC 5738.
+            else if(utf8StringSupported){
+                // utf8-quoted   = "*" DQUOTE *UQUOTED-CHAR DQUOTE
+
+                return Encoding.UTF8.GetBytes("*" + TextUtils.QuoteString(value));
+            }
+            // Use IMAP quoted string.
+            else{
+                return charset.GetBytes(TextUtils.QuoteString(value));
+            }
+        }
+
+        #endregion
+
+    }
 }
