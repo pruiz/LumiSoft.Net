@@ -2635,6 +2635,7 @@ namespace LumiSoft.Net.SMTP.Client
                         // DATA command failed.
                         else{
                             m_pException = new SMTP_ClientException(op.ReplyLines);
+                            SetState(AsyncOP_State.Completed);
                         }
                     }
                 }
