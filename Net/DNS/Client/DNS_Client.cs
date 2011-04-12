@@ -1293,7 +1293,7 @@ namespace LumiSoft.Net.DNS.Client
                                 // Use MX records.
                                 if(mxRecords.Count > 0){
                                     m_pHosts = new HostEntry[mxRecords.Count];
-
+                                    
                                     // Create name to index map, so we can map asynchronous A/AAAA lookup results back to MX priority index.
                                     Dictionary<string,int> name_to_index_map = new Dictionary<string,int>();
                                     List<string>           lookupQueue       = new List<string>();
@@ -1305,7 +1305,7 @@ namespace LumiSoft.Net.DNS.Client
                                         IPAddress[] ips = Get_A_or_AAAA_FromResponse(mx.Host,e1.Value.Response);
                                         // No A or AAAA records in addtional answers section for MX, we need todo new query for that.
                                         if(ips.Length == 0){
-                                            name_to_index_map.Add(mx.Host,i);
+                                            name_to_index_map[mx.Host] = i;
                                             lookupQueue.Add(mx.Host);
                                         }
                                         else{
