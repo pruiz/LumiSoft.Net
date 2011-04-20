@@ -187,6 +187,230 @@ namespace LumiSoft.Net.IMAP.Server
 
         #endregion
 
+        #region class _CmdReader
+
+        /// <summary>
+        /// This class implements IMAP client command reader.
+        /// </summary>
+        /// <remarks>Because IMAP command can contain literal strings, then command text can be multiline.</remarks>
+        private class _CmdReader
+        {
+            private IMAP_Session m_pSession       = null;
+            private string       m_InitialCmdLine = null;
+            private Encoding     m_pCharset       = null;
+            private string       m_CmdLine        = null;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="session">Owner IMAP session.</param>
+            /// <param name="initialCmdLine">IMAP client initial command line.</param>
+            /// <param name="charset">IMAP literal strings charset encoding.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>session</b>,<b>initialCmdLine</b> or <b>charset</b> is null reference.</exception>
+            public _CmdReader(IMAP_Session session,string initialCmdLine,Encoding charset)
+            {    
+                if(session == null){
+                    throw new ArgumentNullException("session");
+                }
+                if(initialCmdLine == null){
+                    throw new ArgumentNullException("initialCmdLine");
+                }
+                if(charset == null){
+                    throw new ArgumentNullException("charset");
+                }
+
+                m_pSession       = session;
+                m_InitialCmdLine = initialCmdLine;
+                m_pCharset       = charset;
+            }
+
+
+            #region method Start
+
+            /// <summary>
+            /// Start operation processing.
+            /// </summary>
+            public void Start()
+            {
+                /* RFC 3501.
+                    literal = "{" number "}" CRLF *CHAR8
+                              ; Number represents the number of CHAR8s
+                */
+
+                // TODO: Async
+                // TODO: Limit total command size. 64k ? 
+
+                
+                // If initial command line ends with literal string, read literal string and remaining command text.
+                if(EndsWithLiteralString(m_InitialCmdLine)){
+                    StringBuilder cmdText     = new StringBuilder();
+                    int           literalSize = GetLiteralSize(m_InitialCmdLine);
+
+                    // Add initial command line part to command text.
+                    cmdText.Append(RemoveLiteralSpecifier(m_InitialCmdLine));
+
+                    SmartStream.ReadLineAsyncOP readLineOP = new SmartStream.ReadLineAsyncOP(new byte[32000],SizeExceededAction.JunkAndThrowException);
+                    while(true){
+                        #region Read literal string
+
+                        // Send "+ Continue".
+                        m_pSession.WriteLine("+ Continue.");
+
+                        // Read literal string.
+                        MemoryStream msLiteral = new MemoryStream();
+                        m_pSession.TcpStream.ReadFixedCount(msLiteral,literalSize);
+                        
+                        // Log
+                        m_pSession.LogAddRead(literalSize,m_pCharset.GetString(msLiteral.ToArray()));
+
+                        // Add to command text as quoted string.
+                        cmdText.Append(TextUtils.QuoteString(m_pCharset.GetString(msLiteral.ToArray())));
+
+                        #endregion
+                        
+                        #region Read continuing command text
+
+                        // Read continuing command text.
+                        m_pSession.TcpStream.ReadLine(readLineOP,false);
+
+                        // We have error.
+                        if(readLineOP.Error != null){
+                            throw readLineOP.Error;
+                        }
+                        else{
+                            string line = readLineOP.LineUtf8;
+
+                            // Log
+                            m_pSession.LogAddRead(readLineOP.BytesInBuffer,line);
+
+                            // Add command line part to command text.
+                            if(EndsWithLiteralString(line)){
+                                cmdText.Append(RemoveLiteralSpecifier(line));
+                            }
+                            else{
+                                cmdText.Append(line);
+                            }
+
+                            // No more literal string, we are done.
+                            if(!EndsWithLiteralString(line)){
+                                break;
+                            }
+                            else{
+                                literalSize = GetLiteralSize(line);
+                            }
+                        }
+
+                        #endregion
+                    }
+
+                    m_CmdLine = cmdText.ToString();
+                }
+                // We have no literal string, so initial cmd line is final.
+                else{
+                    m_CmdLine = m_InitialCmdLine;
+                }                
+            }
+
+            #endregion
+
+
+            #region method EndsWithLiteralString
+
+            /// <summary>
+            /// Cheks if specified value ends with IMAP literal string.
+            /// </summary>
+            /// <param name="value">Data value.</param>
+            /// <returns>Returns true if value ends with IMAP literal string, otherwise false.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>value</b> is null reference.</exception>
+            private bool EndsWithLiteralString(string value)
+            {
+                if(value == null){
+                    throw new ArgumentNullException("value");
+                }
+
+                if(value.EndsWith("}")){
+                    int    digitCount = 0;
+                    char[] chars      = value.ToCharArray();
+                    for(int i=chars.Length-2;i>=0;i--){
+                        // We have literal string start tag.
+                        if(chars[i] == '{'){
+                            break;
+                        }
+                        // Literal string length specifier digit.
+                        else if(char.IsDigit(chars[i])){
+                            digitCount++;
+                        }
+                        // Not IMAP literal string char, so we don't have literal string.
+                        else{
+                            return false;
+                        }
+                    }
+
+                    // We must have at least single digit literal string length specifier.
+                    if(digitCount > 0){
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            #endregion
+
+            #region method GetLiteralSize
+
+            /// <summary>
+            /// Gets literal string bytes count.
+            /// </summary>
+            /// <param name="cmdLine">Command line with ending literal string.</param>
+            /// <returns>Returns literal string byte count.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>cmdLine</b> is null reference.</exception>
+            private int GetLiteralSize(string cmdLine)
+            {
+                if(cmdLine == null){
+                    throw new ArgumentNullException("cmdLine");
+                }
+
+                return Convert.ToInt32(cmdLine.Substring(cmdLine.LastIndexOf('{') + 1,cmdLine.Length - cmdLine.LastIndexOf('{') - 2));
+            }
+
+            #endregion
+
+            #region method RemoveLiteralSpecifier
+
+            /// <summary>
+            /// Removes literal string specifier({no_bytes}) from the specified string.
+            /// </summary>
+            /// <param name="value">Command line with ending literal string specifier.</param>
+            /// <returns>Returns command line without literal string specifier.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>value</b> is null reference.</exception>
+            private string RemoveLiteralSpecifier(string value)
+            {
+                if(value == null){
+                    throw new ArgumentNullException("value");
+                }
+
+                return value.Substring(0,value.LastIndexOf('{'));
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets command line text.
+            /// </summary>
+            public string CmdLine
+            {
+                get{ return m_CmdLine;}
+            }
+
+            #endregion
+        }
+
+        #endregion
+
         private Dictionary<string,AUTH_SASL_ServerMechanism> m_pAuthentications = null;
         private bool                                         m_SessionRejected  = false;
         private int                                          m_BadCommands      = 0;
@@ -3615,7 +3839,10 @@ namespace LumiSoft.Net.IMAP.Server
             // Store start time
 			long startTime = DateTime.Now.Ticks;
 
-            StringReader r = new StringReader(cmdText);
+            _CmdReader cmdReader = new _CmdReader(this,cmdText,Encoding.UTF8);            
+            cmdReader.Start();
+
+            StringReader r = new StringReader(cmdReader.CmdLine);
 
             // See if we have optional CHARSET argument.
             if(r.StartsWith("CHARSET",false)){
