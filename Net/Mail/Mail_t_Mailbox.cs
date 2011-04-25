@@ -59,7 +59,7 @@ namespace LumiSoft.Net.Mail
         public override string ToString(MIME_Encoding_EncodedWord wordEncoder)
         {
             if(string.IsNullOrEmpty(m_DisplayName)){
-                return "<" + m_Address + ">";
+                return m_Address;
             }
             else{
                 if(wordEncoder != null && MIME_Encoding_EncodedWord.MustEncode(m_DisplayName)){
