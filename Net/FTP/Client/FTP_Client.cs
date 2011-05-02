@@ -1395,30 +1395,82 @@ namespace LumiSoft.Net.FTP.Client
         {
             /*
                 There can be single or multiline response.
+            
+                Thus the format for multi-line replies is that the first line
+                will begin with the exact required reply code, followed
+                immediately by a Hyphen, "-" (also known as Minus), followed by
+                text.  The last line will begin with the same code, followed
+                immediately by Space <SP>, optionally some text, and the Telnet
+                end-of-line code.
+
+                For example:
+                                123-First line
+                                Second line
+                                  234 A line beginning with numbers
+                                123 The last line
+
+                The user-process then simply needs to search for the second
+                occurrence of the same reply code, followed by <SP> (Space), at
+                the beginning of a line, and ignore all intermediary lines.  If
+                an intermediary line begins with a 3-digit number, the Server
+                must pad the front  to avoid confusion.
+
+                    This scheme allows standard system routines to be used for
+                    reply information (such as for the STAT reply), with
+                    "artificial" first and last lines tacked on.  In rare cases
+                    where these routines are able to generate three digits and a
+                    Space at the beginning of any line, the beginning of each
+                    text line should be offset by some neutral text, like Space.
+
+                This scheme assumes that multi-line replies may not be nested.
+             
              
                 Examples:
                     226 File successfully transferred
               
 			    	226-File successfully transferred
 			        226 0.002 seconds (measured here), 199.65 Mbytes per second 339163 bytes received in 00:00 (8.11 MB/s)
+                    
+                    226-Maximum disk quota limited to 5120000 kBytes
+                        Used disk quota 0 kBytes, available 5120000 kBytes
+                    226 Transfer complete
             */
 
             List<string> retVal = new List<string>();
-            while(true){
-                string response = ReadLine();
-                // Server closed connection for some reason.
-                if(response == null){
-                    throw new Exception("Remote host disconnected connection unexpectedly.");
-                }
+
+            string response = ReadLine();
+            // Server closed connection for some reason.
+            if(response == null){
+                throw new Exception("Remote host disconnected connection unexpectedly.");
+            }
+
+            // Multiline response.
+            if(response.Length >= 4 && response[3] == '-'){
+                string responseCode = response.Substring(0,3);
                 retVal.Add(response);
-                // Multiline response.
-                if(response.Length >= 4 && response[3] == '-'){
-                    // Fall to next loop cycle.
+
+                // Read while we get final response line. RESPONSE-CODE SP [optional-text] CRLF
+                while(true){
+                    response = ReadLine();
+                    // Server closed connection for some reason.
+                    if(response == null){
+                        throw new Exception("Remote host disconnected connection unexpectedly.");
+                    }
+                    // We got final response line, we are done.
+                    else if(response.StartsWith(responseCode + " ")){
+                        retVal.Add(response);
+
+                        break;
+                    }
+                    // Multiline response continues.
+                    else{
+                        retVal.Add(response);
+                    }
                 }
-                // Single line response.
-                else{
-                    break;
-                }
+            }
+            // Single line response.
+            else{
+                retVal.Add(response);
             }
 
             return retVal.ToArray();
