@@ -589,6 +589,7 @@ namespace LumiSoft.Net.IMAP
 
                     // Eat address ending ")".
                     fetchReader.GetReader().ReadSpecifiedLength(1);
+                    fetchReader.GetReader().ReadToFirstChar();
                 }
 
                 return retVal.ToArray();
