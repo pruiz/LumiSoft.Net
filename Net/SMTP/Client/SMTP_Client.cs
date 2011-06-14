@@ -4079,11 +4079,11 @@ namespace LumiSoft.Net.SMTP.Client
             }
 
             using(SMTP_Client smtp = new SMTP_Client()){
-                smtp.Connect(host,port,ssl);
+                smtp.Connect(host,port,ssl);                
+                smtp.EhloHelo(localHost != null ? localHost : Dns.GetHostName());
                 if(!string.IsNullOrEmpty(userName)){
                     smtp.Auth(smtp.AuthGetStrongestMethod(userName,password));
                 }
-                smtp.EhloHelo(localHost != null ? localHost : Dns.GetHostName());
                 smtp.MailFrom(from,-1);
                 foreach(string t in to){
                     smtp.RcptTo(t);
