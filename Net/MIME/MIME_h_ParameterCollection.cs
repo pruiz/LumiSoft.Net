@@ -341,12 +341,18 @@ namespace LumiSoft.Net.MIME
                 string[] nameParts = paramName.Split('*');
                 int      index     = 0;
                 bool     encoded   = nameParts.Length == 3;
+                // Get multi value parameter index.
                 if(nameParts.Length >= 2){
                     try{
                         index = Convert.ToInt32(nameParts[1]);
                     }
                     catch{
                     }
+                }
+
+                // Single value parameter and we already have parameter with such name, skip it.
+                if(nameParts.Length < 2 && parameters.ContainsKey(nameParts[0])){
+                    continue;
                 }
 
                 // Parameter builder doesn't exist for the specified parameter, create it.
