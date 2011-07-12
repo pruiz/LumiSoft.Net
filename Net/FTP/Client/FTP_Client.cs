@@ -246,6 +246,8 @@ namespace LumiSoft.Net.FTP.Client
                 else{
                     m_pSocket = new Socket(AddressFamily.InterNetworkV6,SocketType.Stream,ProtocolType.Tcp);
                 }
+                m_pSocket.SendTimeout = m_pOwner.Timeout;
+                m_pSocket.ReceiveTimeout = m_pOwner.Timeout;
 
                 int port = 0;
                 // Data connection port range not specified, let system to allocate port for us.
@@ -271,9 +273,7 @@ namespace LumiSoft.Net.FTP.Client
                 // Data connection IP specified, use it.
                 else{
                     m_pSocket.Bind(new IPEndPoint(m_pOwner.DataIP,port));
-                }
-                m_pSocket.SendTimeout = 30000;
-                m_pSocket.ReceiveTimeout = 30000;
+                }                
             }
 
             #endregion
