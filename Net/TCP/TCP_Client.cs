@@ -279,9 +279,13 @@ namespace LumiSoft.Net.TCP
                     // Create socket.
                     if(m_pRemoteEP.AddressFamily == AddressFamily.InterNetwork){
                         m_pSocket = new Socket(AddressFamily.InterNetwork,SocketType.Stream,ProtocolType.Tcp);
+                        m_pSocket.ReceiveTimeout = m_pTcpClient.m_Timeout;
+                        m_pSocket.SendTimeout = m_pTcpClient.m_Timeout;
                     }
                     else if(m_pRemoteEP.AddressFamily == AddressFamily.InterNetworkV6){
                         m_pSocket = new Socket(AddressFamily.InterNetworkV6,SocketType.Stream,ProtocolType.Tcp);
+                        m_pSocket.ReceiveTimeout = m_pTcpClient.m_Timeout;
+                        m_pSocket.SendTimeout = m_pTcpClient.m_Timeout;
                     }
                     // Bind socket to the specified end point.
                     if(m_pLocalEP != null){
