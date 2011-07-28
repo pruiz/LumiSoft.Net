@@ -500,8 +500,16 @@ namespace LumiSoft.Net.SIP.Stack
                 throw new InvalidOperationException("No more hop(s).");
             }
 
-            SIP_Hop hop = m_pHops.Dequeue();        
-            SendToFlow(m_pStack.TransportLayer.GetOrCreateFlow(hop.Transport,null,hop.EndPoint),m_pRequest.Copy());
+            try{
+                SIP_Hop hop = m_pHops.Dequeue();        
+                SendToFlow(m_pStack.TransportLayer.GetOrCreateFlow(hop.Transport,null,hop.EndPoint),m_pRequest.Copy());
+            }
+            catch(ObjectDisposedException x){
+                // Skip all exceptions if owner stack is disposed.
+                if(m_pStack.State != SIP_StackState.Disposed){
+                    throw x;
+                }
+            }
         }
 
         #endregion
