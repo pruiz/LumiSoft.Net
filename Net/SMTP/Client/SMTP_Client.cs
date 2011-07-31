@@ -2714,8 +2714,8 @@ namespace LumiSoft.Net.SMTP.Client
                         SetState(AsyncOP_State.Completed);
                     }
                     else{
-                        // DATA command failed.
-                        if(op.ReplyLines[0].ReplyCode >= 500){
+                        // DATA command failed, only 2xx response is success.
+                        if(!(op.ReplyLines[0].ReplyCode >= 200 && op.ReplyLines[0].ReplyCode <= 299)){
                             m_pException = new SMTP_ClientException(op.ReplyLines);
                         }
 
@@ -3583,23 +3583,30 @@ namespace LumiSoft.Net.SMTP.Client
 
                 try{
                     SmartStream.ReadLineAsyncOP op = new SmartStream.ReadLineAsyncOP(new byte[8000],SizeExceededAction.JunkAndThrowException);
-                    op.Completed += delegate(object s,EventArgs<SmartStream.ReadLineAsyncOP> e){                        
-                        // Response reading completed.
-                        if(!ReadLineCompleted(op)){
-                            SetState(AsyncOP_State.Completed);                        
-                            OnCompletedAsync();
-                        }
-                        // Continue response reading.
-                        else{
-                            while(owner.TcpStream.ReadLine(op,true)){
-                                // Response reading completed.
-                                if(!ReadLineCompleted(op)){
-                                    SetState(AsyncOP_State.Completed);                        
-                                    OnCompletedAsync();
+                    op.Completed += delegate(object s,EventArgs<SmartStream.ReadLineAsyncOP> e){   
+                        try{
+                            // Response reading completed.
+                            if(!ReadLineCompleted(op)){
+                                SetState(AsyncOP_State.Completed);                        
+                                OnCompletedAsync();
+                            }
+                            // Continue response reading.
+                            else{
+                                while(owner.TcpStream.ReadLine(op,true)){
+                                    // Response reading completed.
+                                    if(!ReadLineCompleted(op)){
+                                        SetState(AsyncOP_State.Completed);                        
+                                        OnCompletedAsync();
 
-                                    break;
+                                        break;
+                                    }
                                 }
                             }
+                        }
+                        catch(Exception x){
+                            m_pException = x;
+                            SetState(AsyncOP_State.Completed);                        
+                            OnCompletedAsync();
                         }
                     };
                     while(owner.TcpStream.ReadLine(op,true)){
