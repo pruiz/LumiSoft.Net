@@ -19,7 +19,6 @@ namespace LumiSoft.Net.SIP.Stack
         private Dictionary<string,SIP_ClientTransaction> m_pClientTransactions = null;
         private Dictionary<string,SIP_ServerTransaction> m_pServerTransactions = null;
         private Dictionary<string,SIP_Dialog>            m_pDialogs            = null;
-        private Timer                                    m_pTimer              = null;
         
         /// <summary>
         /// Default constructor.
@@ -37,10 +36,6 @@ namespace LumiSoft.Net.SIP.Stack
             m_pClientTransactions = new Dictionary<string,SIP_ClientTransaction>();
             m_pServerTransactions = new Dictionary<string,SIP_ServerTransaction>();
             m_pDialogs            = new Dictionary<string,SIP_Dialog>();
-
-            m_pTimer = new Timer(20000);
-            m_pTimer.AutoReset = true;
-            m_pTimer.Elapsed += new ElapsedEventHandler(m_pTimer_Elapsed);
         }
 
         #region method Dispose
@@ -52,11 +47,6 @@ namespace LumiSoft.Net.SIP.Stack
         {
             if(m_IsDisposed){
                 return;
-            }
-
-            if(m_pTimer != null){
-                m_pTimer.Dispose();
-                m_pTimer = null;
             }
 
             foreach(SIP_ClientTransaction tr in this.ClientTransactions){
@@ -88,26 +78,6 @@ namespace LumiSoft.Net.SIP.Stack
 
 
         #region Events Handling
-
-        #region method m_pTimer_Elapsed
-
-        private void m_pTimer_Elapsed(object sender,ElapsedEventArgs e)
-        {
-            foreach(SIP_Dialog dialog in this.Dialogs){
-                // Terminate early dialog after 5 minutes, normally there must be any, but just in case ... .
-                if(dialog.State == SIP_DialogState.Early){
-                    if(dialog.CreateTime.AddMinutes(5) < DateTime.Now){
-                        dialog.Terminate();
-                    }
-                }
-                // 
-                else if(dialog.State == SIP_DialogState.Confirmed){
-                    // TODO:
-                }
-            }
-        }
-
-        #endregion
 
         #endregion
 
