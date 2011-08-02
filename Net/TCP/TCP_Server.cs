@@ -806,7 +806,7 @@ namespace LumiSoft.Net.TCP
                 if(m_IsDisposed){
                     throw new ObjectDisposedException("TCP_Server");
                 }
-                if(m_SessionIdleTimeout < 0){
+                if(value < 0){
                     throw new ArgumentException("Property 'SessionIdleTimeout' value must be >= 0.");
                 }
 
