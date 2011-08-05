@@ -2715,7 +2715,7 @@ namespace LumiSoft.Net.SMTP.Client
                     }
                     else{
                         // DATA command failed, only 2xx response is success.
-                        if(!(op.ReplyLines[0].ReplyCode >= 200 || op.ReplyLines[0].ReplyCode <= 299)){
+                        if(op.ReplyLines[0].ReplyCode < 200 || op.ReplyLines[0].ReplyCode > 299){
                             m_pException = new SMTP_ClientException(op.ReplyLines);
                         }
 
