@@ -57,6 +57,14 @@ namespace LumiSoft.Net.AUTH
             get;
         }
 
+        /// <summary>
+        /// Gets if the authentication method supports SASL client "inital response".
+        /// </summary>
+        public virtual bool SupportsInitialResponse
+        {
+            get{ return false; }
+        }
+
         #endregion
     }
 }
