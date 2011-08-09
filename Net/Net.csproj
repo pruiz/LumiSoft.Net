@@ -1,7 +1,7 @@
 ﻿<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="3.5">
   <PropertyGroup>
     <ProjectType>Local</ProjectType>
-    <ProductVersion>9.0.21022</ProductVersion>
+    <ProductVersion>9.0.30729</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{7AB36CCF-5FFD-4780-A54E-A102ECA028B5}</ProjectGuid>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -114,6 +114,7 @@
     <Compile Include="AUTH\AUTH_SASL_Client_DigestMd5.cs" />
     <Compile Include="AUTH\AUTH_SASL_Client_Login.cs" />
     <Compile Include="AUTH\AUTH_SASL_Client_Plain.cs" />
+    <Compile Include="AUTH\AUTH_SASL_Client_XOAuth.cs" />
     <Compile Include="DNS\Client\DNS_ClientCache.cs" />
     <Compile Include="DNS\Client\DNS_ClientTransaction.cs" />
     <Compile Include="DNS\Client\DNS_ClientTransactionState.cs" />
