@@ -36,7 +36,8 @@ namespace LumiSoft.Net.SMTP.Relay
         private List<Relay_Queue>                    m_pQueues               = null;
         private BalanceMode                          m_SmartHostsBalanceMode = BalanceMode.LoadBalance;
         private CircleCollection<Relay_SmartHost>    m_pSmartHosts           = null;
-        private CircleCollection<IPBindInfo>         m_pLocalEndPoints       = null;
+        private CircleCollection<IPBindInfo>         m_pLocalEndPointIPv4    = null;
+        private CircleCollection<IPBindInfo>         m_pLocalEndPointIPv6    = null;
         private long                                 m_MaxConnections        = 0;
         private long                                 m_MaxConnectionsPerIP   = 0;
         private Dns_Client                           m_pDsnClient            = null;
@@ -137,9 +138,10 @@ namespace LumiSoft.Net.SMTP.Relay
             }
             m_IsRunning = true;
 
-            m_pLocalEndPoints   = new CircleCollection<IPBindInfo>();
-            m_pSessions         = new TCP_SessionCollection<Relay_Session>();
-            m_pConnectionsPerIP = new Dictionary<IPAddress,long>();
+            m_pLocalEndPointIPv4 = new CircleCollection<IPBindInfo>();
+            m_pLocalEndPointIPv6 = new CircleCollection<IPBindInfo>();
+            m_pSessions          = new TCP_SessionCollection<Relay_Session>();
+            m_pConnectionsPerIP  = new Dictionary<IPAddress,long>();
 
             Thread tr1 = new Thread(new ThreadStart(this.Run));
             tr1.Start();
@@ -170,7 +172,8 @@ namespace LumiSoft.Net.SMTP.Relay
             // TODO: We need to send notify to all not processed messages, then they can be Disposed as needed.
                         
             // Clean up.            
-            m_pLocalEndPoints = null;
+            m_pLocalEndPointIPv4 = null;
+            m_pLocalEndPointIPv6 = null;
             //m_pSessions.Dispose();
             m_pSessions = null;
             m_pConnectionsPerIP = null;
@@ -192,15 +195,16 @@ namespace LumiSoft.Net.SMTP.Relay
                 try{
                     // Bind info has changed, create new local end points.
                     if(m_HasBindingsChanged){
-                        m_pLocalEndPoints.Clear();
+                        m_pLocalEndPointIPv4.Clear();
+                        m_pLocalEndPointIPv6.Clear();
 
                         foreach(IPBindInfo binding in m_pBindings){
                             if(binding.IP == IPAddress.Any){
                                 foreach(IPAddress ip in System.Net.Dns.GetHostAddresses("")){
                                     if(ip.AddressFamily == AddressFamily.InterNetwork){
                                         IPBindInfo b = new IPBindInfo(binding.HostName,binding.Protocol,ip,25);
-                                        if(!m_pLocalEndPoints.Contains(b)){
-                                            m_pLocalEndPoints.Add(b);
+                                        if(!m_pLocalEndPointIPv4.Contains(b)){
+                                            m_pLocalEndPointIPv4.Add(b);
                                         }
                                     }
                                 }
@@ -209,16 +213,23 @@ namespace LumiSoft.Net.SMTP.Relay
                                 foreach(IPAddress ip in System.Net.Dns.GetHostAddresses("")){
                                     if(ip.AddressFamily == AddressFamily.InterNetworkV6){
                                         IPBindInfo b = new IPBindInfo(binding.HostName,binding.Protocol,ip,25);
-                                        if(!m_pLocalEndPoints.Contains(b)){
-                                            m_pLocalEndPoints.Add(b);
+                                        if(!m_pLocalEndPointIPv6.Contains(b)){
+                                            m_pLocalEndPointIPv6.Add(b);
                                         }
                                     }
                                 }
                             }
                             else{
                                 IPBindInfo b = new IPBindInfo(binding.HostName,binding.Protocol,binding.IP,25);
-                                if(!m_pLocalEndPoints.Contains(b)){
-                                    m_pLocalEndPoints.Add(b);
+                                if(binding.IP.AddressFamily == AddressFamily.InterNetwork){
+                                    if(!m_pLocalEndPointIPv4.Contains(b)){
+                                        m_pLocalEndPointIPv4.Add(b);
+                                    }
+                                }
+                                else{
+                                    if(!m_pLocalEndPointIPv6.Contains(b)){
+                                        m_pLocalEndPointIPv6.Add(b);
+                                    }
                                 }
                             }
                         }
@@ -227,7 +238,7 @@ namespace LumiSoft.Net.SMTP.Relay
                     }
 
                     // There are no local end points specified.
-                    if(m_pLocalEndPoints.Count == 0){
+                    if(m_pLocalEndPointIPv4.Count == 0 && m_pLocalEndPointIPv6.Count == 0){
                         Thread.Sleep(10);
                     }
                     // Maximum allowed relay sessions exceeded, skip adding new ones.
@@ -253,12 +264,8 @@ namespace LumiSoft.Net.SMTP.Relay
                         }
                         // Create new session for queued relay item.
                         else{
-                            // Get round-robin local end point for that session.
-                            // This ensures if multiple network connections, all will be load balanced.
-                            IPBindInfo localBindInfo = m_pLocalEndPoints.Next();
-
                             if(m_RelayMode == Relay_Mode.Dns){
-                                Relay_Session session = new Relay_Session(this,localBindInfo,item);
+                                Relay_Session session = new Relay_Session(this,item);
                                 m_pSessions.Add(session);
                                 ThreadPool.QueueUserWorkItem(new WaitCallback(session.Start));
                             }
@@ -272,7 +279,7 @@ namespace LumiSoft.Net.SMTP.Relay
                                     smartHosts = m_pSmartHosts.ToCurrentOrderArray();
                                 }
 
-                                Relay_Session session = new Relay_Session(this,localBindInfo,item,smartHosts);
+                                Relay_Session session = new Relay_Session(this,item,smartHosts);
                                 m_pSessions.Add(session);
                                 ThreadPool.QueueUserWorkItem(new WaitCallback(session.Start));
                             }                            
@@ -287,6 +294,35 @@ namespace LumiSoft.Net.SMTP.Relay
 
         #endregion
 
+
+        #region method GetLocalBinding
+
+        /// <summary>
+        /// Gets local IP binding for specified remote IP.
+        /// </summary>
+        /// <param name="remoteIP">Remote SMTP target IP address.</param>
+        /// <returns>Returns local IP binding or null if no suitable IP binding available.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>remoteIP</b> is null reference.</exception>
+        internal IPBindInfo GetLocalBinding(IPAddress remoteIP)
+        {
+            if(remoteIP == null){
+                throw new ArgumentNullException("remoteIP");
+            }
+
+            // Get round-robin local end point for that remote IP.
+            // This ensures if multiple network connections, all will be load balanced.
+
+            // IPv6
+            if(remoteIP.AddressFamily == AddressFamily.InterNetworkV6){
+                return m_pLocalEndPointIPv6.Next();
+            }
+            // IPv4
+            else{                
+                 return m_pLocalEndPointIPv4.Next();
+            }
+        }
+
+        #endregion
 
         #region method TryAddIpUsage
 

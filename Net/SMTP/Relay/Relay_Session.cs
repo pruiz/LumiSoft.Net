@@ -127,25 +127,20 @@ namespace LumiSoft.Net.SMTP.Relay
         /// Dns relay session constructor.
         /// </summary>
         /// <param name="server">Owner relay server.</param>
-        /// <param name="localBindInfo">Local bind info.</param>
         /// <param name="realyItem">Relay item.</param>
-        /// <exception cref="ArgumentNullException">Is raised when <b>server</b>,<b>localBindInfo</b> or <b>realyItem</b> is null.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>server</b> or <b>realyItem</b> is null.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        internal Relay_Session(Relay_Server server,IPBindInfo localBindInfo,Relay_QueueItem realyItem)
+        internal Relay_Session(Relay_Server server,Relay_QueueItem realyItem)
         {
             if(server == null){
                 throw new ArgumentNullException("server");
-            }
-            if(localBindInfo == null){
-                throw new ArgumentNullException("localBindInfo");
             }
             if(realyItem == null){
                 throw new ArgumentNullException("realyItem");
             }
 
-            m_pServer        = server;
-            m_pLocalBindInfo = localBindInfo;
-            m_pRelayItem     = realyItem;
+            m_pServer    = server;
+            m_pRelayItem = realyItem;
 
             m_SessionID         = Guid.NewGuid().ToString();
             m_SessionCreateTime = DateTime.Now;
@@ -157,18 +152,14 @@ namespace LumiSoft.Net.SMTP.Relay
         /// Smart host relay session constructor.
         /// </summary>
         /// <param name="server">Owner relay server.</param>
-        /// <param name="localBindInfo">Local bind info.</param>
         /// <param name="realyItem">Relay item.</param>
         /// <param name="smartHosts">Smart hosts.</param>
-        /// <exception cref="ArgumentNullException">Is raised when <b>server</b>,<b>localBindInfo</b>,<b>realyItem</b> or <b>smartHosts</b>is null.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>server</b>,<b>realyItem</b> or <b>smartHosts</b>is null.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        internal Relay_Session(Relay_Server server,IPBindInfo localBindInfo,Relay_QueueItem realyItem,Relay_SmartHost[] smartHosts)
+        internal Relay_Session(Relay_Server server,Relay_QueueItem realyItem,Relay_SmartHost[] smartHosts)
         {
             if(server == null){
                 throw new ArgumentNullException("server");
-            }
-            if(localBindInfo == null){
-                throw new ArgumentNullException("localBindInfo");
             }
             if(realyItem == null){
                 throw new ArgumentNullException("realyItem");
@@ -177,10 +168,9 @@ namespace LumiSoft.Net.SMTP.Relay
                 throw new ArgumentNullException("smartHosts");
             }
 
-            m_pServer        = server;
-            m_pLocalBindInfo = localBindInfo;
-            m_pRelayItem     = realyItem;
-            m_pSmartHosts    = smartHosts;
+            m_pServer     = server;
+            m_pRelayItem  = realyItem;
+            m_pSmartHosts = smartHosts;
                         
             m_RelayMode         = Relay_Mode.SmartHost;
             m_SessionID         = Guid.NewGuid().ToString();
@@ -251,8 +241,7 @@ namespace LumiSoft.Net.SMTP.Relay
         /// <param name="state">User data.</param>
         internal void Start(object state)
         {
-            try{                
-                m_pSmtpClient.LocalHostName = m_pLocalBindInfo.HostName;
+            try{ 
                 if(m_pServer.Logger != null){
                     m_pSmtpClient.Logger = new Logger();
                     m_pSmtpClient.Logger.WriteLog += new EventHandler<WriteLogEventArgs>(SmtpClient_WriteLog);
@@ -356,11 +345,14 @@ namespace LumiSoft.Net.SMTP.Relay
                 Dispose(op.Error);
             }
             else{
+                StringBuilder buf = new StringBuilder();
                 foreach(HostEntry host in op.Hosts){
                     foreach(IPAddress ip in host.Addresses){
                         m_pTargets.Add(new Relay_Target(host.HostName,new IPEndPoint(ip,25)));
                     }
+                    buf.Append(host.HostName + " ");
                 }
+                LogText("Resolved to following email hosts: (" + buf.ToString().TrimEnd() + ").");
 
                 BeginConnect();
             }
@@ -419,32 +411,69 @@ namespace LumiSoft.Net.SMTP.Relay
                 return;
             }
 
-            // If maximum connections to specified target exceeded and there are more targets, try to get limit free target.            
+            // Maximum connections per IP limited.           
             if(m_pServer.MaxConnectionsPerIP > 0){
                 // For DNS or load-balnced smart host relay, search free target if any.
                 if(m_pServer.RelayMode == Relay_Mode.Dns || m_pServer.SmartHostsBalanceMode == BalanceMode.LoadBalance){
                     foreach(Relay_Target t in m_pTargets){
-                        // We found free target, stop searching.
-                        if(m_pServer.TryAddIpUsage(m_pTargets[0].Target.Address)){
-                            m_pActiveTarget = t;
-                            m_pTargets.Remove(t);
-                            break;
+                        // Get local IP binding for remote IP.
+                        m_pLocalBindInfo = m_pServer.GetLocalBinding(t.Target.Address);
+
+                        // We have suitable local IP binding for the target.
+                        if(m_pLocalBindInfo != null){
+                            // We found free target, stop searching.
+                            if(m_pServer.TryAddIpUsage(t.Target.Address)){
+                                m_pActiveTarget = t;
+                                m_pTargets.Remove(t);
+
+                                break;
+                            }
                         }
+                        // No suitable local IP binding, try next target.
+                        //else{
+                        //}
                     }
                 }
                 // Smart host fail-over mode, just check if it's free.
                 else{
-                    // Smart host IP limit not reached.
-                    if(m_pServer.TryAddIpUsage(m_pTargets[0].Target.Address)){
-                        m_pActiveTarget = m_pTargets[0];
-                        m_pTargets.RemoveAt(0);
+                    // Get local IP binding for remote IP.
+                    m_pLocalBindInfo = m_pServer.GetLocalBinding(m_pTargets[0].Target.Address);
+
+                    // We have suitable local IP binding for the target.
+                    if(m_pLocalBindInfo != null){
+                        // Smart host IP limit not reached.
+                        if(m_pServer.TryAddIpUsage(m_pTargets[0].Target.Address)){
+                            m_pActiveTarget = m_pTargets[0];
+                            m_pTargets.RemoveAt(0);
+                        }
                     }
+                    // No suitable local IP binding, try next target.
+                    //else{
+                    //}
                 }                
             }
             // Just get first target.
             else{
-                m_pActiveTarget = m_pTargets[0];
-                m_pTargets.RemoveAt(0);
+                 // Get local IP binding for remote IP.
+                 m_pLocalBindInfo = m_pServer.GetLocalBinding(m_pTargets[0].Target.Address);
+
+                 // We have suitable local IP binding for the target.
+                 if(m_pLocalBindInfo != null){
+                    m_pActiveTarget = m_pTargets[0];
+                    m_pTargets.RemoveAt(0);
+                 }
+                 // No suitable local IP binding, try next target.
+                 //else{
+                 //}
+            }
+
+            // We don't have suitable local IP end point for relay target.
+            // This may heppen for example: if remote server supports only IPv6 and we don't have local IPv6 local end point.            
+            if(m_pLocalBindInfo == null){
+                LogText("No suitable IPv4/IPv6 local IP endpoint for relay target.");
+                Dispose(new Exception("No suitable IPv4/IPv6 local IP endpoint for relay target."));
+
+                return;
             }
 
             // If all targets has exeeded maximum allowed connection per IP address, end relay session, 
@@ -452,8 +481,12 @@ namespace LumiSoft.Net.SMTP.Relay
             if(m_pActiveTarget == null){
                 LogText("All targets has exeeded maximum allowed connection per IP address, skip relay.");
                 Dispose(new Exception("All targets has exeeded maximum allowed connection per IP address, skip relay."));
+
                 return;
             }
+
+            // Set SMTP host name.
+            m_pSmtpClient.LocalHostName = m_pLocalBindInfo.HostName;
 
             // Start connecting to remote end point.
             TCP_Client.ConnectAsyncOP connectOP = new TCP_Client.ConnectAsyncOP(new IPEndPoint(m_pLocalBindInfo.IP,0),m_pActiveTarget.Target,false,null);
