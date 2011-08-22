@@ -301,6 +301,9 @@ namespace LumiSoft.Net.TCP
                     m_pException = x;
                     CleanupSocketRelated();
                     m_pTcpClient.LogAddException("Exception: " + x.Message,x);
+                    SetState(AsyncOP_State.Completed);
+
+                    return false;
                 }
 
                 // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
