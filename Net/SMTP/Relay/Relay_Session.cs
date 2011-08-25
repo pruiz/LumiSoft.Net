@@ -473,8 +473,9 @@ namespace LumiSoft.Net.SMTP.Relay
                     m_pTargets.RemoveAt(0);
                  }
                  // No suitable local IP binding, try next target.
-                 //else{
-                 //}
+                 else{
+                    LogText("Skipping relay target (" + m_pTargets[0].HostName + "->" + m_pTargets[0].Target.Address + "), no suitable local IPv4/IPv6 binding.");
+                 }
             }
 
             // We don't have suitable local IP end point for relay target.
