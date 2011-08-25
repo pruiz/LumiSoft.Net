@@ -428,10 +428,15 @@ namespace LumiSoft.Net.SMTP.Relay
 
                                 break;
                             }
+                            // Connection per IP limit reached.
+                            else{
+                                LogText("Skipping relay target (" + t.HostName + "->" + t.Target.Address + "), maximum connections to the specified IP has reached.");
+                            }
                         }
                         // No suitable local IP binding, try next target.
-                        //else{
-                        //}
+                        else{
+                            LogText("Skipping relay target (" + t.HostName + "->" + t.Target.Address + "), no suitable local IPv4/IPv6 binding.");
+                        }
                     }
                 }
                 // Smart host fail-over mode, just check if it's free.
@@ -446,10 +451,15 @@ namespace LumiSoft.Net.SMTP.Relay
                             m_pActiveTarget = m_pTargets[0];
                             m_pTargets.RemoveAt(0);
                         }
+                        // Connection per IP limit reached.
+                        else{
+                            LogText("Skipping relay target (" + m_pTargets[0].HostName + "->" + m_pTargets[0].Target.Address + "), maximum connections to the specified IP has reached.");
+                        }
                     }
                     // No suitable local IP binding, try next target.
-                    //else{
-                    //}
+                    else{
+                        LogText("Skipping relay target (" + m_pTargets[0].HostName + "->" + m_pTargets[0].Target.Address + "), no suitable local IPv4/IPv6 binding.");
+                    }
                 }                
             }
             // Just get first target.
