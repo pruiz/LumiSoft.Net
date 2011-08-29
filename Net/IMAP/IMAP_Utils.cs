@@ -514,10 +514,75 @@ namespace LumiSoft.Net.IMAP
 
 		#endregion
 
+        #region static method EncodeMailbox
 
-		#region method NormalizeFolder
+        /// <summary>
+        /// Encodes mailbox name.
+        /// </summary>
+        /// <param name="mailbox">Mailbox name.</param>
+        /// <param name="encoding">Mailbox name encoding mechanism.</param>
+        /// <returns>Renturns encoded mailbox name.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>mailbox</b> is null reference.</exception>
+        public static string EncodeMailbox(string mailbox,IMAP_Mailbox_Encoding encoding)
+        {
+            if(mailbox == null){
+                throw new ArgumentNullException("mailbox");
+            }
 
-		/// <summary>
+            /* RFC 5738 3.
+                string        =/ utf8-quoted
+                utf8-quoted   = "*" DQUOTE *UQUOTED-CHAR DQUOTE
+                UQUOTED-CHAR  = QUOTED-CHAR / UTF8-2 / UTF8-3 / UTF8-4
+            */
+
+            if(encoding == IMAP_Mailbox_Encoding.ImapUtf7){
+                return "\"" + IMAP_Utils.Encode_IMAP_UTF7_String(mailbox) + "\"";
+            }
+            else if(encoding == IMAP_Mailbox_Encoding.ImapUtf8){
+                return "*\"" + mailbox + "\"";
+            }
+            else{
+                return "\"" + mailbox + "\"";
+            }
+        }
+
+        #endregion
+
+        #region static method DecodeMailbox
+
+        /// <summary>
+        /// Decodes mailbox name.
+        /// </summary>
+        /// <param name="mailbox">Mailbox name.</param>
+        /// <returns>Returns decoded mailbox name.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>mailbox</b> is null reference.</exception>
+        public static string DecodeMailbox(string mailbox)
+        {
+            if(mailbox == null){
+                throw new ArgumentNullException("mailbox");
+            }
+
+            /* RFC 5738 3.
+                string        =/ utf8-quoted
+                utf8-quoted   = "*" DQUOTE *UQUOTED-CHAR DQUOTE
+                UQUOTED-CHAR  = QUOTED-CHAR / UTF8-2 / UTF8-3 / UTF8-4
+            */
+
+            // UTF-8 mailbox name.
+            if(mailbox.StartsWith("*\"")){
+                return mailbox.Substring(2,mailbox.Length - 3);
+            }
+            else{
+                return Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(mailbox));
+            }
+        }
+
+        #endregion
+
+
+        #region static method NormalizeFolder
+
+        /// <summary>
 		/// Normalizes folder path.  Example: /Inbox/SubFolder/ will be Inbox/SubFolder.
 		/// </summary>
 		/// <param name="folder">Folder path to normalize.</param>
@@ -557,11 +622,11 @@ namespace LumiSoft.Net.IMAP
         #region static method MustUseLiteralString
 
         /// <summary>
-        /// Gets if specified string must be sent as IMAP literal-string or quoted-string.
+        /// Gets if specified string must be sent as IMAP literal-string.
         /// </summary>
         /// <param name="value">String value.</param>
         /// <param name="utf8StringSupported">Specifies if RFC 5738 IMAP UTF-8 string is supported.</param>
-        /// <returns>Returns true if string must be sent as literal-string, otherwise quoted-string.</returns>
+        /// <returns>Returns true if string must be sent as literal-string.</returns>
         public static bool MustUseLiteralString(string value,bool utf8StringSupported)
         {
             if(value != null){
@@ -634,6 +699,45 @@ namespace LumiSoft.Net.IMAP
             // Use IMAP quoted string.
             else{
                 return charset.GetBytes(TextUtils.QuoteString(value));
+            }
+        }
+
+        #endregion
+
+
+
+        #region static method ReadString
+
+        /// <summary>
+        /// Reads IMAP string/astring/nstring/utf8-quoted from string reader.
+        /// </summary>
+        /// <param name="reader">String reader.</param>
+        /// <returns>Returns IMAP string.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>reader</b> is null reference.</exception>
+        internal static string ReadString(StringReader reader)
+        {
+            if(reader == null){
+                throw new ArgumentNullException("reader");
+            }
+
+            reader.ReadToFirstChar();
+
+            // utf8-quoted
+            if(reader.StartsWith("*\"")){
+                reader.ReadSpecifiedLength(1);
+
+                return reader.ReadWord();
+            }
+            // string/astring/nstring
+            else{
+                string word = reader.ReadWord();
+                
+                // nstring
+                if(string.Equals(word,"NIL",StringComparison.InvariantCultureIgnoreCase)){
+                    return null;
+                }
+
+                return word;
             }
         }
 

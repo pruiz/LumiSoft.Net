@@ -60,11 +60,11 @@ namespace LumiSoft.Net.IMAP
             if(!string.Equals(word,"HEADER",StringComparison.InvariantCultureIgnoreCase)){
                 throw new ParseException("Parse error: Not a SEARCH 'HEADER' key.");
             }
-            string fieldName = r.ReadWord();
+            string fieldName = IMAP_Utils.ReadString(r);
             if(fieldName == null){
                 throw new ParseException("Parse error: Invalid 'HEADER' field-name value.");
             }
-            string value = r.ReadWord();
+            string value = IMAP_Utils.ReadString(r);
             if(value == null){
                 throw new ParseException("Parse error: Invalid 'HEADER' string value.");
             }

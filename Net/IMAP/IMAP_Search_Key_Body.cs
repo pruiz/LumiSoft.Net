@@ -50,7 +50,7 @@ namespace LumiSoft.Net.IMAP
             if(!string.Equals(word,"BODY",StringComparison.InvariantCultureIgnoreCase)){
                 throw new ParseException("Parse error: Not a SEARCH 'BODY' key.");
             }
-            string value = r.ReadWord();
+            string value = IMAP_Utils.ReadString(r);
             if(value == null){
                 throw new ParseException("Parse error: Invalid 'BODY' value.");
             }

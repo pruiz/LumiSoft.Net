@@ -48,7 +48,7 @@ namespace LumiSoft.Net.IMAP
             if(!string.Equals(word,"CC",StringComparison.InvariantCultureIgnoreCase)){
                 throw new ParseException("Parse error: Not a SEARCH 'CC' key.");
             }
-            string value = r.ReadWord();
+            string value = IMAP_Utils.ReadString(r);
             if(value == null){
                 throw new ParseException("Parse error: Invalid 'CC' value.");
             }

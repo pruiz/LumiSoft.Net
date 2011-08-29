@@ -48,7 +48,7 @@ namespace LumiSoft.Net.IMAP
             if(!string.Equals(word,"BCC",StringComparison.InvariantCultureIgnoreCase)){
                 throw new ParseException("Parse error: Not a SEARCH 'BCC' key.");
             }
-            string value = r.ReadWord();
+            string value = IMAP_Utils.ReadString(r);
             if(value == null){
                 throw new ParseException("Parse error: Invalid 'BCC' value.");
             }

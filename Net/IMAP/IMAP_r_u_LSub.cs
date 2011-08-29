@@ -73,7 +73,7 @@ namespace LumiSoft.Net.IMAP
 
             string attributes = r.ReadParenthesized();
             string delimiter  = r.ReadWord();
-            string folder     = TextUtils.UnQuoteString(IMAP_Utils.Decode_IMAP_UTF7_String(r.ReadToEnd().Trim()));
+            string folder     = TextUtils.UnQuoteString(IMAP_Utils.DecodeMailbox(r.ReadToEnd().Trim()));
 
             return new IMAP_r_u_LSub(folder,delimiter[0],attributes == string.Empty ? new string[0] : attributes.Split(' '));
         }
@@ -89,15 +89,15 @@ namespace LumiSoft.Net.IMAP
         /// <returns>Returns this as string.</returns>
         public override string ToString()
         {
-            return ToString(false);
+            return ToString(IMAP_Mailbox_Encoding.None);
         }
 
         /// <summary>
         /// Returns this as string.
         /// </summary>
-        /// <param name="encode">If true, folder name is encoded with IMAP UTF-7 encoding.</param>
+        /// <param name="encoding">Specifies how mailbox name is encoded.</param>
         /// <returns>Returns this as string.</returns>
-        public string ToString(bool encode)
+        public string ToString(IMAP_Mailbox_Encoding encoding)
         {
             // Example:    S: * LSUB (\Noselect) "/" ~/Mail/foo
 
@@ -113,12 +113,8 @@ namespace LumiSoft.Net.IMAP
             }
             retVal.Append(") ");
             retVal.Append("\"" + m_Delimiter + "\" ");
-            if(encode){
-                retVal.Append("\"" + IMAP_Utils.Encode_IMAP_UTF7_String(m_FolderName) + "\"\r\n");
-            }
-            else{
-                retVal.Append("\"" + m_FolderName + "\"\r\n");
-            }
+            retVal.Append(IMAP_Utils.EncodeMailbox(m_FolderName,encoding));
+            retVal.Append("\r\n");
 
             return retVal.ToString();
         }

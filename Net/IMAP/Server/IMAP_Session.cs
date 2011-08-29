@@ -418,6 +418,7 @@ namespace LumiSoft.Net.IMAP.Server
         private char                                         m_FolderSeparator  = '/';
         private GenericIdentity                              m_pUser            = null;
         private _SelectedFolder                              m_pSelectedFolder  = null;
+        private IMAP_Mailbox_Encoding                        m_MailboxEncoding  = IMAP_Mailbox_Encoding.ImapUtf7;
 
         /// <summary>
         /// Default constructor.
@@ -427,7 +428,7 @@ namespace LumiSoft.Net.IMAP.Server
             m_pAuthentications = new Dictionary<string,AUTH_SASL_ServerMechanism>(StringComparer.CurrentCultureIgnoreCase);
 
             m_pCapabilities = new List<string>();
-            m_pCapabilities.AddRange(new string[]{"IMAP4rev1","NAMESPACE","QUOTA","ACL","IDLE"});
+            m_pCapabilities.AddRange(new string[]{"IMAP4rev1","NAMESPACE","QUOTA","ACL","IDLE","ENABLE","UTF8=ACCEPT"});
         }
 
 
@@ -688,6 +689,9 @@ namespace LumiSoft.Net.IMAP.Server
                 }
                 else if(cmd == "MYRIGHTS"){
                     MYRIGHTS(cmdTag,args);
+                }
+                else if(cmd == "ENABLE"){
+                    ENABLE(cmdTag,args);
                 }
                 else if(cmd == "CHECK"){
                     CHECK(cmdTag,args);
@@ -1323,8 +1327,8 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }
 
-            string refName = IMAP_Utils.Decode_IMAP_UTF7_String(parts[0]);
-            string folder  = IMAP_Utils.Decode_IMAP_UTF7_String(parts[1]);
+            string refName = IMAP_Utils.DecodeMailbox(parts[0]);
+            string folder  = IMAP_Utils.DecodeMailbox(parts[1]);
 
             // Store start time
 			long startTime = DateTime.Now.Ticks;
@@ -1337,7 +1341,7 @@ namespace LumiSoft.Net.IMAP.Server
             else{
                 IMAP_e_List e = OnList(refName,folder);
                 foreach(IMAP_r_u_List r in e.Folders){
-                    response.Append(r.ToString(true));
+                    response.Append(r.ToString(m_MailboxEncoding));
                 }
             }
                         
@@ -1408,7 +1412,7 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }
 
-            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+            string folder = IMAP_Utils.DecodeMailbox(TextUtils.UnQuoteString(cmdText));
             
             IMAP_e_Folder e = OnCreate(cmdTag,folder,new IMAP_r_ServerStatus(cmdTag,"OK","CREATE command completed."));
 
@@ -1479,7 +1483,7 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }
 
-            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+            string folder = IMAP_Utils.DecodeMailbox(cmdText);
             
             IMAP_e_Folder e = OnDelete(cmdTag,folder,new IMAP_r_ServerStatus(cmdTag,"OK","DELETE command completed."));
 
@@ -1563,7 +1567,7 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }
             
-            IMAP_e_Rename e = OnRename(cmdTag,IMAP_Utils.Decode_IMAP_UTF7_String(parts[0]),IMAP_Utils.Decode_IMAP_UTF7_String(parts[1]));
+            IMAP_e_Rename e = OnRename(cmdTag,IMAP_Utils.DecodeMailbox(parts[0]),IMAP_Utils.DecodeMailbox(parts[1]));
             if(e.Response == null){
                 WriteLine(cmdTag + " NO Internal server error: IMAP Server application didn't return any resposne.");
             }
@@ -1629,8 +1633,8 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }
 
-            string refName = IMAP_Utils.Decode_IMAP_UTF7_String(parts[0]);
-            string folder  = IMAP_Utils.Decode_IMAP_UTF7_String(parts[1]);
+            string refName = IMAP_Utils.DecodeMailbox(parts[0]);
+            string folder  = IMAP_Utils.DecodeMailbox(parts[1]);
 
             // Store start time
 			long startTime = DateTime.Now.Ticks;
@@ -1639,7 +1643,7 @@ namespace LumiSoft.Net.IMAP.Server
             
             IMAP_e_LSub e = OnLSub(refName,folder);
             foreach(IMAP_r_u_LSub r in e.Folders){
-                response.Append(r.ToString(true));
+                response.Append(r.ToString(m_MailboxEncoding));
             }
                                     
             response.Append(cmdTag + " OK LSUB Completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds.\r\n");
@@ -1688,7 +1692,7 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }
 
-            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+            string folder = IMAP_Utils.DecodeMailbox(TextUtils.UnQuoteString(cmdText));
             
             IMAP_e_Folder e = OnSubscribe(cmdTag,folder,new IMAP_r_ServerStatus(cmdTag,"OK","SUBSCRIBE command completed."));
             
@@ -1725,7 +1729,7 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }
 
-            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+            string folder = IMAP_Utils.DecodeMailbox(TextUtils.UnQuoteString(cmdText));
             
             IMAP_e_Folder e = OnUnsubscribe(cmdTag,folder,new IMAP_r_ServerStatus(cmdTag,"OK","UNSUBSCRIBE command completed."));
             
@@ -1824,7 +1828,7 @@ namespace LumiSoft.Net.IMAP.Server
             // Store start time
 			long startTime = DateTime.Now.Ticks;
 
-            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(parts[0]));
+            string folder = IMAP_Utils.DecodeMailbox(TextUtils.UnQuoteString(parts[0]));
             if(!(parts[1].StartsWith("(") && parts[1].EndsWith(")"))){
                 WriteLine(cmdTag + " BAD Error in arguments.");
             }
@@ -1968,6 +1972,43 @@ namespace LumiSoft.Net.IMAP.Server
                             S: A142 OK [READ-WRITE] SELECT completed
             */
 
+            /* 5738 3.2.  UTF8 Parameter to SELECT and EXAMINE
+                The "UTF8=ACCEPT" capability also indicates that the server supports
+                the "UTF8" parameter to SELECT and EXAMINE.  When a mailbox is
+                selected with the "UTF8" parameter, it alters the behavior of all
+                IMAP commands related to message sizes, message headers, and MIME
+                body headers so they refer to the message with UTF-8 headers.  If the
+                mailstore is not UTF-8 header native and the SELECT or EXAMINE
+                command with UTF-8 header modifier succeeds, then the server MUST
+                return results as if the mailstore were UTF-8 header native with
+                upconversion requirements as described in Section 8.  The server MAY
+                reject the SELECT or EXAMINE command with the [NOT-UTF-8] response
+                code, unless the "UTF8=ALL" or "UTF8=ONLY" capability is advertised.
+
+                Servers MAY include mailboxes that can only be selected or examined
+                if the "UTF8" parameter is provided.  However, such mailboxes MUST
+                NOT be included in the output of an unextended LIST, LSUB, or
+                equivalent command.  If a client attempts to SELECT or EXAMINE such
+                mailboxes without the "UTF8" parameter, the server MUST reject the
+                command with a [UTF-8-ONLY] response code.  As a result, such
+                mailboxes will not be accessible by IMAP clients written prior to
+                this specification and are discouraged unless the server advertises
+                "UTF8=ONLY" or the server implements IMAP4 LIST Command Extensions
+   
+                    utf8-select-param = "UTF8"
+                        ;; Conforms to <select-param> from RFC 4466
+
+                    C: a SELECT newmailbox (UTF8)
+                    S: ...
+                    S: a OK SELECT completed
+                    C: b FETCH 1 (SIZE ENVELOPE BODY)
+                    S: ... < UTF-8 header native results >
+                    S: b OK FETCH completed
+
+                    C: c EXAMINE legacymailbox (UTF8)
+                    S: c NO [NOT-UTF-8] Mailbox does not support UTF-8 access
+            */
+
             // Store start time
 			long startTime = DateTime.Now.Ticks;
 
@@ -1982,8 +2023,21 @@ namespace LumiSoft.Net.IMAP.Server
                 m_pSelectedFolder = null;
             }
 
+            string[] args = TextUtils.SplitQuotedString(cmdText,' ');
+            if(args.Length >= 2){
+                // At moment we don't support UTF-8 mailboxes.
+                if(string.Equals(args[1],"(UTF8)",StringComparison.InvariantCultureIgnoreCase)){
+                    WriteLine(cmdTag + " NO [NOT-UTF-8] Mailbox does not support UTF-8 access.");
+                }
+                else{
+                    WriteLine(cmdTag + " BAD Invalid arguments.");
+                }
+
+                return;
+            }
+
             try{
-                string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+                string folder = TextUtils.UnQuoteString(IMAP_Utils.DecodeMailbox(cmdText));
 
                 IMAP_e_Select e = OnSelect(cmdTag,folder);
                 if(e.ErrorResponse == null){
@@ -2073,6 +2127,43 @@ namespace LumiSoft.Net.IMAP.Server
                             S: A932 OK [READ-ONLY] EXAMINE completed
             */
 
+            /* 5738 3.2.  UTF8 Parameter to SELECT and EXAMINE
+                The "UTF8=ACCEPT" capability also indicates that the server supports
+                the "UTF8" parameter to SELECT and EXAMINE.  When a mailbox is
+                selected with the "UTF8" parameter, it alters the behavior of all
+                IMAP commands related to message sizes, message headers, and MIME
+                body headers so they refer to the message with UTF-8 headers.  If the
+                mailstore is not UTF-8 header native and the SELECT or EXAMINE
+                command with UTF-8 header modifier succeeds, then the server MUST
+                return results as if the mailstore were UTF-8 header native with
+                upconversion requirements as described in Section 8.  The server MAY
+                reject the SELECT or EXAMINE command with the [NOT-UTF-8] response
+                code, unless the "UTF8=ALL" or "UTF8=ONLY" capability is advertised.
+
+                Servers MAY include mailboxes that can only be selected or examined
+                if the "UTF8" parameter is provided.  However, such mailboxes MUST
+                NOT be included in the output of an unextended LIST, LSUB, or
+                equivalent command.  If a client attempts to SELECT or EXAMINE such
+                mailboxes without the "UTF8" parameter, the server MUST reject the
+                command with a [UTF-8-ONLY] response code.  As a result, such
+                mailboxes will not be accessible by IMAP clients written prior to
+                this specification and are discouraged unless the server advertises
+                "UTF8=ONLY" or the server implements IMAP4 LIST Command Extensions
+   
+                    utf8-select-param = "UTF8"
+                        ;; Conforms to <select-param> from RFC 4466
+
+                    C: a SELECT newmailbox (UTF8)
+                    S: ...
+                    S: a OK SELECT completed
+                    C: b FETCH 1 (SIZE ENVELOPE BODY)
+                    S: ... < UTF-8 header native results >
+                    S: b OK FETCH completed
+
+                    C: c EXAMINE legacymailbox (UTF8)
+                    S: c NO [NOT-UTF-8] Mailbox does not support UTF-8 access
+            */
+
             if(!this.IsAuthenticated){
                 WriteLine(cmdTag + " NO Authentication required.");
 
@@ -2087,7 +2178,20 @@ namespace LumiSoft.Net.IMAP.Server
                 m_pSelectedFolder = null;
             }
 
-            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+            string[] args = TextUtils.SplitQuotedString(cmdText,' ');
+            if(args.Length >= 2){
+                // At moment we don't support UTF-8 mailboxes.
+                if(string.Equals(args[1],"(UTF8)",StringComparison.InvariantCultureIgnoreCase)){
+                    WriteLine(cmdTag + " NO [NOT-UTF-8] Mailbox does not support UTF-8 access.");
+                }
+                else{
+                    WriteLine(cmdTag + " BAD Invalid arguments.");
+                }
+
+                return;
+            }
+
+            string folder = TextUtils.UnQuoteString(IMAP_Utils.DecodeMailbox(cmdText));
 
             IMAP_e_Select e = OnSelect(cmdTag,folder);
             if(e.ErrorResponse == null){
@@ -2227,10 +2331,10 @@ namespace LumiSoft.Net.IMAP.Server
             r.ReadToFirstChar();
             string folder = null;
             if(r.StartsWith("\"")){
-                folder = IMAP_Utils.Decode_IMAP_UTF7_String(r.ReadWord());
+                folder = IMAP_Utils.DecodeMailbox(r.ReadWord());
             }
             else{
-                folder = IMAP_Utils.Decode_IMAP_UTF7_String(r.QuotedReadToDelimiter(' '));
+                folder = IMAP_Utils.DecodeMailbox(r.QuotedReadToDelimiter(' '));
             }
             r.ReadToFirstChar();
             List<string> flags = new List<string>();
@@ -2322,7 +2426,7 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }
             
-            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+            string folder = IMAP_Utils.DecodeMailbox(TextUtils.UnQuoteString(cmdText));
 
             IMAP_e_GetQuotaRoot e = OnGetGuotaRoot(folder,new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"GETQUOTAROOT command completed."));
 
@@ -2372,7 +2476,7 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }            
 
-            string quotaRoot = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+            string quotaRoot = IMAP_Utils.DecodeMailbox(TextUtils.UnQuoteString(cmdText));
 
             IMAP_e_GetQuota e = OnGetQuota(quotaRoot,new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"QUOTA command completed."));
 
@@ -2434,7 +2538,7 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }            
 
-            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+            string folder = IMAP_Utils.DecodeMailbox(TextUtils.UnQuoteString(cmdText));
 
             IMAP_e_GetAcl e = OnGetAcl(folder,new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"GETACL command completed."));
 
@@ -2519,8 +2623,8 @@ namespace LumiSoft.Net.IMAP.Server
             }
 
             IMAP_e_SetAcl e = OnSetAcl(
-                IMAP_Utils.Decode_IMAP_UTF7_String(parts[0]),
-                IMAP_Utils.Decode_IMAP_UTF7_String(parts[1]),
+                IMAP_Utils.DecodeMailbox(parts[0]),
+                IMAP_Utils.DecodeMailbox(parts[1]),
                 setType,
                 rights,
                 new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"SETACL command completed.")
@@ -2578,8 +2682,8 @@ namespace LumiSoft.Net.IMAP.Server
             }
 
             IMAP_e_DeleteAcl e = OnDeleteAcl(
-                IMAP_Utils.Decode_IMAP_UTF7_String(parts[0]),
-                IMAP_Utils.Decode_IMAP_UTF7_String(parts[1]),
+                IMAP_Utils.DecodeMailbox(parts[0]),
+                IMAP_Utils.DecodeMailbox(parts[1]),
                 new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"DELETEACL command completed.")
             );
 
@@ -2646,8 +2750,8 @@ namespace LumiSoft.Net.IMAP.Server
             
 
             IMAP_e_ListRights e = OnListRights(
-                IMAP_Utils.Decode_IMAP_UTF7_String(parts[0]),
-                IMAP_Utils.Decode_IMAP_UTF7_String(parts[1]),
+                IMAP_Utils.DecodeMailbox(parts[0]),
+                IMAP_Utils.DecodeMailbox(parts[1]),
                 new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"LISTRIGHTS command completed.")
             );
 
@@ -2694,7 +2798,7 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }
             
-            string folder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(cmdText));
+            string folder = IMAP_Utils.DecodeMailbox(TextUtils.UnQuoteString(cmdText));
 
             IMAP_e_MyRights e = OnMyRights(folder,new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"MYRIGHTS command completed."));
 
@@ -2705,6 +2809,112 @@ namespace LumiSoft.Net.IMAP.Server
             retVal.Append(e.Response.ToString());
 
             WriteLine(retVal.ToString());
+        }
+
+        #endregion
+
+        #region method ENABLE
+
+        private void ENABLE(string cmdTag,string cmdText)
+        {            
+            /* RFC 5161 3.1. The ENABLE Command.
+                Arguments: capability names
+
+                Result: OK: Relevant capabilities enabled
+                        BAD: No arguments, or syntax error in an argument
+
+                The ENABLE command takes a list of capability names, and requests the
+                server to enable the named extensions.  Once enabled using ENABLE,
+                each extension remains active until the IMAP connection is closed.
+                For each argument, the server does the following:
+
+                    - If the argument is not an extension known to the server, the server
+                      MUST ignore the argument.
+
+                    - If the argument is an extension known to the server, and it is not
+                      specifically permitted to be enabled using ENABLE, the server MUST
+                      ignore the argument.  (Note that knowing about an extension doesn't
+                      necessarily imply supporting that extension.)
+
+                    - If the argument is an extension that is supported by the server and
+                      that needs to be enabled, the server MUST enable the extension for
+                      the duration of the connection.  At present, this applies only to
+                      CONDSTORE ([RFC4551]).  Note that once an extension is enabled,
+                      there is no way to disable it.
+
+                If the ENABLE command is successful, the server MUST send an untagged
+                ENABLED response (see Section 3.2).
+
+                Clients SHOULD only include extensions that need to be enabled by the
+                server.  At the time of publication, CONDSTORE is the only such
+                extension (i.e., ENABLE CONDSTORE is an additional "CONDSTORE
+                enabling command" as defined in [RFC4551]).  Future RFCs may add to
+                this list.
+
+                The ENABLE command is only valid in the authenticated state (see
+                [RFC3501]), before any mailbox is selected.  Clients MUST NOT issue
+                ENABLE once they SELECT/EXAMINE a mailbox; however, server
+                implementations don't have to check that no mailbox is selected or
+                was previously selected during the duration of a connection.
+
+                The ENABLE command can be issued multiple times in a session.  It is
+                additive; i.e., "ENABLE a b", followed by "ENABLE c" is the same as a
+                single command "ENABLE a b c".  When multiple ENABLE commands are
+                issued, each corresponding ENABLED response SHOULD only contain
+                extensions enabled by the corresponding ENABLE command.
+
+                There are no limitations on pipelining ENABLE.  For example, it is
+                possible to send ENABLE and then immediately SELECT, or a LOGIN
+                immediately followed by ENABLE.
+
+                The server MUST NOT change the CAPABILITY list as a result of
+                executing ENABLE; i.e., a CAPABILITY command issued right after an
+                ENABLE command MUST list the same capabilities as a CAPABILITY
+                command issued before the ENABLE command.  This is demonstrated in
+                the following example:
+             
+                    C: t1 CAPABILITY
+                    S: * CAPABILITY IMAP4rev1 ID LITERAL+ ENABLE X-GOOD-IDEA
+                    S: t1 OK foo
+                    C: t2 ENABLE CONDSTORE X-GOOD-IDEA
+                    S: * ENABLED X-GOOD-IDEA
+                    S: t2 OK foo
+                    C: t3 CAPABILITY
+                    S: * CAPABILITY IMAP4rev1 ID LITERAL+ ENABLE X-GOOD-IDEA
+                    S: t3 OK foo again
+
+                In the following example, the client enables CONDSTORE:
+
+                    C: a1 ENABLE CONDSTORE
+                    S: * ENABLED CONDSTORE
+                    S: a1 OK Conditional Store enabled
+            */
+
+            // Capability disabled.
+            if(!SupportsCap("ENABLE")){
+                WriteLine(cmdTag + " NO Command 'ENABLE' not supported.");
+
+                return;
+            }
+            if(string.IsNullOrEmpty(cmdText)){
+                WriteLine(cmdTag + " BAD No arguments, or syntax error in an argument.");
+
+                return;
+            }
+
+            StringBuilder response = new StringBuilder();
+            foreach(string capa in cmdText.Split(' ')){
+                if(string.Equals("UTF8=ACCEPT",capa,StringComparison.InvariantCultureIgnoreCase)){
+                    m_MailboxEncoding = IMAP_Mailbox_Encoding.ImapUtf8;
+                    response.Append("* ENABLED UTF8=ACCEPT\r\n");
+                }
+                // Ignore as specification says.
+                //else{
+                //}
+            }
+            response.Append(cmdTag + " OK ENABLE command completed.\r\n");
+
+            WriteLine(response.ToString());
         }
 
         #endregion
@@ -4117,7 +4327,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                 return;
             }
-            string targetFolder = IMAP_Utils.Decode_IMAP_UTF7_String(TextUtils.UnQuoteString(parts[1]));
+            string targetFolder = IMAP_Utils.DecodeMailbox(TextUtils.UnQuoteString(parts[1]));
 
             UpdateSelectedFolderAndSendChanges();
 
@@ -4634,7 +4844,7 @@ namespace LumiSoft.Net.IMAP.Server
         }
 
         #endregion
-
+                
 
         #region method WriteLine
 
@@ -4648,11 +4858,19 @@ namespace LumiSoft.Net.IMAP.Server
                 throw new ArgumentNullException("line");
             }
 
-            int countWritten = this.TcpStream.WriteLine(line);
+            byte[] buffer = null;
+            if(line.EndsWith("\r\n")){
+                buffer = Encoding.UTF8.GetBytes(line);
+            }
+            else{
+                buffer = Encoding.UTF8.GetBytes(line + "\r\n");
+            }
+
+            this.TcpStream.Write(buffer,0,buffer.Length);
             
             // Log.
             if(this.Server.Logger != null){
-                this.Server.Logger.AddWrite(this.ID,this.AuthenticatedUserIdentity,countWritten,line,this.LocalEndPoint,this.RemoteEndPoint);
+                this.Server.Logger.AddWrite(this.ID,this.AuthenticatedUserIdentity,buffer.Length,line,this.LocalEndPoint,this.RemoteEndPoint);
             }
         }
 
