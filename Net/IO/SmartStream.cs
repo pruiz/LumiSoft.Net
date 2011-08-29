@@ -2850,7 +2850,9 @@ namespace LumiSoft.Net.IO
                 m_pLineBuffer = new byte[32000];
 
                 // Start reading data.
+                #pragma warning disable
                 m_pOwner.BeginReadLine(m_pLineBuffer,0,m_pLineBuffer.Length - 2,m_SizeExceededAction,new AsyncCallback(this.ReadLine_Completed),null);
+                #pragma warning restore
             }
 
 
@@ -2865,7 +2867,9 @@ namespace LumiSoft.Net.IO
                 try{
                     int storedCount = 0;                    
                     try{
+                        #pragma warning disable
                         storedCount = m_pOwner.EndReadLine(asyncResult);
+                        #pragma warning restore
                     }
                     catch(LineSizeExceededException lx){
                         if(m_SizeExceededAction == SizeExceededAction.ThrowException){
@@ -2904,7 +2908,9 @@ namespace LumiSoft.Net.IO
                         }
 
                         // Strart reading new line.
+                        #pragma warning disable
                         m_pOwner.BeginReadLine(m_pLineBuffer,0,m_pLineBuffer.Length - 2,m_SizeExceededAction,new AsyncCallback(this.ReadLine_Completed),null);
+                        #pragma warning restore
                     }
                 }
                 catch(Exception x){
