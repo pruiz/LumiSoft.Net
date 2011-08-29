@@ -267,8 +267,26 @@ namespace LumiSoft.Net.SMTP.Server
                 else if(cmd == "RCPT"){
                     RCPT(args);
                 }
-                else if(cmd == "DATA"){
-                    readNextCommand = DATA(args);
+                else if(cmd == "DATA"){                    
+                    Cmd_DATA cmdData = new Cmd_DATA();
+                    cmdData.CompletedAsync += delegate(object sender,EventArgs<SMTP_Session.Cmd_DATA> e){
+                        if(op.Error != null){
+                            OnError(op.Error);
+                        }
+
+                        cmdData.Dispose();
+                        BeginReadCmd();
+                    };
+                    if(!cmdData.Start(this,args)){
+                        if(op.Error != null){
+                            OnError(op.Error);
+                        }
+
+                        cmdData.Dispose();
+                    }
+                    else{
+                        readNextCommand = false;
+                    }
                 }
                 else if(cmd == "BDAT"){
                     readNextCommand = BDAT(args);
@@ -301,6 +319,694 @@ namespace LumiSoft.Net.SMTP.Server
              }
 
              return readNextCommand;
+        }
+
+        #endregion
+//
+        #region method ReadCommandAsync
+
+        #region class ReadCommandAsyncOP
+
+        /// <summary>
+        /// 
+        /// </summary>
+        private class ReadCommandAsyncOP
+        {
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            public ReadCommandAsyncOP()
+            {
+            }
+
+
+            #region Properties implementation
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Reads next SMTP command.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        private void ReadCommandAsync(ReadCommandAsyncOP op)
+        {
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+
+            // ReadCommandCompleted
+        }
+
+        #endregion
+//
+        #region method ReadCommandCompleted
+
+        /// <summary>
+        /// Is called when SMTP command reading has completed.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        private void ReadCommandCompleted(ReadCommandAsyncOP op)
+        {
+            if(this.IsDisposed){
+                return;
+            }
+            if(op == null){
+                // TODO: Log somewhere, don't raise exception.
+            }
+
+            // TODO:
+        }
+
+        #endregion
+
+        #region method SendResponseAsync
+
+        #region class SendResponseAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="SMTP_Session.SendResponseAsync"/> asynchronous operation.
+        /// </summary>
+        private class SendResponseAsyncOP : IDisposable,IAsyncOP
+        {
+            private object             m_pLock         = new object();
+            private AsyncOP_State      m_State         = AsyncOP_State.WaitingForStart;
+            private Exception          m_pException    = null;
+            private SMTP_t_ReplyLine[] m_pReplyLines   = null;
+            private SMTP_Session       m_pSession      = null;
+            private bool               m_RiseCompleted = false;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="reply">SMTP server reply line.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>reply</b> is null reference.</exception>
+            public SendResponseAsyncOP(SMTP_t_ReplyLine reply)
+            {
+                if(reply == null){
+                    throw new ArgumentNullException("reply");
+                }
+
+                m_pReplyLines = new SMTP_t_ReplyLine[]{reply};
+            }
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="replyLines">SMTP server reply lines.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>replyLines</b> is null reference.</exception>
+            /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid values.</exception>
+            public SendResponseAsyncOP(SMTP_t_ReplyLine[] replyLines)
+            {
+                if(replyLines == null){
+                    throw new ArgumentNullException("replyLines");
+                }
+                if(replyLines.Length < 1){
+                    throw new ArgumentException("Argument 'replyLines' must contain at least 1 item.","replyLines");
+                }
+
+                m_pReplyLines = replyLines;
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resource being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+                
+                m_pException  = null;
+                m_pReplyLines = null;
+                m_pSession    = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner SMTP session.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            public bool Start(SMTP_Session owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+
+                m_pSession = owner;
+
+                SetState(AsyncOP_State.Active);
+
+                try{
+                    // Build SMTP response.
+                    StringBuilder response = new StringBuilder();
+                    foreach(SMTP_t_ReplyLine replyLine in m_pReplyLines){
+                        response.Append(replyLine.ToString());
+                    }
+                                        
+                    byte[] buffer = Encoding.UTF8.GetBytes(response.ToString());
+
+                    // Log
+                    m_pSession.LogAddWrite(buffer.Length,response.ToString());
+
+                    // Start response sending.
+                    m_pSession.TcpStream.BeginWrite(buffer,0,buffer.Length,this.ResponseSendingCompleted,null);
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSession.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method ResponseSendingCompleted
+
+            /// <summary>
+            /// Is called when response sending has finished.
+            /// </summary>
+            /// <param name="ar">Asynchronous result.</param>
+            private void ResponseSendingCompleted(IAsyncResult ar)
+            {
+                try{
+                    m_pSession.TcpStream.EndWrite(ar);
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSession.LogAddException("Exception: " + m_pException.Message,m_pException);                    
+                }
+
+                SetState(AsyncOP_State.Completed);
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<SendResponseAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<SendResponseAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Sends SMTP server response.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="SendResponseAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        private bool SendResponseAsync(SendResponseAsyncOP op)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+
+            return op.Start(this);
+        }
+
+        #endregion
+
+
+        #region class Cmd_DATA
+
+        /// <summary>
+        /// Implements SMTP DATA command. Defined in RFC 5321 4.1.1.4.
+        /// </summary>
+        private class Cmd_DATA : IDisposable,IAsyncOP
+        {
+            private object        m_pLock         = new object();
+            private AsyncOP_State m_State         = AsyncOP_State.WaitingForStart;
+            private Exception     m_pException    = null;
+            private SMTP_Session  m_pSession      = null;
+            private DateTime      m_StartTime;
+            private bool          m_RiseCompleted = false;
+            
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            public Cmd_DATA()
+            {
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resource being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+                
+                m_pException = null;
+                m_pSession   = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+             /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner SMTP session.</param>
+            /// <param name="cmdText">SMTP client command text.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            public bool Start(SMTP_Session owner,string cmdText)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+
+                m_pSession  = owner;
+                m_StartTime = DateTime.Now;
+
+                SetState(AsyncOP_State.Active);
+
+                try{
+                    /* RFC 5321 4.1.1.4.
+                        The receiver normally sends a 354 response to DATA, and then treats
+                        the lines (strings ending in <CRLF> sequences, as described in
+                        Section 2.3.7) following the command as mail data from the sender.
+                        This command causes the mail data to be appended to the mail data
+                        buffer.  The mail data may contain any of the 128 ASCII character
+                        codes, although experience has indicated that use of control
+                        characters other than SP, HT, CR, and LF may cause problems and
+                        SHOULD be avoided when possible.
+             
+                        The custom of accepting lines ending only in <LF>, as a concession to
+                        non-conforming behavior on the part of some UNIX systems, has proven
+                        to cause more interoperability problems than it solves, and SMTP
+                        server systems MUST NOT do this, even in the name of improved
+                        robustness.  In particular, the sequence "<LF>.<LF>" (bare line
+                        feeds, without carriage returns) MUST NOT be treated as equivalent to
+                        <CRLF>.<CRLF> as the end of mail data indication.
+             
+                        Receipt of the end of mail data indication requires the server to
+                        process the stored mail transaction information.  This processing
+                        consumes the information in the reverse-path buffer, the forward-path
+                        buffer, and the mail data buffer, and on the completion of this
+                        command these buffers are cleared.  If the processing is successful,
+                        the receiver MUST send an OK reply.  If the processing fails, the
+                        receiver MUST send a failure reply.  The SMTP model does not allow
+                        for partial failures at this point: either the message is accepted by
+                        the server for delivery and a positive response is returned or it is
+                        not accepted and a failure reply is returned.  In sending a positive
+                        "250 OK" completion reply to the end of data indication, the receiver
+                        takes full responsibility for the message (see Section 6.1).  Errors
+                        that are diagnosed subsequently MUST be reported in a mail message,
+                        as discussed in Section 4.4.
+
+                        When the SMTP server accepts a message either for relaying or for
+                        final delivery, it inserts a trace record (also referred to
+                        interchangeably as a "time stamp line" or "Received" line) at the top
+                        of the mail data.  This trace record indicates the identity of the
+                        host that sent the message, the identity of the host that received
+                        the message (and is inserting this time stamp), and the date and time
+                        the message was received.  Relayed messages will have multiple time
+                        stamp lines.  Details for formation of these lines, including their
+                        syntax, is specified in Section 4.4.
+                    */
+                                        
+                    // RFC 5321 3.1.
+                    if(m_pSession.m_SessionRejected){
+                        SendFinalResponse(new SMTP_t_ReplyLine(503,"Bad sequence of commands: Session rejected.",true));
+                    }
+                    // RFC 5321 4.1.4.
+                    else if(string.IsNullOrEmpty(m_pSession.m_EhloHost)){
+                        SendFinalResponse(new SMTP_t_ReplyLine(503,"Bad sequence of commands: Send EHLO/HELO first.",true));
+                    }
+                    // RFC 5321 4.1.4.
+                    else if(m_pSession.m_pFrom == null){
+                        SendFinalResponse(new SMTP_t_ReplyLine(503,"Bad sequence of commands: Send 'MAIL FROM:' first.",true));
+                    }
+                    // RFC 5321 4.1.4.
+                    else if(m_pSession.m_pTo.Count == 0){
+                        SendFinalResponse(new SMTP_t_ReplyLine(503,"Bad sequence of commands: Send 'RCPT TO:' first.",true));
+                    }
+                    else if(!string.IsNullOrEmpty(cmdText)){
+                        SendFinalResponse(new SMTP_t_ReplyLine(500,"Command line syntax error.",true));
+                    }
+                    else{
+                        // Get message store stream.
+                        m_pSession.m_pMessageStream = m_pSession.OnGetMessageStream();
+                        if(m_pSession.m_pMessageStream == null){
+                            m_pSession.m_pMessageStream = new MemoryStreamEx(32000);
+                        }                   
+                        
+                        // Send "354 Start mail input; end with <CRLF>.<CRLF>".
+                        SMTP_Session.SendResponseAsyncOP sendResponseOP = new SendResponseAsyncOP(new SMTP_t_ReplyLine(354,"Start mail input; end with <CRLF>.<CRLF>",true));
+                        sendResponseOP.CompletedAsync += delegate(object sender,EventArgs<SendResponseAsyncOP> e){
+                            Send354ResponseCompleted(sendResponseOP);
+                        };
+                        if(!m_pSession.SendResponseAsync(sendResponseOP)){
+                            Send354ResponseCompleted(sendResponseOP);
+                        }
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSession.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed){
+                        m_pSession.Reset();
+                    }
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method SendFinalResponse
+
+            /// <summary>
+            /// Sends specified final response to client.
+            /// </summary>
+            /// <param name="reply">SMTP reply.</param>
+            private void SendFinalResponse(SMTP_t_ReplyLine reply)
+            {
+                try{
+                    if(reply == null){
+                        throw new ArgumentNullException("reply");
+                    }
+                   
+                    SMTP_Session.SendResponseAsyncOP sendResponseOP = new SendResponseAsyncOP(reply);
+                    sendResponseOP.CompletedAsync += delegate(object sender,EventArgs<SendResponseAsyncOP> e){
+                        SendFinalResponseCompleted(sendResponseOP);
+                    };
+                    if(!m_pSession.SendResponseAsync(sendResponseOP)){
+                        SendFinalResponseCompleted(sendResponseOP);
+                    }                    
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSession.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+            }
+
+            #endregion
+
+            #region method SendFinalResponseCompleted
+
+            /// <summary>
+            /// Is called when SMTP server "final" response sending has completed.
+            /// </summary>
+            private void SendFinalResponseCompleted(SMTP_Session.SendResponseAsyncOP op)
+            {                 
+                if(op.Error != null){
+                    m_pException = op.Error;
+                }
+
+                SetState(AsyncOP_State.Completed);
+                
+                op.Dispose();
+            }
+
+            #endregion
+
+            #region method Send354ResponseCompleted
+
+            /// <summary>
+            /// Is called when SMTP server 354 response sending has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            private void Send354ResponseCompleted(SMTP_Session.SendResponseAsyncOP op)
+            {
+                try{
+                    // RFC 5321.4.4 trace info.
+                    byte[] recevived = m_pSession.CreateReceivedHeader();
+                    m_pSession.m_pMessageStream.Write(recevived,0,recevived.Length);
+                    
+                    // Create asynchronous read period-terminated opeartion.
+                    SmartStream.ReadPeriodTerminatedAsyncOP readPeriodTermOP = new SmartStream.ReadPeriodTerminatedAsyncOP(
+                        m_pSession.m_pMessageStream,
+                        m_pSession.Server.MaxMessageSize,
+                        SizeExceededAction.JunkAndThrowException
+                    );
+                    // This event is raised only if read period-terminated opeartion completes asynchronously.
+                    readPeriodTermOP.Completed += new EventHandler<EventArgs<SmartStream.ReadPeriodTerminatedAsyncOP>>(delegate(object sender,EventArgs<SmartStream.ReadPeriodTerminatedAsyncOP> e){                
+                        MessageReadingCompleted(readPeriodTermOP);
+                    });
+                    // Read period-terminated completed synchronously.
+                    if(m_pSession.TcpStream.ReadPeriodTerminated(readPeriodTermOP,true)){
+                        MessageReadingCompleted(readPeriodTermOP);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pSession.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                op.Dispose();
+            }
+
+            #endregion
+
+            #region method MessageReadingCompleted
+
+            /// <summary>
+            /// Is called when incoming SMTP message reading has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            private void MessageReadingCompleted(SmartStream.ReadPeriodTerminatedAsyncOP op)
+            {      
+                try{
+                    if(op.Error != null){
+                        if(op.Error is LineSizeExceededException){
+                            SendFinalResponse(new SMTP_t_ReplyLine(503,"500 Line too long.",true));
+                        }
+                        else if(op.Error is DataSizeExceededException){
+                            SendFinalResponse(new SMTP_t_ReplyLine(503,"552 Too much mail data.",true));
+                        }
+                        else{
+                            m_pException = op.Error;
+                        }
+
+                        m_pSession.OnMessageStoringCanceled();
+                    }
+                    else{
+                        // Log.
+                        m_pSession.LogAddRead(op.BytesStored,"Readed " + op.BytesStored + " message bytes.");
+
+                        SMTP_Reply reply = new SMTP_Reply(250,"DATA completed in " + (DateTime.Now - m_StartTime).TotalSeconds.ToString("f2") + " seconds.");
+
+                        reply = m_pSession.OnMessageStoringCompleted(reply);
+
+                        SendFinalResponse(SMTP_t_ReplyLine.Parse(reply.ReplyCode + " " + reply.ReplyLines[0]));
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;       
+                }
+
+                // We got some unknown error, we are done.
+                if(m_pException != null){
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                op.Dispose();
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<Cmd_DATA>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<Cmd_DATA>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
         }
 
         #endregion
@@ -1004,7 +1710,7 @@ namespace LumiSoft.Net.SMTP.Server
         }
 
         #endregion
-
+// REMOVE ME:
         #region method DATA
 
         private bool DATA(string cmdText)
@@ -1469,22 +2175,111 @@ namespace LumiSoft.Net.SMTP.Server
         #endregion
 
 
+        #region mehtod LogAddRead
+
+        /// <summary>
+        /// Logs read operation.
+        /// </summary>
+        /// <param name="size">Number of bytes readed.</param>
+        /// <param name="text">Log text.</param>
+        public void LogAddRead(long size,string text)
+        {
+            try{
+                if(this.Server.Logger != null){
+                    this.Server.Logger.AddRead(
+                        this.ID,
+                        this.AuthenticatedUserIdentity,
+                        size,
+                        text,                        
+                        this.LocalEndPoint,
+                        this.RemoteEndPoint
+                    );
+                }
+            }
+            catch{
+                // We skip all logging errors, normally there shouldn't be any.
+            }
+        }
+
+        #endregion
+
+        #region method LogAddWrite
+
+        /// <summary>
+        /// Logs write operation.
+        /// </summary>
+        /// <param name="size">Number of bytes written.</param>
+        /// <param name="text">Log text.</param>
+        public void LogAddWrite(long size,string text)
+        {
+            try{
+                if(this.Server.Logger != null){
+                    this.Server.Logger.AddWrite(
+                        this.ID,
+                        this.AuthenticatedUserIdentity,
+                        size,
+                        text,                        
+                        this.LocalEndPoint,
+                        this.RemoteEndPoint
+                    );
+                }
+            }
+            catch{
+                // We skip all logging errors, normally there shouldn't be any.
+            }
+        }
+
+        #endregion
+
         #region method LogAddText
 
         /// <summary>
-        /// Logs specified text.
+        /// Logs free text entry.
         /// </summary>
-        /// <param name="text">text to log.</param>
-        /// <exception cref="ArgumentNullException">Is raised when <b>text</b> is null reference.</exception>
+        /// <param name="text">Log text.</param>
         public void LogAddText(string text)
         {
-            if(text == null){
-                throw new ArgumentNullException("text");
+            try{
+                if(this.Server.Logger != null){
+                    this.Server.Logger.AddText(
+                        this.IsConnected ? this.ID : "",
+                        this.IsConnected ? this.AuthenticatedUserIdentity : null,
+                        text,                        
+                        this.IsConnected ? this.LocalEndPoint : null,
+                        this.IsConnected ? this.RemoteEndPoint : null
+                    );
+                }
             }
+            catch{
+                // We skip all logging errors, normally there shouldn't be any.
+            }
+        }
 
-            // Log
-            if(this.Server.Logger != null){
-                this.Server.Logger.AddText(this.ID,text);
+        #endregion
+
+        #region method LogAddException
+
+        /// <summary>
+        /// Logs exception.
+        /// </summary>
+        /// <param name="text">Log text.</param>
+        /// <param name="x">Exception happened.</param>
+        public void LogAddException(string text,Exception x)
+        {
+            try{
+                if(this.Server.Logger != null){
+                    this.Server.Logger.AddException(
+                        this.IsConnected ? this.ID : "",
+                        this.IsConnected ? this.AuthenticatedUserIdentity : null,
+                        text,                        
+                        this.IsConnected ? this.LocalEndPoint : null,
+                        this.IsConnected ? this.RemoteEndPoint : null,
+                        x
+                    );
+                }
+            }
+            catch{
+                // We skip all logging errors, normally there shouldn't be any.
             }
         }
 
