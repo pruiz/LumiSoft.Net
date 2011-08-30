@@ -546,13 +546,19 @@ namespace LumiSoft.Net.IO
             /// <param name="e">Event data.</param>
             private void m_pReadLineOP_Completed(object sender,EventArgs<ReadLineAsyncOP> e)
             {
-                if(ProcessReadedLine()){
-                    OnCompleted();
-                }
-                else{
-                    if(DoRead()){
+                try{
+                    if(ProcessReadedLine()){
                         OnCompleted();
                     }
+                    else{
+                        if(DoRead()){
+                            OnCompleted();
+                        }
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    OnCompleted();
                 }
             }
 
