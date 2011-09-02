@@ -465,6 +465,7 @@ namespace LumiSoft.Net.TCP
                 m_pTcpClient.m_pLocalEP    = (IPEndPoint)m_pSocket.LocalEndPoint;
                 m_pTcpClient.m_pRemoteEP   = (IPEndPoint)m_pSocket.RemoteEndPoint;
                 m_pTcpClient.m_pTcpStream  = new SmartStream(m_pStream,true);
+                m_pTcpClient.m_pTcpStream.Encoding = Encoding.UTF8;
 
                 m_pTcpClient.OnConnected(this.CompleteConnectCallback);
             }
@@ -1073,6 +1074,7 @@ namespace LumiSoft.Net.TCP
         /// Sends and logs specified line to connected host.
         /// </summary>
         /// <param name="line">Line to send.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>line</b> is null reference.</exception>
         protected void WriteLine(string line)
         {
             if(line == null){
