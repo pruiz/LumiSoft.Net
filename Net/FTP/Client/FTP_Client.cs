@@ -738,7 +738,7 @@ namespace LumiSoft.Net.FTP.Client
                                 type = name_value[1].ToLower();
                             }
                             else if(name_value[0].ToLower() == "size"){
-                                size = Convert.ToInt32(name_value[1]);
+                                size = Convert.ToInt64(name_value[1]);
                             }
                             else if(name_value[0].ToLower() == "modify"){
                                 modified = DateTime.ParseExact(name_value[1],"yyyyMMddHHmmss",System.Globalization.DateTimeFormatInfo.InvariantInfo);
