@@ -16,7 +16,7 @@ namespace LumiSoft.Net.SMTP.Client
         /// </summary>
         /// <param name="responseLine">SMTP server response line.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>responseLine</b> is null.</exception>
-        public SMTP_ClientException(string responseLine) : base(responseLine)
+        public SMTP_ClientException(string responseLine) : base(responseLine.TrimEnd())
         {
             if(responseLine == null){
                 throw new ArgumentNullException("responseLine");
@@ -30,7 +30,7 @@ namespace LumiSoft.Net.SMTP.Client
         /// </summary>
         /// <param name="replyLines">SMTP server error reply lines.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>replyLines</b> is null reference.</exception>
-        public SMTP_ClientException(SMTP_t_ReplyLine[] replyLines) : base(replyLines[0].ToString())
+        public SMTP_ClientException(SMTP_t_ReplyLine[] replyLines) : base(replyLines[0].ToString().TrimEnd())
         {
             if(replyLines == null){
                 throw new ArgumentNullException("replyLines");
