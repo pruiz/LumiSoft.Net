@@ -314,11 +314,21 @@ namespace LumiSoft.Net.SMTP.Relay
 
             // IPv6
             if(remoteIP.AddressFamily == AddressFamily.InterNetworkV6){
-                return m_pLocalEndPointIPv6.Next();
+                if(m_pLocalEndPointIPv6.Count == 0){
+                    return null;
+                }
+                else{
+                    return m_pLocalEndPointIPv6.Next();
+                }
             }
             // IPv4
-            else{                
-                 return m_pLocalEndPointIPv4.Next();
+            else{
+                if(m_pLocalEndPointIPv4.Count == 0){
+                    return null;
+                }
+                else{
+                    return m_pLocalEndPointIPv4.Next();
+                }
             }
         }
 
