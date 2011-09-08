@@ -302,6 +302,28 @@ namespace LumiSoft.Net.IMAP.Client
 
                     #endregion
 
+                    #region X-GM-MSGID
+
+                    else if(m_pFetchReader.StartsWith("X-GM-MSGID ",false)){
+                        // Eat X-GM-MSGID word.
+                        m_pFetchReader.ReadWord();
+
+                        m_pHandler.OnX_GM_MSGID(Convert.ToUInt64(m_pFetchReader.ReadWord()));
+                    }
+
+                    #endregion
+
+                    #region X-GM-MSGID
+
+                    else if(m_pFetchReader.StartsWith("X-GM-THRID ",false)){
+                        // Eat X-GM-THRID word.
+                        m_pFetchReader.ReadWord();
+
+                        m_pHandler.OnX_GM_MSGID(Convert.ToUInt64(m_pFetchReader.ReadWord()));
+                    }
+
+                    #endregion
+
                     #region Fetch closing ")"
 
                     else if(m_pFetchReader.StartsWith(")",false)){

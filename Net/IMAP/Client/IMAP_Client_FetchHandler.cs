@@ -250,6 +250,47 @@ namespace LumiSoft.Net.IMAP.Client
 
         #endregion
 
+
+        /// <summary>
+        /// Is raised when current message FETCH GMail X-GM-MSGID data-item is returned.
+        /// </summary>
+        public event EventHandler<EventArgs<ulong>> X_GM_MSGID = null;
+
+        #region method OnX_GM_MSGID
+
+        /// <summary>
+        /// Raises <b>X_GM_MSGID</b> event.
+        /// </summary>
+        /// <param name="msgID">Message ID.</param>
+        internal void OnX_GM_MSGID(ulong msgID)
+        {
+            if(this.X_GM_MSGID != null){
+                this.X_GM_MSGID(this,new EventArgs<ulong>(msgID));
+            }
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when current message FETCH GMail X-GM-THRID data-item is returned.
+        /// </summary>
+        public event EventHandler<EventArgs<ulong>> X_GM_THRID = null;
+
+        #region method OnX_GM_THRID
+
+        /// <summary>
+        /// Raises <b>X_GM_THRID</b> event.
+        /// </summary>
+        /// <param name="threadID">Message thread ID.</param>
+        internal void OnX_GM_THRID(ulong threadID)
+        {
+            if(this.X_GM_THRID != null){
+                this.X_GM_THRID(this,new EventArgs<ulong>(threadID));
+            }
+        }
+
+        #endregion
+
         #endregion
     }
 }

@@ -122,6 +122,8 @@
     <Compile Include="IAsyncOP.cs" />
     <Compile Include="IMAP\Client\IMAP_Client_CmdPart.cs" />
     <Compile Include="IMAP\Client\IMAP_Client_CmdPart_Type.cs" />
+    <Compile Include="IMAP\IMAP_Fetch_DataItem_X_GM_MSGID.cs" />
+    <Compile Include="IMAP\IMAP_Fetch_DataItem_X_GM_THRID.cs" />
     <Compile Include="IMAP\IMAP_Mailbox_Encoding.cs" />
     <Compile Include="IMAP\IMAP_r_u_Enable.cs" />
     <Compile Include="IMAP\IMAP_t_LiteralString.cs" />
