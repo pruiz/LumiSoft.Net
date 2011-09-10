@@ -313,13 +313,13 @@ namespace LumiSoft.Net.IMAP.Client
 
                     #endregion
 
-                    #region X-GM-MSGID
+                    #region X-GM-THRID
 
                     else if(m_pFetchReader.StartsWith("X-GM-THRID ",false)){
                         // Eat X-GM-THRID word.
                         m_pFetchReader.ReadWord();
 
-                        m_pHandler.OnX_GM_MSGID(Convert.ToUInt64(m_pFetchReader.ReadWord()));
+                        m_pHandler.OnX_GM_THRID(Convert.ToUInt64(m_pFetchReader.ReadWord()));
                     }
 
                     #endregion
