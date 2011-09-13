@@ -39,6 +39,44 @@ namespace LumiSoft.Net.Mail
             m_Address     = address;
         }
 
+        #region static method Parse
+
+        /// <summary>
+        /// Parses <b>mailbox</b> from specified string value.
+        /// </summary>
+        /// <param name="value">The <b>mailbox</b> string value.</param>
+        /// <returns>Returns parse mailbox.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>value</b> is null reference.</exception>
+        /// <exception cref="ParseException">Is raised when <b>value</b> is not valid <b>mailbox</b> value.</exception>
+        public static Mail_t_Mailbox Parse(string value)
+        {
+            if(value == null){
+                throw new ArgumentNullException("value");
+            }
+
+            MIME_Reader        r      = new MIME_Reader(value);
+            Mail_t_MailboxList retVal = new Mail_t_MailboxList();
+            while(true){
+                string word = r.QuotedReadToDelimiter(new char[]{',','<'});
+                // We processed all data.
+                if(string.IsNullOrEmpty(word) && r.Available == 0){
+                    throw new ParseException("Not valid 'mailbox' value '" + value + "'.");
+                }
+                // name-addr
+                else if(r.Peek(true) == '<'){
+                    return new Mail_t_Mailbox(word != null ? MIME_Encoding_EncodedWord.DecodeS(TextUtils.UnQuoteString(word.Trim())) : null,r.ReadParenthesized());
+                }
+                // addr-spec
+                else{
+                    return new Mail_t_Mailbox(null,word);
+                }
+            }
+
+            throw new ParseException("Not valid 'mailbox' value '" + value + "'.");
+        }
+
+        #endregion
+
 
         #region method override ToString
 
