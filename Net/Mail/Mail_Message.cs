@@ -1915,6 +1915,9 @@ namespace LumiSoft.Net.Mail
                     if(disposition != null && string.Equals(disposition.DispositionType,"attachment",StringComparison.InvariantCultureIgnoreCase)){
                         retVal.Add(entity);
                     }
+                    // We don't consider inline content as attachments.
+                    else if(disposition != null && string.Equals(disposition.DispositionType,"inline",StringComparison.InvariantCultureIgnoreCase)){
+                    }
                     else if(contentType != null && contentType.Type.ToLower() == "application"){
                         retVal.Add(entity);
                     }
