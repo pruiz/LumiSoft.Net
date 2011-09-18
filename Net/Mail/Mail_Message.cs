@@ -169,6 +169,65 @@ namespace LumiSoft.Net.Mail
         #endregion
 
 
+        #region method GetAttachments
+
+        /// <summary>
+        /// Gets this message attachments.
+        /// </summary>
+        /// <param name="includeInline">Specifies if 'inline' entities are included.</param>
+        /// <returns>Returns this message attachments.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        public MIME_Entity[] GetAttachments(bool includeInline)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+
+            List<MIME_Entity> retVal = new List<MIME_Entity>();
+            foreach(MIME_Entity entity in this.AllEntities){
+                MIME_h_ContentType contentType= null;
+                try{
+                    contentType = entity.ContentType;
+                }
+                catch{
+                    // ContentType parsing failed.
+                }
+                MIME_h_ContentDisposition disposition = null;
+                try{
+                    disposition = entity.ContentDisposition;
+                }
+                catch{
+                    // ContentDisposition parsing failed.
+                }
+
+                if(disposition != null && string.Equals(disposition.DispositionType,"attachment",StringComparison.InvariantCultureIgnoreCase)){
+                    retVal.Add(entity);
+                }
+                else if(!includeInline && disposition != null && string.Equals(disposition.DispositionType,"inline",StringComparison.InvariantCultureIgnoreCase)){
+                }
+                else if(contentType != null && contentType.Type.ToLower() == "application"){
+                    retVal.Add(entity);
+                }
+                else if(contentType != null && contentType.Type.ToLower() == "image"){
+                    retVal.Add(entity);
+                }
+                else if(contentType != null && contentType.Type.ToLower() == "video"){
+                    retVal.Add(entity);
+                }
+                else if(contentType != null && contentType.Type.ToLower() == "audio"){
+                    retVal.Add(entity);
+                }
+                else if(contentType != null && contentType.Type.ToLower() == "message"){
+                    retVal.Add(entity);
+                }
+            }
+
+            return retVal.ToArray();
+        }
+
+        #endregion
+
+
         #region Properties Implementation
 
         // Permanent headerds list: http://www.rfc-editor.org/rfc/rfc4021.txt
@@ -1895,47 +1954,7 @@ namespace LumiSoft.Net.Mail
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                List<MIME_Entity> retVal = new List<MIME_Entity>();
-                foreach(MIME_Entity entity in this.AllEntities){
-                    MIME_h_ContentType contentType= null;
-                    try{
-                        contentType = entity.ContentType;
-                    }
-                    catch{
-                        // ContentType parsing failed.
-                    }
-                    MIME_h_ContentDisposition disposition = null;
-                    try{
-                        disposition = entity.ContentDisposition;
-                    }
-                    catch{
-                        // ContentDisposition parsing failed.
-                    }
-
-                    if(disposition != null && string.Equals(disposition.DispositionType,"attachment",StringComparison.InvariantCultureIgnoreCase)){
-                        retVal.Add(entity);
-                    }
-                    // We don't consider inline content as attachments.
-                    else if(disposition != null && string.Equals(disposition.DispositionType,"inline",StringComparison.InvariantCultureIgnoreCase)){
-                    }
-                    else if(contentType != null && contentType.Type.ToLower() == "application"){
-                        retVal.Add(entity);
-                    }
-                    else if(contentType != null && contentType.Type.ToLower() == "image"){
-                        retVal.Add(entity);
-                    }
-                    else if(contentType != null && contentType.Type.ToLower() == "video"){
-                        retVal.Add(entity);
-                    }
-                    else if(contentType != null && contentType.Type.ToLower() == "audio"){
-                        retVal.Add(entity);
-                    }
-                    else if(contentType != null && contentType.Type.ToLower() == "message"){
-                        retVal.Add(entity);
-                    }
-                }
-
-                return retVal.ToArray();
+                return GetAttachments(false);
             }
         }
 
