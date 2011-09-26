@@ -1212,13 +1212,24 @@ namespace LumiSoft.Net.SMTP.Client
                             4 of [BASE64] or contain a single character "=".
                     */
 
-                    byte[] buffer = Encoding.UTF8.GetBytes("AUTH " + m_pSASL.Name + "\r\n");
+                    if(m_pSASL.SupportsInitialResponse){
+                        byte[] buffer = Encoding.UTF8.GetBytes("AUTH " + m_pSASL.Name + " " + Convert.ToBase64String(m_pSASL.Continue(null)) + "\r\n");
 
-                    // Log
-                    m_pSmtpClient.LogAddWrite(buffer.Length,"AUTH " + m_pSASL.Name);
+                        // Log
+                        m_pSmtpClient.LogAddWrite(buffer.Length,Encoding.UTF8.GetString(buffer));
 
-                    // Start command sending.
-                    m_pSmtpClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.AuthCommandSendingCompleted,null);
+                        // Start command sending.
+                        m_pSmtpClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.AuthCommandSendingCompleted,null);
+                    }
+                    else{
+                        byte[] buffer = Encoding.UTF8.GetBytes("AUTH " + m_pSASL.Name + "\r\n");
+
+                        // Log
+                        m_pSmtpClient.LogAddWrite(buffer.Length,"AUTH " + m_pSASL.Name);
+
+                        // Start command sending.
+                        m_pSmtpClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.AuthCommandSendingCompleted,null);
+                    }                    
                 }
                 catch(Exception x){
                     m_pException = x;
@@ -1308,7 +1319,7 @@ namespace LumiSoft.Net.SMTP.Client
 
                         // We need just send SASL returned auth-response as base64.
                         byte[] buffer = Encoding.UTF8.GetBytes(Convert.ToBase64String(clientResponse) + "\r\n");
-
+                        
                         // Log
                         m_pSmtpClient.LogAddWrite(buffer.Length,Convert.ToBase64String(clientResponse));
 
