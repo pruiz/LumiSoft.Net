@@ -117,6 +117,14 @@ namespace LumiSoft.Net.AUTH
             get{ return m_UserName; }
         }
 
+        /// <summary>
+        /// Gets if the authentication method supports SASL client "inital response".
+        /// </summary>
+        public override bool SupportsInitialResponse
+        {
+            get{ return true; }
+        }
+
         #endregion
     }
 }
