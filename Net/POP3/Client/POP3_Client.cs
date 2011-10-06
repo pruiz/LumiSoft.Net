@@ -516,13 +516,24 @@ namespace LumiSoft.Net.POP3.Client
                                           represents an empty initial response.
                     */
 
-                    byte[] buffer = Encoding.UTF8.GetBytes("AUTH " + m_pSASL.Name + "\r\n");
+                    if(m_pSASL.SupportsInitialResponse){
+                        byte[] buffer = Encoding.UTF8.GetBytes("AUTH " + m_pSASL.Name + " " + Convert.ToBase64String(m_pSASL.Continue(null)) + "\r\n");
 
-                    // Log
-                    m_pPop3Client.LogAddWrite(buffer.Length,"AUTH " + m_pSASL.Name);
+                        // Log
+                        m_pPop3Client.LogAddWrite(buffer.Length,Encoding.UTF8.GetString(buffer).TrimEnd());
 
-                    // Start command sending.
-                    m_pPop3Client.TcpStream.BeginWrite(buffer,0,buffer.Length,this.AuthCommandSendingCompleted,null);
+                        // Start command sending.
+                        m_pPop3Client.TcpStream.BeginWrite(buffer,0,buffer.Length,this.AuthCommandSendingCompleted,null);
+                    }
+                    else{
+                        byte[] buffer = Encoding.UTF8.GetBytes("AUTH " + m_pSASL.Name + "\r\n");
+
+                        // Log
+                        m_pPop3Client.LogAddWrite(buffer.Length,"AUTH " + m_pSASL.Name);
+
+                        // Start command sending.
+                        m_pPop3Client.TcpStream.BeginWrite(buffer,0,buffer.Length,this.AuthCommandSendingCompleted,null);
+                    }
                 }
                 catch(Exception x){
                     m_pException = x;
