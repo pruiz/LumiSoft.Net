@@ -45,13 +45,9 @@ namespace LumiSoft.Net.AUTH
         /// </summary>
         /// <param name="serverResponse">Server sent SASL response.</param>
         /// <returns>Returns challange request what must be sent to server or null if authentication has completed.</returns>
-        /// <exception cref="ArgumentNullException">Is raised when <b>serverResponse</b> is null reference.</exception>
         /// <exception cref="InvalidOperationException">Is raised when this method is called when authentication is completed.</exception>
         public override byte[] Continue(byte[] serverResponse)
         {
-            if(serverResponse == null){
-                throw new ArgumentNullException("serverResponse");
-            }
             if(m_IsCompleted){
                 throw new InvalidOperationException("Authentication is completed.");
             }
