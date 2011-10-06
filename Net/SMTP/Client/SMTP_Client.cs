@@ -1216,7 +1216,7 @@ namespace LumiSoft.Net.SMTP.Client
                         byte[] buffer = Encoding.UTF8.GetBytes("AUTH " + m_pSASL.Name + " " + Convert.ToBase64String(m_pSASL.Continue(null)) + "\r\n");
 
                         // Log
-                        m_pSmtpClient.LogAddWrite(buffer.Length,Encoding.UTF8.GetString(buffer));
+                        m_pSmtpClient.LogAddWrite(buffer.Length,Encoding.UTF8.GetString(buffer).TrimEnd());
 
                         // Start command sending.
                         m_pSmtpClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.AuthCommandSendingCompleted,null);
@@ -1229,7 +1229,7 @@ namespace LumiSoft.Net.SMTP.Client
 
                         // Start command sending.
                         m_pSmtpClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.AuthCommandSendingCompleted,null);
-                    }                    
+                    }
                 }
                 catch(Exception x){
                     m_pException = x;
