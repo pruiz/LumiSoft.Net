@@ -598,6 +598,14 @@ namespace LumiSoft.Net.IMAP.Server
                 OnError(op.Error);
             }
 
+            // Remote host shut-down(Socket.ShutDown) socket.
+            if(op.BytesInBuffer == 0){
+                LogAddText("The remote host '" + this.RemoteEndPoint.ToString() + "' shut down socket.");
+                Dispose();
+                
+                return false;
+            }
+
             try{
                 if(this.IsDisposed){
                     return false;

@@ -206,7 +206,7 @@ namespace LumiSoft.Net.SMTP.Server
                     }
                 });
                 // Process incoming commands while, command reading completes synchronously.
-                while(this.TcpStream.ReadLine(readLineOP,true)){
+                while(this.TcpStream.ReadLine(readLineOP,true)){                    
                     if(!ProcessCmd(readLineOP)){
                         break;
                     }
@@ -233,6 +233,14 @@ namespace LumiSoft.Net.SMTP.Server
             // Check errors.
             if(op.Error != null){
                 OnError(op.Error);
+            }
+
+            // Remote host shut-down(Socket.ShutDown) socket.
+            if(op.BytesInBuffer == 0){
+                LogAddText("The remote host '" + this.RemoteEndPoint.ToString() + "' shut down socket.");
+                Dispose();
+                
+                return false;
             }
 
             try{
