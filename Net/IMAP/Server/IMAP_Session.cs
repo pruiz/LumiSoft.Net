@@ -428,7 +428,7 @@ namespace LumiSoft.Net.IMAP.Server
             m_pAuthentications = new Dictionary<string,AUTH_SASL_ServerMechanism>(StringComparer.CurrentCultureIgnoreCase);
 
             m_pCapabilities = new List<string>();
-            m_pCapabilities.AddRange(new string[]{"IMAP4rev1","NAMESPACE","QUOTA","ACL","IDLE","ENABLE","UTF8=ACCEPT"});
+            m_pCapabilities.AddRange(new string[]{"IMAP4rev1","NAMESPACE","QUOTA","ACL","IDLE","ENABLE","UTF8=ACCEPT","SASL-IR"});
         }
 
 
@@ -1043,6 +1043,19 @@ namespace LumiSoft.Net.IMAP.Server
                             authenticators.
             */
 
+            /* RFC 4959.l7 SASL-IR 7.
+                The following syntax specification uses the Augmented Backus-Naur
+                Form [RFC4234] notation.  [RFC3501] defines the non-terminals
+                capability, auth-type, and base64.
+
+                capability    =/ "SASL-IR"
+
+                authenticate  = "AUTHENTICATE" SP auth-type [SP (base64 / "=")]
+                                *(CRLF base64)
+                                ;;redefine AUTHENTICATE from [RFC3501]
+            
+            */
+
             if(m_SessionRejected){
                 WriteLine(cmdTag + " NO Bad sequence of commands: Session rejected.");
 
@@ -1054,14 +1067,38 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }
 
-            string mechanism = cmdText;
+            #region Parse parameters
+
+            string[] arguments = cmdText.Split(' ');
+            if(arguments.Length > 2){
+                WriteLine(cmdTag + " BAD Syntax error, syntax: AUTHENTICATE SP mechanism [SP initial-response] CRLF");
+                return;
+            }
+            byte[] initialClientResponse = new byte[0];
+            if(arguments.Length == 2){
+                if(arguments[1] == "="){
+                    // Skip.
+                }
+                else{
+                    try{
+                        initialClientResponse = Convert.FromBase64String(arguments[1]);
+                    }
+                    catch{
+                        WriteLine(cmdTag + " BAD Syntax error: Parameter 'initial-response' value must be BASE64 or contain a single character '='.");
+                        return;
+                    }
+                }
+            }
+            string mechanism = arguments[0];
+
+            #endregion
                         
             if(!this.Authentications.ContainsKey(mechanism)){
                 WriteLine(cmdTag + " NO Not supported authentication mechanism.");
                 return;
             }
 
-            byte[] clientResponse = new byte[0];
+            byte[] clientResponse = initialClientResponse;
             AUTH_SASL_ServerMechanism auth = this.Authentications[mechanism];            
             auth.Reset();
             while(true){

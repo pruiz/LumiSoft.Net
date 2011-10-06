@@ -16,6 +16,24 @@ namespace LumiSoft.Net.IMAP.Client
     /// <summary>
     /// IMAP v4 Client. Defined in RFC 3501.
     /// </summary>
+	/// <example>
+	/// <code>
+	/// /*
+	///  To make this code to work, you need to import following namespaces:
+	///  using LumiSoft.Net.IMAP.Client; 
+	/// */
+	/// 
+	/// using(IMAP_Client imap = new IMAP_Client()){
+    ///     imap.Connect("host",143);
+    ///     // Call Capability even if you don't care about capabilities, it also controls IMAP client features.
+    ///     imap.Capability();
+    ///     
+    ///     imap.Authenticate(... choose auth method ...);
+    /// 
+    ///     // Do do your stuff ...
+    /// }
+	/// </code>
+	/// </example>
     public class IMAP_Client : TCP_Client
     {
         #region class _FetchResponseReader
@@ -391,6 +409,7 @@ namespace LumiSoft.Net.IMAP.Client
         private GenericIdentity            m_pAuthenticatedUser = null;
         private string                     m_GreetingText       = "";
         private int                        m_CommandIndex       = 1;
+        private List<string>               m_pCapabilities      = null;
         private IMAP_Client_SelectedFolder m_pSelectedFolder    = null;
         private IMAP_Mailbox_Encoding      m_MailboxEncoding    = IMAP_Mailbox_Encoding.ImapUtf7;
 
@@ -435,6 +454,7 @@ namespace LumiSoft.Net.IMAP.Client
             m_pAuthenticatedUser = null;
             m_GreetingText       = "";
             m_CommandIndex       = 1;
+            m_pCapabilities      = null;
             m_pSelectedFolder    = null;
             m_MailboxEncoding    = IMAP_Mailbox_Encoding.ImapUtf7;
 		}
@@ -690,13 +710,24 @@ namespace LumiSoft.Net.IMAP.Client
                                           authentication exchange cancelled
                     */
 
-                    byte[] buffer = Encoding.UTF8.GetBytes((m_pImapClient.m_CommandIndex++).ToString("d5") + " AUTHENTICATE " + m_pSASL.Name + "\r\n");
+                    if(m_pSASL.SupportsInitialResponse && m_pImapClient.SupportsCapability("SASL-IR")){
+                        byte[] buffer = Encoding.UTF8.GetBytes((m_pImapClient.m_CommandIndex++).ToString("d5") + " AUTHENTICATE " + m_pSASL.Name + " " + Convert.ToBase64String(m_pSASL.Continue(null)) + "\r\n");
+                            
+                        // Log
+                        m_pImapClient.LogAddWrite(buffer.Length,Encoding.UTF8.GetString(buffer).TrimEnd());
 
-                    // Log
-                    m_pImapClient.LogAddWrite(buffer.Length,(m_pImapClient.m_CommandIndex++).ToString("d5") + " AUTHENTICATE " + m_pSASL.Name);
+                        // Start command sending.
+                        m_pImapClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.AuthenticateCommandSendingCompleted,null);
+                    }
+                    else{
+                        byte[] buffer = Encoding.UTF8.GetBytes((m_pImapClient.m_CommandIndex++).ToString("d5") + " AUTHENTICATE " + m_pSASL.Name + "\r\n");
 
-                    // Start command sending.
-                    m_pImapClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.AuthenticateCommandSendingCompleted,null);
+                        // Log
+                        m_pImapClient.LogAddWrite(buffer.Length,(m_pImapClient.m_CommandIndex++).ToString("d5") + " AUTHENTICATE " + m_pSASL.Name);
+
+                        // Start command sending.
+                        m_pImapClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.AuthenticateCommandSendingCompleted,null);
+                    }
                 }
                 catch(Exception x){
                     m_pException = x;
@@ -3332,6 +3363,12 @@ namespace LumiSoft.Net.IMAP.Client
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
 
+            //Cache IMAP server capabiliteis.
+            m_pCapabilities = new List<string>();
+            foreach(IMAP_r_u_Capability capability in retVal){
+                m_pCapabilities.AddRange(capability.Capabilities);
+            }
+
             return retVal.ToArray();
         }
 
@@ -3779,6 +3816,36 @@ namespace LumiSoft.Net.IMAP.Client
 
         #endregion
 
+        #region method SupportsCapability
+
+        /// <summary>
+        /// Gets if IMAP server supports the specified capability.
+        /// </summary>
+        /// <param name="capability">IMAP capability.</param>
+        /// <returns>Return true if IMAP server supports the specified capability.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>capability</b> is null reference.</exception>
+        private bool SupportsCapability(string capability)
+        {
+            if(capability == null){
+                throw new ArgumentNullException("capability");
+            }
+
+            if(m_pCapabilities == null){
+                return false;
+            }
+            else{
+                foreach(string c in m_pCapabilities){
+                    if(string.Equals(c,capability,StringComparison.InvariantCultureIgnoreCase)){
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        #endregion
+
 
         #region Properties implementation
 
@@ -3817,6 +3884,25 @@ namespace LumiSoft.Net.IMAP.Client
 			    }
 
                 return m_GreetingText; 
+            }
+        }
+
+        /// <summary>
+        /// Get IMAP server(CAPABILITY command cached) supported capabilities.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when this property is accessed and IMAP client is not connected.</exception>
+        public string[] Capabilities
+        {
+            get{ 
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+                if(!this.IsConnected){
+				    throw new InvalidOperationException("You must connect first.");
+			    }
+
+                return m_pCapabilities.ToArray(); 
             }
         }
 
