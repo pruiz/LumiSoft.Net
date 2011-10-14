@@ -194,22 +194,21 @@ namespace LumiSoft.Net.POP3.Server
         private bool ProcessCmd(SmartStream.ReadLineAsyncOP op)
         {
             bool readNextCommand = true;
-
-            // Check errors.
-            if(op.Error != null){
-                OnError(op.Error);
-            }
-
-            // Remote host shut-down(Socket.ShutDown) socket.
-            if(op.BytesInBuffer == 0){
-                LogAddText("The remote host '" + this.RemoteEndPoint.ToString() + "' shut down socket.");
-                Dispose();
-                
-                return false;
-            }
-
+                        
             try{
+                // We are already disposed.
                 if(this.IsDisposed){
+                    return false;
+                }
+                // Check errors.
+                if(op.Error != null){
+                    OnError(op.Error);
+                }
+                // Remote host shut-down(Socket.ShutDown) socket.
+                if(op.BytesInBuffer == 0){
+                    LogAddText("The remote host '" + this.RemoteEndPoint.ToString() + "' shut down socket.");
+                    Dispose();
+                
                     return false;
                 }
                                 
