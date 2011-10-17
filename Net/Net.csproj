@@ -127,6 +127,10 @@
     <Compile Include="IMAP\IMAP_Fetch_DataItem_X_GM_THRID.cs" />
     <Compile Include="IMAP\IMAP_Mailbox_Encoding.cs" />
     <Compile Include="IMAP\IMAP_r_u_Enable.cs" />
+    <Compile Include="IMAP\IMAP_r_u_Exists.cs" />
+    <Compile Include="IMAP\IMAP_r_u_Flags.cs" />
+    <Compile Include="IMAP\IMAP_r_u_Recent.cs" />
+    <Compile Include="IMAP\IMAP_r_u_Search.cs" />
     <Compile Include="IMAP\IMAP_t_LiteralString.cs" />
     <Compile Include="IMAP\IMAP_t_QuotedString.cs" />
     <Compile Include="Media\_WaveIn.cs" />
