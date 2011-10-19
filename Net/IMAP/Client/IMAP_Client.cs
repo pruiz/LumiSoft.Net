@@ -412,6 +412,7 @@ namespace LumiSoft.Net.IMAP.Client
         private List<string>               m_pCapabilities      = null;
         private IMAP_Client_SelectedFolder m_pSelectedFolder    = null;
         private IMAP_Mailbox_Encoding      m_MailboxEncoding    = IMAP_Mailbox_Encoding.ImapUtf7;
+        private object                     m_pIdle              = null;
 
         /// <summary>
         /// Default constructor.
@@ -480,6 +481,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(this.IsAuthenticated){
                 throw new InvalidOperationException("STARTTLS is only valid in not-authenticated state.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.2.1. STARTTLS Command.
@@ -546,6 +550,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(this.IsAuthenticated){
                 throw new InvalidOperationException("Re-authentication error, you are already authenticated.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.2.3.  LOGIN Command
@@ -603,6 +610,9 @@ namespace LumiSoft.Net.IMAP.Client
 			}
             if(this.IsAuthenticated){
                 throw new InvalidOperationException("Connection is already authenticated.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
             if(sasl == null){
                 throw new ArgumentNullException("sasl");
@@ -925,6 +935,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(this.IsAuthenticated){
                 throw new InvalidOperationException("Connection is already authenticated.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
             if(op == null){
                 throw new ArgumentNullException("op");
@@ -954,6 +967,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 2342 5. NAMESPACE Command.
@@ -1017,6 +1033,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.3.8. LIST Command.
@@ -1191,6 +1210,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.3.3. CREATE Command.
@@ -1276,6 +1298,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.3.4. DELETE Command.
@@ -1370,6 +1395,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.3.5. RENAME Command.
@@ -1463,6 +1491,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.3.9. LSUB Command.
@@ -1544,6 +1575,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.3.6. SUBSCRIBE Command.
@@ -1609,6 +1643,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.3.7. UNSUBSCRIBE Command.
@@ -1663,6 +1700,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.3.10. STATUS Command.
@@ -1772,6 +1812,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.3.1.  SELECT Command.
@@ -1882,6 +1925,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.3.2.  EXAMINE Command.
@@ -1953,6 +1999,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 2087 4.3. GETQUOTAROOT Command.
@@ -2014,6 +2063,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 2087 4.2. GETQUOTA Command.
@@ -2101,6 +2153,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 4314 3.3. GETACL Command.
@@ -2172,6 +2227,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 4314 3.1. SETACL Command.
@@ -2266,6 +2324,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 4314 3.2. DELETEACL Command.
@@ -2330,6 +2391,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 4314 3.4. LISTRIGHTS Command.
@@ -2400,6 +2464,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 4314 3.5. MYRIGHTS Command.
@@ -2483,6 +2550,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.3.11. APPEND Command.
@@ -2618,10 +2688,23 @@ namespace LumiSoft.Net.IMAP.Client
         /// </summary>
         /// <param name="capabilities">IMAP capabilities.</param>
         /// <returns>Returns enabled capabilities info.</returns>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected,not-authenticated or selected state).</exception>
         /// <exception cref="ArgumentNullException">Is raised when <b>capabilities</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         public IMAP_r_u_Enable[] Enable(string[] capabilities)
         {
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(!this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }
+            if(this.SelectedFolder != null){
+                throw new InvalidOperationException("The 'ENABLE UTF8=ACCEPT' command MUST only be used in the authenticated state.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
+            }
             if(capabilities == null){
                 throw new ArgumentNullException("capabilities");
             }
@@ -2679,6 +2762,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(this.SelectedFolder != null){
                 throw new InvalidOperationException("The 'ENABLE UTF8=ACCEPT' command MUST only be used in the authenticated state.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 5161 and RFC 5738 3.
@@ -2712,6 +2798,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(m_pSelectedFolder == null){
                 throw new InvalidOperationException("Not selected state, you need to select some folder first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.4.2. CLOSE Command.
@@ -2791,6 +2880,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(m_pSelectedFolder == null){
                 throw new InvalidOperationException("Not selected state, you need to select some folder first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.4.5. FETCH Command.
@@ -2868,6 +2960,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(m_pSelectedFolder == null){
                 throw new InvalidOperationException("Not selected state, you need to select some folder first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
             
             // Build IMAP command.
@@ -3011,6 +3106,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(m_pSelectedFolder == null){
                 throw new InvalidOperationException("Not selected state, you need to select some folder first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.4.6. STORE Command.
@@ -3145,6 +3243,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(m_pSelectedFolder == null){
                 throw new InvalidOperationException("Not selected state, you need to select some folder first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.4.7. COPY Command.
@@ -3227,6 +3328,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(m_pSelectedFolder == null){
                 throw new InvalidOperationException("Not selected state, you need to select some folder first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             CopyMessages(uid,seqSet,targetFolder);
@@ -3255,6 +3359,9 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(m_pSelectedFolder == null){
                 throw new InvalidOperationException("Not selected state, you need to select some folder first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.4.3. EXPUNGE Command.
@@ -3294,6 +3401,141 @@ namespace LumiSoft.Net.IMAP.Client
 
         #endregion
 
+        #region method StartIdle
+
+        /// <summary>
+        /// Starts idling.
+        /// </summary>
+        /// <param name="errorCallback">Callback to be called when error happens on asynchronous IDLE. Value null means not notifed.</param>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected, not-authenticated, not-selected or idle state).</exception>
+        /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
+        /// <remarks>IMAP server must support IDLE capability, otherwise error raised when this method is called.
+        /// Server IDLE notifications raise event <see cref="UntaggedResponse"/> when any changes in mailbox.
+        /// StartIdle and stop idle should be called periodically to refresh IDLE, otherwise IMAP server session timeout timer will close connection.</remarks>
+        public void StartIdle(EventHandler<ExceptionEventArgs> errorCallback)
+        {
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(!this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }
+            if(m_pSelectedFolder == null){
+                throw new InvalidOperationException("Not selected state, you need to select some folder first.");
+            }
+            if(m_pIdle != null){
+                throw new InvalidOperationException("Already idling !");
+            }
+
+            /* RFC 2177.3. IDLE Command.
+                Arguments:  none
+
+                Responses:  continuation data will be requested; the client sends
+                            the continuation data "DONE" to end the command
+
+                Result:     OK - IDLE completed after client sent "DONE"
+                            NO - failure: the server will not allow the IDLE
+                                 command at this time
+                            BAD - command unknown or arguments invalid
+
+                The IDLE command may be used with any IMAP4 server implementation
+                that returns "IDLE" as one of the supported capabilities to the
+                CAPABILITY command.  If the server does not advertise the IDLE
+                capability, the client MUST NOT use the IDLE command and must poll
+                for mailbox updates.  In particular, the client MUST continue to be
+                able to accept unsolicited untagged responses to ANY command, as
+                specified in the base IMAP specification.
+
+                The IDLE command is sent from the client to the server when the
+                client is ready to accept unsolicited mailbox update messages.  The
+                server requests a response to the IDLE command using the continuation
+                ("+") response.  The IDLE command remains active until the client
+                responds to the continuation, and as long as an IDLE command is
+                active, the server is now free to send untagged EXISTS, EXPUNGE, and
+                other messages at any time.
+
+                The IDLE command is terminated by the receipt of a "DONE"
+                continuation from the client; such response satisfies the server's
+                continuation request.  At that point, the server MAY send any
+                remaining queued untagged responses and then MUST immediately send
+                the tagged response to the IDLE command and prepare to process other
+                commands. As in the base specification, the processing of any new
+                command may cause the sending of unsolicited untagged responses,
+                subject to the ambiguity limitations.  The client MUST NOT send a
+                command while the server is waiting for the DONE, since the server
+                will not be able to distinguish a command from a continuation.             
+             
+                Example:    C: A001 SELECT INBOX
+                            S: * FLAGS (Deleted Seen)
+                            S: * 3 EXISTS
+                            S: * 0 RECENT
+                            S: * OK [UIDVALIDITY 1]
+                            S: A001 OK SELECT completed
+                            C: A002 IDLE
+                            S: + idling
+                            ...time passes; new mail arrives...
+                            S: * 4 EXISTS
+                            C: DONE
+                            S: A002 OK IDLE terminated
+            */
+
+            SendCommand((m_CommandIndex++).ToString("d5") + " IDLE\r\n");
+
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
+            if(!response.ResponseCode.Equals("+",StringComparison.InvariantCultureIgnoreCase)){
+                throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
+            }
+
+            m_pIdle = new object();
+
+            // Start idling asynchronously.
+            ReadFinalResponseAsyncOP args = new ReadFinalResponseAsyncOP();
+            args.CompletedAsync += delegate(object sender,EventArgs<ReadFinalResponseAsyncOP> e){
+                // IDLE failed.
+                if(e.Value.Error != null){
+                    if(errorCallback != null){
+                        errorCallback(this,new ExceptionEventArgs(e.Value.Error));
+                    }
+                }
+            };                
+            if(!ReadFinalResponseAsync(args)){
+                if(args.Error != null){
+                    throw args.Error;
+                }
+            }
+        }
+
+        #endregion
+
+        #region method StopIdle
+
+        /// <summary>
+        /// Stops idling.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected, not-authenticated, not-selected or not-idle state).</exception>
+        /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
+        public void StopIdle()
+        {
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(!this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }
+            if(m_pSelectedFolder == null){
+                throw new InvalidOperationException("Not selected state, you need to select some folder first.");
+            }
+            if(m_pIdle == null){
+                throw new InvalidOperationException("Not in idling, you neet to switch in IDLE sate first.");
+            }
+
+            SendCommand("DONE\r\n");
+
+            m_pIdle = null;
+        }
+
+        #endregion
+
 
         #region method Capability
 
@@ -3307,6 +3549,9 @@ namespace LumiSoft.Net.IMAP.Client
         {
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.1.1. CAPABILITY Command.
@@ -3385,6 +3630,9 @@ namespace LumiSoft.Net.IMAP.Client
         {
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
             /* RFC 3501 6.1.2. NOOP Command.
@@ -3778,6 +4026,773 @@ namespace LumiSoft.Net.IMAP.Client
 
         #endregion
 
+        #region method ReadResponseAsync
+
+        #region class ReadResponseAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="IMAP_Client.ReadResponseAsync"/> asynchronous operation.
+        /// </summary>
+        private class ReadResponseAsyncOP : IDisposable,IAsyncOP
+        {
+            private object        m_pLock         = new object();
+            private AsyncOP_State m_State         = AsyncOP_State.WaitingForStart;
+            private Exception     m_pException    = null;
+            private IMAP_r        m_pResponse     = null;
+            private IMAP_Client   m_pImapClient   = null;
+            private bool          m_RiseCompleted = false;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            public ReadResponseAsyncOP()
+            {
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resource being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+
+                m_pException  = null;
+                m_pImapClient = null;
+                m_pResponse   = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner IMAP client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            internal bool Start(IMAP_Client owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+
+                m_pImapClient = owner;
+
+                SetState(AsyncOP_State.Active);
+
+                try{                    
+                    // Read IMAP server response.
+                    SmartStream.ReadLineAsyncOP op = new SmartStream.ReadLineAsyncOP(new byte[32000],SizeExceededAction.JunkAndThrowException);
+                    op.Completed += delegate(object s,EventArgs<SmartStream.ReadLineAsyncOP> e){   
+                        try{
+                            ReadLineCompleted(op);
+                            SetState(AsyncOP_State.Completed);        
+                        }
+                        catch(Exception x){
+                            m_pException = x;
+                            SetState(AsyncOP_State.Completed);
+                        }
+                    };
+                    // Read line completed synchronously.
+                    if(owner.TcpStream.ReadLine(op,true)){
+                        ReadLineCompleted(op);
+                        SetState(AsyncOP_State.Completed);
+
+                        return false;        
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pImapClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
+            }
+
+            #endregion
+
+            #region method Reuse
+
+            /// <summary>
+            /// Prepares this class for reuse.
+            /// </summary>
+            /// <exception cref="InvalidOperationException">Is riased when this is not valid state.</exception>
+            public void Reuse()
+            {
+                if(m_State != AsyncOP_State.Completed){
+                    throw new InvalidOperationException("Reuse is valid only in Completed state.");
+                }
+
+                m_State         = AsyncOP_State.WaitingForStart;
+                m_pException    = null;
+                m_pResponse     = null;
+                m_pImapClient   = null;
+                m_RiseCompleted = false;
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method ReadLineCompleted
+
+            /// <summary>
+            /// Is called when read line has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+            private void ReadLineCompleted(SmartStream.ReadLineAsyncOP op)
+            {
+                if(op == null){
+                    throw new ArgumentNullException("op");
+                }
+
+                try{
+                    // Line reading failed, we are done.
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                    }
+                    // Remote host shut down socket.                        
+                    else if(op.BytesInBuffer == 0){
+                        m_pException = new IOException("The remote host shut-down socket.");
+                    }
+                    // Line reading succeeded.
+                    else{
+                        string responseLine = op.LineUtf8;
+
+                        // Log.
+                        m_pImapClient.LogAddRead(op.BytesInBuffer,responseLine);
+
+                        // Untagged response.
+                        if(responseLine.StartsWith("*")){
+                            string[] parts = responseLine.Split(new char[]{' '},4);
+                            string   word  = responseLine.Split(' ')[1];
+
+                            #region Untagged status responses. RFC 3501 7.1.
+
+                            // OK,NO,BAD,PREAUTH,BYE
+
+                            if(word.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_ServerStatus.Parse(responseLine);
+
+                                // Process optional response-codes(7.2). ALERT,BADCHARSET,CAPABILITY,PARSE,PERMANENTFLAGS,READ-ONLY,
+                                // READ-WRITE,TRYCREATE,UIDNEXT,UIDVALIDITY,UNSEEN
+                                /*
+                                if(!string.IsNullOrEmpty(response.OptionalResponseCode)){
+                                    if(response.OptionalResponseCode.Equals("PERMANENTFLAGS",StringComparison.InvariantCultureIgnoreCase)){
+                                        if(folderInfo != null){
+                                            StringReader r = new StringReader(response.OptionalResponseArgs);
+
+                                            folderInfo.SetPermanentFlags(r.ReadParenthesized().Split(' '));
+                                        }
+                                    }
+                                    else if(response.OptionalResponseCode.Equals("READ-ONLY",StringComparison.InvariantCultureIgnoreCase)){
+                                        if(folderInfo != null){
+                                            folderInfo.SetReadOnly(true);
+                                        }
+                                    }
+                                    else if(response.OptionalResponseCode.Equals("READ-WRITE",StringComparison.InvariantCultureIgnoreCase)){
+                                        if(folderInfo != null){
+                                            folderInfo.SetReadOnly(true);
+                                        }
+                                    }
+                                    else if(response.OptionalResponseCode.Equals("UIDNEXT",StringComparison.InvariantCultureIgnoreCase)){
+                                        if(folderInfo != null){
+                                            folderInfo.SetUidNext(Convert.ToInt64(response.OptionalResponseArgs));
+                                        }
+                                    }
+                                    else if(response.OptionalResponseCode.Equals("UIDVALIDITY",StringComparison.InvariantCultureIgnoreCase)){
+                                        if(folderInfo != null){
+                                            folderInfo.SetUidValidity(Convert.ToInt64(response.OptionalResponseArgs));
+                                        }
+                                    }
+                                    else if(response.OptionalResponseCode.Equals("UNSEEN",StringComparison.InvariantCultureIgnoreCase)){
+                                        if(folderInfo != null){
+                                            folderInfo.SetFirstUnseen(Convert.ToInt32(response.OptionalResponseArgs));
+                                        }
+                                    }
+                                    // We don't care about other response codes.                            
+                                }*/
+
+                                m_pImapClient.OnUntaggedStatusResponse((IMAP_r_u)m_pResponse);
+                            }
+                            else if(word.Equals("NO",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_ServerStatus.Parse(responseLine);
+
+                                m_pImapClient.OnUntaggedStatusResponse((IMAP_r_u)m_pResponse);
+                            }
+                            else if(word.Equals("BAD",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_ServerStatus.Parse(responseLine);
+
+                                m_pImapClient.OnUntaggedStatusResponse((IMAP_r_u)m_pResponse);
+                            }
+                            else if(word.Equals("PREAUTH",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_ServerStatus.Parse(responseLine);
+
+                                m_pImapClient.OnUntaggedStatusResponse((IMAP_r_u)m_pResponse);
+                            }
+                            else if(word.Equals("BYE",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_ServerStatus.Parse(responseLine);
+
+                                m_pImapClient.OnUntaggedStatusResponse((IMAP_r_u)m_pResponse);
+                            }
+
+                            #endregion
+
+                            #region Untagged server and mailbox status. RFC 3501 7.2.
+
+                            // CAPABILITY,LIST,LSUB,STATUS,SEARCH,FLAGS
+
+                            #region CAPABILITY
+
+                            else if(word.Equals("CAPABILITY",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Capability.Parse(responseLine);                                
+                            }
+
+                            #endregion
+
+                            #region LIST
+
+                            else if(word.Equals("LIST",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_List.Parse(responseLine);
+                            }
+
+                            #endregion
+
+                            #region LSUB
+
+                            else if(word.Equals("LSUB",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_LSub.Parse(responseLine);
+                            }
+
+                            #endregion
+
+                            #region STATUS
+
+                            else if(word.Equals("STATUS",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Status.Parse(responseLine);
+                            }
+
+                            #endregion
+
+                            #region SEARCH
+
+                            else if(word.Equals("SEARCH",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Search.Parse(responseLine);
+                            }
+
+                            #endregion
+
+                            #region FLAGS
+
+                            else if(word.Equals("FLAGS",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Flags.Parse(responseLine);
+
+                                m_pImapClient.m_pSelectedFolder.SetFlags(((IMAP_r_u_Flags)m_pResponse).Flags);
+                            }
+
+                            #endregion
+
+                            #endregion
+
+                            #region Untagged mailbox size. RFC 3501 7.3.
+
+                            // EXISTS,RECENT
+
+                            else if(Net_Utils.IsInteger(word) && parts[2].Equals("EXISTS",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Exists.Parse(responseLine);
+
+                                m_pImapClient.m_pSelectedFolder.SetMessagesCount(((IMAP_r_u_Exists)m_pResponse).MessageCount);
+                            }
+                            else if(Net_Utils.IsInteger(word) && parts[2].Equals("RECENT",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Recent.Parse(responseLine);
+
+                                m_pImapClient.m_pSelectedFolder.SetRecentMessagesCount(((IMAP_r_u_Exists)m_pResponse).MessageCount);
+                            }
+                                                
+                            #endregion
+
+                            #region Untagged message status. RFC 3501 7.4.
+
+                            // EXPUNGE,FETCH
+
+                            else if(Net_Utils.IsInteger(word) && parts[2].Equals("EXPUNGE",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Expunge.Parse(responseLine);
+                                m_pImapClient.OnMessageExpunged((IMAP_r_u_Expunge)m_pResponse);
+                            }
+                            else if(Net_Utils.IsInteger(word) && parts[2].Equals("FETCH",StringComparison.InvariantCultureIgnoreCase)){
+                                // Currently we eat all fetch responses here, because we don't use ReadResponseAsync for fetch responses
+                                // at moment.
+                                IMAP_Client_FetchHandler fetchHandler = new IMAP_Client_FetchHandler();
+
+                                // User din't provide us FETCH handler, make dummy one which eats up all fetch responses.
+                                if(fetchHandler == null){
+                                    fetchHandler = new IMAP_Client_FetchHandler();
+                                }
+
+                                _FetchResponseReader r = new _FetchResponseReader(m_pImapClient,responseLine,fetchHandler);
+                                r.Start();                        
+                            }
+
+                            #endregion
+
+                            #region Untagged acl realted. RFC 4314.
+
+                            else if(word.Equals("ACL",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Acl.Parse(responseLine);
+                            }
+                            else if(word.Equals("LISTRIGHTS",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_ListRights.Parse(responseLine);
+                            }
+                            else if(word.Equals("MYRIGHTS",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_Response_MyRights.Parse(responseLine);
+                            }
+
+                            #endregion
+
+                            #region Untagged quota related. RFC 2087.
+
+                            else if(word.Equals("QUOTA",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Quota.Parse(responseLine);
+                            }
+                            else if(word.Equals("QUOTAROOT",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_QuotaRoot.Parse(responseLine);
+                            }
+
+                            #endregion
+
+                            #region Untagged namespace related. RFC 2342.
+
+                            else if(word.Equals("NAMESPACE",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Namespace.Parse(responseLine);
+                            }
+
+                            #endregion
+
+                            #region Untagged enable related. RFC 5161.
+
+                            else if(word.Equals("ENABLED",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Enable.Parse(responseLine);
+                            }
+
+                            #endregion
+                            
+                            // Raise event 'UntaggedResponse'.
+                            m_pImapClient.OnUntaggedResponse((IMAP_r_u)m_pResponse);
+                        }
+                        // Command continuation response.
+                        else if(responseLine.StartsWith("+")){
+                            m_pResponse = new IMAP_r_ServerStatus("+","+",null,null,"+");
+                        }
+                        // Completion status response.
+                        else{
+                            // Command response reading has completed.
+                            m_pResponse = IMAP_r_ServerStatus.Parse(responseLine);
+                        }
+                    }                    
+                }
+                catch(Exception x){
+                    m_pException = x;
+                }
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            /// <summary>
+            /// Returns IMAP server response.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public IMAP_r Response
+            {
+                get{
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Response' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pResponse; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<ReadResponseAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<ReadResponseAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Starts reading IMAP server response.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="ReadResponseAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any oth the arguments has invalid value.</exception>
+        private bool ReadResponseAsync(ReadResponseAsyncOP op)
+        {
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+
+            return op.Start(this);
+        }
+
+        #endregion
+
+        #region method ReadFinalResponseAsync
+
+        #region class ReadFinalResponseAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="IMAP_Client.ReadFinalResponseAsyncOP"/> asynchronous operation.
+        /// </summary>
+        private class ReadFinalResponseAsyncOP : IDisposable,IAsyncOP
+        {
+            private object        m_pLock          = new object();
+            private AsyncOP_State m_State          = AsyncOP_State.WaitingForStart;
+            private Exception     m_pException     = null;
+            private IMAP_r        m_pFinalResponse = null;
+            private IMAP_Client   m_pImapClient    = null;
+            private bool          m_RiseCompleted  = false;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            public ReadFinalResponseAsyncOP()
+            {
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resource being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+
+                m_pException     = null;
+                m_pImapClient    = null;
+                m_pFinalResponse = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner IMAP client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            internal bool Start(IMAP_Client owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+
+                
+                m_pImapClient = owner;
+                
+                SetState(AsyncOP_State.Active);
+
+                try{                    
+                    ReadResponseAsyncOP args = new ReadResponseAsyncOP();
+                    args.CompletedAsync += delegate(object sender,EventArgs<ReadResponseAsyncOP> e){
+                        try{
+                            ResponseReadingCompleted(e.Value);
+                            args.Reuse();
+
+                            // Read responses while we get final response.
+                            while(m_State == AsyncOP_State.Active && !m_pImapClient.ReadResponseAsync(args)){
+                                ResponseReadingCompleted(args);
+                                args.Reuse();
+                            }
+                        }
+                        catch(Exception x){
+                            m_pException = x;
+                            m_pImapClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                            SetState(AsyncOP_State.Completed);
+                        }
+                    };
+                    // Read responses while reading completes synchronously.
+                    while(m_State == AsyncOP_State.Active && !m_pImapClient.ReadResponseAsync(args)){
+                        ResponseReadingCompleted(args);
+                        args.Reuse();
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pImapClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method ResponseReadingCompleted
+
+            /// <summary>
+            /// Is called when IMAP server response reading has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            /// <exception cref="ReadResponseAsyncOP">Is raiswed when <b>op</b> is null reference.</exception>
+            private void ResponseReadingCompleted(ReadResponseAsyncOP op)
+            {
+                if(op == null){
+                    throw new ArgumentNullException("op");
+                }
+
+                // Response reading failed.
+                if(op.Error != null){
+                    m_pException = op.Error;
+                    SetState(AsyncOP_State.Completed);
+                }
+                else{
+                    // We are done, we got final response.
+                    if(op.Response is IMAP_r_ServerStatus){
+                        m_pFinalResponse = op.Response;
+                        SetState(AsyncOP_State.Completed);
+                    }
+                }
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            /// <summary>
+            /// Returns IMAP server final response.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public IMAP_r FinalResponse
+            {
+                get{
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Response' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pFinalResponse; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<ReadFinalResponseAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<ReadFinalResponseAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Starts reading IMAP server final(OK/BAD/NO/+) response.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="ReadResponseAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any oth the arguments has invalid value.</exception>
+        private bool ReadFinalResponseAsync(ReadFinalResponseAsyncOP op)
+        {            
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+                        
+            return op.Start(this);            
+        }
+
+        #endregion
+
         #region method ReadStringLiteral
 
         /// <summary>
@@ -3976,6 +4991,26 @@ namespace LumiSoft.Net.IMAP.Client
         {
             if(this.UntaggedStatusResponse != null){
                 this.UntaggedStatusResponse(this,new EventArgs<IMAP_r_u>(response));
+            }
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP server sends any untagged response.
+        /// </summary>
+        public event EventHandler<EventArgs<IMAP_r_u>> UntaggedResponse = null;
+
+        #region method OnUntaggedResponse
+
+        /// <summary>
+        /// Raises <b>UntaggedResponse</b> event.
+        /// </summary>
+        /// <param name="response">Untagged IMAP server response.</param>
+        private void OnUntaggedResponse(IMAP_r_u response)
+        {
+            if(this.UntaggedResponse != null){
+                this.UntaggedResponse(this,new EventArgs<IMAP_r_u>(response));
             }
         }
 
