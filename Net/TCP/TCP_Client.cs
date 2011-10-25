@@ -1095,7 +1095,7 @@ namespace LumiSoft.Net.TCP
         /// </summary>
         /// <param name="size">Number of bytes readed.</param>
         /// <param name="text">Log text.</param>
-        protected void LogAddRead(long size,string text)
+        internal protected void LogAddRead(long size,string text)
         {
             try{
                 if(m_pLogger != null){
@@ -1123,7 +1123,7 @@ namespace LumiSoft.Net.TCP
         /// </summary>
         /// <param name="size">Number of bytes written.</param>
         /// <param name="text">Log text.</param>
-        protected void LogAddWrite(long size,string text)
+        internal protected void LogAddWrite(long size,string text)
         {
             try{
                 if(m_pLogger != null){
@@ -1150,7 +1150,7 @@ namespace LumiSoft.Net.TCP
         /// Logs free text entry.
         /// </summary>
         /// <param name="text">Log text.</param>
-        protected void LogAddText(string text)
+        internal protected void LogAddText(string text)
         {
             try{
                 if(m_pLogger != null){
@@ -1177,7 +1177,7 @@ namespace LumiSoft.Net.TCP
         /// </summary>
         /// <param name="text">Log text.</param>
         /// <param name="x">Exception happened.</param>
-        protected void LogAddException(string text,Exception x)
+        internal protected void LogAddException(string text,Exception x)
         {
             try{
                 if(m_pLogger != null){
