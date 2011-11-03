@@ -27,15 +27,15 @@ namespace LumiSoft.Net
 		}
 
 
-		#region method AppenString
+		#region method AppendString
 
-		/// <summary>
+        /// <summary>
 		/// Appends specified string to SourceString.
 		/// </summary>
-		/// <param name="str">String value to append.</param>
-		public void AppenString(string str)
+		/// <param name="value">String value to append.</param>
+		public void AppendString(string value)
 		{
-			m_SourceString += str;
+			m_SourceString += value;
 		}
 
 		#endregion
@@ -185,8 +185,7 @@ namespace LumiSoft.Net
 		}
 
 		#endregion
-
-
+        
 		#region method ReadWord
 
         /// <summary>
@@ -308,16 +307,23 @@ namespace LumiSoft.Net
 			}
 
 			bool inQuotedString = false; // Holds flag if position is quoted string or not
-			char lastChar       = (char)0;
+            bool skipNextChar   = false;
 
 			int closingCharIndex = -1;
 			int nestedStartingCharCounter = 0;
 			for(int i=1;i<m_SourceString.Length;i++){
-				// Skip escaped(\) "
-				if(lastChar != '\\' && m_SourceString[i] == '\"'){
-					// Start/end quoted string area
-					inQuotedString = !inQuotedString;
-				}
+                // Skip this char.
+                if(skipNextChar){
+                    skipNextChar = false;
+                }
+                // We have char escape '\', skip next char.
+                else if(m_SourceString[i] == '\\'){
+                    skipNextChar = true;
+                }
+                // Start/end quoted string area
+                else if(m_SourceString[i] == '\"'){
+                    inQuotedString = !inQuotedString;
+                }
 				// We need to skip parenthesis in quoted string
 				else if(!inQuotedString){
 					// There is nested parenthesis
@@ -337,8 +343,6 @@ namespace LumiSoft.Net
 						}
 					}
 				}
-
-				lastChar = m_SourceString[i];
 			}
 
 			if(closingCharIndex == -1){
@@ -353,8 +357,7 @@ namespace LumiSoft.Net
 		}
 
 		#endregion
-
-
+        
         #region method ReadToEnd
 
         /// <summary>
@@ -371,6 +374,24 @@ namespace LumiSoft.Net
             m_SourceString = "";
 
             return retVal;
+        }
+
+        #endregion
+
+        #region method RemoveFromEnd
+
+        /// <summary>
+        /// Removes specified count of chars from the end of the source string.
+        /// </summary>
+        /// <param name="count">Char count.</param>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        public void RemoveFromEnd(int count)
+        {
+            if(count < 0){
+                throw new ArgumentException("Argument 'count' value must be >= 0.","count");
+            }
+
+            m_SourceString = m_SourceString.Substring(0,m_SourceString.Length - count);
         }
 
         #endregion
