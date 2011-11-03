@@ -35,377 +35,7 @@ namespace LumiSoft.Net.IMAP.Client
 	/// </code>
 	/// </example>
     public class IMAP_Client : TCP_Client
-    {
-        #region class _FetchResponseReader
-
-        /// <summary>
-        /// This class implements FETCH response reader.
-        /// </summary>
-        internal class _FetchResponseReader
-        {
-            private IMAP_Client              m_pImap        = null;
-            private string                   m_FetchLine    = null;
-            private StringReader             m_pFetchReader = null;
-            private IMAP_Client_FetchHandler m_pHandler     = null;
-
-            /// <summary>
-            /// Default constructor.
-            /// </summary>
-            /// <param name="imap">IMAP client.</param>
-            /// <param name="fetchLine">Initial FETCH response line.</param>
-            /// <param name="handler">Fetch data-items handler.</param>
-            /// <exception cref="ArgumentNullException">Is raised when <b>imap</b>,<b>fetchLine</b> or <b>handler</b> is null reference.</exception>
-            public _FetchResponseReader(IMAP_Client imap,string fetchLine,IMAP_Client_FetchHandler handler)
-            {
-                if(imap == null){
-                    throw new ArgumentNullException("imap");
-                }
-                if(fetchLine == null){
-                    throw new ArgumentNullException("fetchLine");
-                }
-                if(handler == null){
-                    throw new ArgumentNullException("handler");
-                }
-
-                m_pImap     = imap;
-                m_FetchLine = fetchLine;
-                m_pHandler  = handler;
-            }
-
-            #region method Start
-
-            /// <summary>
-            /// Starts reading FETCH response.
-            /// </summary>
-            public void Start()
-            {
-                // * seqNo FETCH 1data-item/(1*data-item)
-
-                int seqNo = Convert.ToInt32(m_FetchLine.Split(' ')[1]);
-
-                // Notify that current message has changed.
-                m_pHandler.SetCurrentSeqNo(seqNo);
-                m_pHandler.OnNextMessage();
-
-                m_pFetchReader = new StringReader(m_FetchLine.Split(new char[]{' '},4)[3]);
-                if(m_pFetchReader.StartsWith("(")){
-                    m_pFetchReader.ReadSpecifiedLength(1);
-                }
-
-                // Read data-items.
-                while(m_pFetchReader.Available > 0){
-                    m_pFetchReader.ReadToFirstChar();
-//*
-                    #region BODY
-
-                    if(m_pFetchReader.StartsWith("BODY ",false)){
-                    }
-
-                    #endregion
-
-                    #region BODY[<section>]<<origin octet>>
-
-                    else if(m_pFetchReader.StartsWith("BODY[",false)){
-                        // Eat BODY word.
-                        m_pFetchReader.ReadWord();
-
-                        // Read body-section.
-                        string section = m_pFetchReader.ReadParenthesized();
-
-                        // Read origin if any.
-                        int offset = -1;
-                        if(m_pFetchReader.StartsWith("<")){
-                            offset = Convert.ToInt32(m_pFetchReader.ReadParenthesized().Split(' ')[0]);
-                        }
-
-
-                        // Get Message store stream.
-                        IMAP_Client_Fetch_Body_EArgs eArgs = new IMAP_Client_Fetch_Body_EArgs(section,offset);
-                        m_pHandler.OnBody(eArgs);
-
-                        // We don't have BODY[].
-                        m_pFetchReader.ReadToFirstChar();
-                        if(m_pFetchReader.StartsWith("NIL",false)){
-                            // Eat NIL.
-                            m_pFetchReader.ReadWord();
-                        }
-                        // BODY[] value is returned as string-literal.
-                        else if(m_pFetchReader.StartsWith("{",false)){
-                            if(eArgs.Stream == null){
-                                m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()),new JunkingStream());
-                            }
-                            else{
-                                m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()),eArgs.Stream);
-                            }
-                            
-                            // Read continuing FETCH line.
-                            m_pFetchReader = new StringReader(m_pImap.ReadLine());
-                        }
-                        // BODY[] is quoted-string.
-                        else{
-                            m_pFetchReader.ReadWord();
-                        }
-
-                        // Notify that message storing has completed.
-                        eArgs.OnStoringCompleted();
-                    }
-
-                    #endregion
-//*
-                    #region BODYSTRUCTURE
-
-                    else if(m_pFetchReader.StartsWith("BODYSTRUCTURE ",false)){
-                    }
-
-                    #endregion
-
-                    #region ENVELOPE
-
-                    else if(m_pFetchReader.StartsWith("ENVELOPE ",false)){
-                        m_pHandler.OnEnvelope(IMAP_Envelope.Parse(this));
-                    }
-
-                    #endregion
-
-                    #region  FLAGS
-
-                    else if(m_pFetchReader.StartsWith("FLAGS ",false)){
-                        // Eat FLAGS word.
-                        m_pFetchReader.ReadWord();
-
-                        string   flagsList = m_pFetchReader.ReadParenthesized();
-                        string[] flags     = new string[0];
-                        if(!string.IsNullOrEmpty(flagsList)){
-                            flags = flagsList.Split(' ');
-                        }
-
-                        m_pHandler.OnFlags(flags);
-                    }
-
-                    #endregion
-
-                    #region INTERNALDATE
-
-                    else if(m_pFetchReader.StartsWith("INTERNALDATE ",false)){
-                         // Eat INTERNALDATE word.
-                        m_pFetchReader.ReadWord();
-
-                        m_pHandler.OnInternalDate(IMAP_Utils.ParseDate(m_pFetchReader.ReadWord()));
-                    }
-
-                    #endregion
-
-                    #region RFC822
-
-                    else if(m_pFetchReader.StartsWith("RFC822 ",false)){
-                        // Eat RFC822 word.
-                        m_pFetchReader.ReadWord(false,new char[]{' '},false);
-                        m_pFetchReader.ReadToFirstChar();
-
-                        // Get Message store stream.
-                        IMAP_Client_Fetch_Rfc822_EArgs eArgs = new IMAP_Client_Fetch_Rfc822_EArgs();
-                        m_pHandler.OnRfc822(eArgs);
-
-                        // We don't have RFC822.
-                        if(m_pFetchReader.StartsWith("NIL",false)){
-                            // Eat NIL.
-                            m_pFetchReader.ReadWord();
-                        }
-                        // RFC822 value is returned as string-literal.
-                        else if(m_pFetchReader.StartsWith("{",false)){
-                            if(eArgs.Stream == null){
-                                m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()),new JunkingStream());
-                            }
-                            else{
-                                m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()),eArgs.Stream);
-                            }
-                            
-                            // Read continuing FETCH line.
-                            m_pFetchReader = new StringReader(m_pImap.ReadLine());
-                        }
-                        // RFC822 is quoted-string.
-                        else{
-                            m_pFetchReader.ReadWord();
-                        }
-
-                        // Notify that message storing has completed.
-                        eArgs.OnStoringCompleted();
-                    }
-
-                    #endregion
-
-                    #region RFC822.HEADER
-
-                    else if(m_pFetchReader.StartsWith("RFC822.HEADER ",false)){
-                        // Eat RFC822.HEADER word.
-                        m_pFetchReader.ReadWord(false,new char[]{' '},false);
-                        m_pFetchReader.ReadToFirstChar();
-                        
-                        string text = null;
-                        // We don't have HEADER.
-                        if(m_pFetchReader.StartsWith("NIL",false)){
-                            // Eat NIL.
-                            m_pFetchReader.ReadWord();
-
-                            text = null;
-                        }
-                        // HEADER value is returned as string-literal.
-                        else if(m_pFetchReader.StartsWith("{",false)){
-                            text = m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()));
-                            
-                            // Read continuing FETCH line.
-                            m_pFetchReader = new StringReader(m_pImap.ReadLine());
-                        }
-                        // HEADER is quoted-string.
-                        else{
-                            text = m_pFetchReader.ReadWord();
-                        }
-
-                        m_pHandler.OnRfc822Header(text);
-                    }
-
-                    #endregion
-
-                    #region RFC822.SIZE
-
-                    else if(m_pFetchReader.StartsWith("RFC822.SIZE ",false)){
-                        // Eat RFC822.SIZE word.
-                        m_pFetchReader.ReadWord(false,new char[]{' '},false);
-
-                        m_pHandler.OnSize(Convert.ToInt32(m_pFetchReader.ReadWord()));
-                    }
-
-                    #endregion
-
-                    #region RFC822.TEXT
-
-                    else if(m_pFetchReader.StartsWith("RFC822.TEXT ",false)){
-                        // Eat RFC822.TEXT word.
-                        m_pFetchReader.ReadWord(false,new char[]{' '},false);
-                        m_pFetchReader.ReadToFirstChar();
-                        
-                        string text = null;
-                        // We don't have TEXT.
-                        if(m_pFetchReader.StartsWith("NIL",false)){
-                            // Eat NIL.
-                            m_pFetchReader.ReadWord();
-
-                            text = null;
-                        }
-                        // TEXT value is returned as string-literal.
-                        else if(m_pFetchReader.StartsWith("{",false)){
-                            text = m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()));
-                            
-                            // Read continuing FETCH line.
-                            m_pFetchReader = new StringReader(m_pImap.ReadLine());
-                        }
-                        // TEXT is quoted-string.
-                        else{
-                            text = m_pFetchReader.ReadWord();
-                        }
-
-                        m_pHandler.OnRfc822Text(text);
-                    }
-
-                    #endregion
-
-                    #region UID
-
-                    else if(m_pFetchReader.StartsWith("UID ",false)){
-                        // Eat UID word.
-                        m_pFetchReader.ReadWord();
-
-                        m_pHandler.OnUID(Convert.ToInt64(m_pFetchReader.ReadWord()));
-                    }
-
-                    #endregion
-
-                    #region X-GM-MSGID
-
-                    else if(m_pFetchReader.StartsWith("X-GM-MSGID ",false)){
-                        // Eat X-GM-MSGID word.
-                        m_pFetchReader.ReadWord();
-
-                        m_pHandler.OnX_GM_MSGID(Convert.ToUInt64(m_pFetchReader.ReadWord()));
-                    }
-
-                    #endregion
-
-                    #region X-GM-THRID
-
-                    else if(m_pFetchReader.StartsWith("X-GM-THRID ",false)){
-                        // Eat X-GM-THRID word.
-                        m_pFetchReader.ReadWord();
-
-                        m_pHandler.OnX_GM_THRID(Convert.ToUInt64(m_pFetchReader.ReadWord()));
-                    }
-
-                    #endregion
-
-                    #region Fetch closing ")"
-
-                    else if(m_pFetchReader.StartsWith(")",false)){
-                        break;
-                    }
-
-                    #endregion
-
-                    else{
-                        throw new NotSupportedException("Not supported IMAP FETCH data-item '" + m_pFetchReader.ReadToEnd() + "'.");
-                    }
-                }
-            }
-
-            #endregion
-
-
-            #region method GetReader
-
-            /// <summary>
-            /// Gets FETCH current line data reader.
-            /// </summary>
-            internal StringReader GetReader()
-            {
-                return m_pFetchReader;
-            }
-
-            #endregion
-
-            #region method ReadString
-
-            /// <summary>
-            /// Reads string. Quoted-string-string-literal and NIL supported.
-            /// </summary>
-            /// <returns>Returns readed string.</returns>
-            internal string ReadString()
-            {                        
-                m_pFetchReader.ReadToFirstChar();
-                // NIL string.
-                if(m_pFetchReader.StartsWith("NIL",false)){
-                    m_pFetchReader.ReadWord();
-
-                    return null;
-                }
-                // string-literal.
-                else if(m_pFetchReader.StartsWith("{")){
-                    string retVal = m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()));
-
-                    // Read continuing FETCH line.
-                    m_pFetchReader = new StringReader(m_pImap.ReadLine());
-
-                    return retVal;
-                }
-                // quoted-string or atom.
-                else{
-                    return MIME_Encoding_EncodedWord.DecodeS(m_pFetchReader.ReadWord());
-                }
-            }
-
-            #endregion
-        }
-
-        #endregion
-
+    {        
         private GenericIdentity            m_pAuthenticatedUser = null;
         private string                     m_GreetingText       = "";
         private int                        m_CommandIndex       = 1;
@@ -515,7 +145,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " STARTTLS\r\n");
 
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadFinalResponse(null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -581,7 +211,7 @@ namespace LumiSoft.Net.IMAP.Client
             // Log manually, remove password.
             LogAddWrite(cmd.Length,(m_CommandIndex - 1).ToString("d5") + " LOGIN " + TextUtils.QuoteString(user) + " <PASSWORD-REMOVED>");
 
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadFinalResponse(null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -1000,7 +630,12 @@ namespace LumiSoft.Net.IMAP.Client
             SendCommand((m_CommandIndex++).ToString("d5") + " NAMESPACE\r\n");
 
             List<IMAP_r_u_Namespace> retVal = new List<IMAP_r_u_Namespace>();
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,retVal,null,null);
+
+            IMAP_r_ServerStatus response = ReadFinalResponse(delegate(object sender,EventArgs<IMAP_r_u> e){
+                if(e.Value is IMAP_r_u_Namespace){
+                    retVal.Add((IMAP_r_u_Namespace)e.Value);
+                }
+            });
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -1177,7 +812,12 @@ namespace LumiSoft.Net.IMAP.Client
             }
             
             List<IMAP_r_u_List> retVal = new List<IMAP_r_u_List>();
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,retVal,null,null,null,null,null,null,null,null,null,null);
+
+            IMAP_r_ServerStatus response = ReadFinalResponse(delegate(object sender,EventArgs<IMAP_r_u> e){
+                if(e.Value is IMAP_r_u_List){
+                    retVal.Add((IMAP_r_u_List)e.Value);
+                }
+            });
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -1267,7 +907,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " CREATE " + IMAP_Utils.EncodeMailbox(folder,m_MailboxEncoding) + "\r\n");
 
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadFinalResponse(null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -1357,7 +997,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " DELETE " + IMAP_Utils.EncodeMailbox(folder,m_MailboxEncoding) + "\r\n");
 
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadFinalResponse(null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -1460,7 +1100,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " RENAME " + IMAP_Utils.EncodeMailbox(folder,m_MailboxEncoding) + " " + IMAP_Utils.EncodeMailbox(newFolder,m_MailboxEncoding) + "\r\n");
 
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadFinalResponse(null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -1542,7 +1182,12 @@ namespace LumiSoft.Net.IMAP.Client
             }
             
             List<IMAP_r_u_LSub> retVal  = new List<IMAP_r_u_LSub>();
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,retVal,null,null,null,null,null,null,null,null,null);
+
+            IMAP_r_ServerStatus response = ReadFinalResponse(delegate(object sender,EventArgs<IMAP_r_u> e){
+                if(e.Value is IMAP_r_u_LSub){
+                    retVal.Add((IMAP_r_u_LSub)e.Value);
+                }
+            });
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -1612,7 +1257,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " SUBSCRIBE " + IMAP_Utils.EncodeMailbox(folder,m_MailboxEncoding) + "\r\n");
 
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadFinalResponse(null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -1668,7 +1313,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " UNSUBSCRIBE " + IMAP_Utils.EncodeMailbox(folder,m_MailboxEncoding) + "\r\n");
 
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadFinalResponse(null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -1779,7 +1424,12 @@ namespace LumiSoft.Net.IMAP.Client
             SendCommand((m_CommandIndex++).ToString("d5") + " STATUS " + IMAP_Utils.EncodeMailbox(folder,m_MailboxEncoding) + " (MESSAGES RECENT UIDNEXT UIDVALIDITY UNSEEN)\r\n");
 
             List<IMAP_r_u_Status> retVal  = new List<IMAP_r_u_Status>();
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,retVal,null,null,null,null,null);
+
+            IMAP_r_ServerStatus response = ReadFinalResponse(delegate(object sender,EventArgs<IMAP_r_u> e){
+                if(e.Value is IMAP_r_u_Status){
+                    retVal.Add((IMAP_r_u_Status)e.Value);
+                }
+            });
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -1886,17 +1536,60 @@ namespace LumiSoft.Net.IMAP.Client
 
             IMAP_Client_SelectedFolder folderInfo = new IMAP_Client_SelectedFolder(folder);
 
-            IMAP_r_ServerStatus response = ReadResponse(null,folderInfo,null,null,null,null,null,null,null,null,null,null,null,null);
-            if(response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
+            IMAP_r_ServerStatus response = ReadFinalResponse(delegate(object sender,EventArgs<IMAP_r_u> e){                
+                if(e.Value is IMAP_r_u_Flags){
+                    IMAP_r_u_Flags resp = (IMAP_r_u_Flags)e.Value;
+
+                    folderInfo.SetFlags(resp.Flags);                    
+                }
+                else if(e.Value is IMAP_r_u_Exists){
+                    IMAP_r_u_Exists resp = (IMAP_r_u_Exists)e.Value;
+
+                    folderInfo.SetMessagesCount(resp.MessageCount);                    
+                }
+                else if(e.Value is IMAP_r_u_Recent){
+                    IMAP_r_u_Recent resp = (IMAP_r_u_Recent)e.Value;
+
+                    folderInfo.SetRecentMessagesCount(resp.MessageCount);                    
+                }
+                else if(e.Value is IMAP_r_u_ServerStatus){
+                    IMAP_r_u_ServerStatus resp = (IMAP_r_u_ServerStatus)e.Value;
+
+                    if(!string.IsNullOrEmpty(resp.OptionalResponseCode)){
+                        if(resp.OptionalResponseCode.Equals("PERMANENTFLAGS",StringComparison.InvariantCultureIgnoreCase)){
+                            StringReader r = new StringReader(resp.OptionalResponseArgs);
+
+                            folderInfo.SetPermanentFlags(r.ReadParenthesized().Split(' '));                            
+                        }
+                        else if(resp.OptionalResponseCode.Equals("READ-ONLY",StringComparison.InvariantCultureIgnoreCase)){
+                            folderInfo.SetReadOnly(true);                            
+                        }
+                        else if(resp.OptionalResponseCode.Equals("READ-WRITE",StringComparison.InvariantCultureIgnoreCase)){
+                            folderInfo.SetReadOnly(true);                            
+                        }
+                        else if(resp.OptionalResponseCode.Equals("UIDNEXT",StringComparison.InvariantCultureIgnoreCase)){
+                            folderInfo.SetUidNext(Convert.ToInt64(resp.OptionalResponseArgs));                            
+                        }
+                        else if(resp.OptionalResponseCode.Equals("UIDVALIDITY",StringComparison.InvariantCultureIgnoreCase)){
+                            folderInfo.SetUidValidity(Convert.ToInt64(resp.OptionalResponseArgs));                            
+                        }
+                        else if(resp.OptionalResponseCode.Equals("UNSEEN",StringComparison.InvariantCultureIgnoreCase)){
+                            folderInfo.SetFirstUnseen(Convert.ToInt32(resp.OptionalResponseArgs));                            
+                        }
+                        // We don't care about other response codes.                            
+                    }                    
+                }
+            });
+            if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
+                throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
+            }
+            else{
                 m_pSelectedFolder = folderInfo;
  
                 // Mark folder as read-only if optional response code "READ-ONLY" specified.
                 if(response.OptionalResponseCode != null && response.OptionalResponseCode.Equals("READ-ONLY",StringComparison.InvariantCultureIgnoreCase)){
                     m_pSelectedFolder.SetReadOnly(true);
                 }
-            }
-            else{
-                throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
         }
 
@@ -1959,17 +1652,58 @@ namespace LumiSoft.Net.IMAP.Client
 
             IMAP_Client_SelectedFolder folderInfo = new IMAP_Client_SelectedFolder(folder);
 
-            IMAP_r_ServerStatus response = ReadResponse(null,folderInfo,null,null,null,null,null,null,null,null,null,null,null,null);
-            if(response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
-                m_pSelectedFolder = folderInfo;
- 
-                // Mark folder as read-only if optional response code "READ-ONLY" specified.
-                if(response.OptionalResponseCode != null && response.OptionalResponseCode.Equals("READ-ONLY",StringComparison.InvariantCultureIgnoreCase)){
-                    m_pSelectedFolder.SetReadOnly(true);
+            IMAP_r_ServerStatus response = ReadFinalResponse(delegate(object sender,EventArgs<IMAP_r_u> e){                
+                if(e.Value is IMAP_r_u_Flags){
+                    IMAP_r_u_Flags resp = (IMAP_r_u_Flags)e.Value;
+
+                    folderInfo.SetFlags(resp.Flags);                    
                 }
+                else if(e.Value is IMAP_r_u_Exists){
+                    IMAP_r_u_Exists resp = (IMAP_r_u_Exists)e.Value;
+
+                    folderInfo.SetMessagesCount(resp.MessageCount);                    
+                }
+                else if(e.Value is IMAP_r_u_Recent){
+                    IMAP_r_u_Recent resp = (IMAP_r_u_Recent)e.Value;
+
+                    folderInfo.SetRecentMessagesCount(resp.MessageCount);                    
+                }
+                else if(e.Value is IMAP_r_u_ServerStatus){
+                    IMAP_r_u_ServerStatus resp = (IMAP_r_u_ServerStatus)e.Value;
+
+                    if(!string.IsNullOrEmpty(resp.OptionalResponseCode)){
+                        if(resp.OptionalResponseCode.Equals("PERMANENTFLAGS",StringComparison.InvariantCultureIgnoreCase)){
+                            StringReader r = new StringReader(resp.OptionalResponseArgs);
+
+                            folderInfo.SetPermanentFlags(r.ReadParenthesized().Split(' '));                            
+                        }
+                        else if(resp.OptionalResponseCode.Equals("READ-ONLY",StringComparison.InvariantCultureIgnoreCase)){
+                            folderInfo.SetReadOnly(true);                            
+                        }
+                        else if(resp.OptionalResponseCode.Equals("READ-WRITE",StringComparison.InvariantCultureIgnoreCase)){
+                            folderInfo.SetReadOnly(true);                            
+                        }
+                        else if(resp.OptionalResponseCode.Equals("UIDNEXT",StringComparison.InvariantCultureIgnoreCase)){
+                            folderInfo.SetUidNext(Convert.ToInt64(resp.OptionalResponseArgs));                            
+                        }
+                        else if(resp.OptionalResponseCode.Equals("UIDVALIDITY",StringComparison.InvariantCultureIgnoreCase)){
+                            folderInfo.SetUidValidity(Convert.ToInt64(resp.OptionalResponseArgs));                            
+                        }
+                        else if(resp.OptionalResponseCode.Equals("UNSEEN",StringComparison.InvariantCultureIgnoreCase)){
+                            folderInfo.SetFirstUnseen(Convert.ToInt32(resp.OptionalResponseArgs));                            
+                        }
+                        // We don't care about other response codes.                            
+                    }                    
+                }
+            });
+            if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
+                throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
             else{
-                throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
+                m_pSelectedFolder = folderInfo;
+ 
+                // Examine is always read only.
+                m_pSelectedFolder.SetReadOnly(true);                
             }
         }
 
@@ -2026,16 +1760,19 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " GETQUOTAROOT " + IMAP_Utils.EncodeMailbox(folder,m_MailboxEncoding) + "\r\n");
             
-            List<IMAP_r_u_Quota> quota = new List<IMAP_r_u_Quota>();
-            List<IMAP_r_u_QuotaRoot> quotaRoot = new List<IMAP_r_u_QuotaRoot>();
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,quota,quotaRoot,null,null,null);
+            List<IMAP_r> retVal = new List<IMAP_r>();
+
+            IMAP_r_ServerStatus response = ReadFinalResponse(delegate(object sender,EventArgs<IMAP_r_u> e){
+                if(e.Value is IMAP_r_u_Quota){
+                    retVal.Add((IMAP_r_u_Quota)e.Value);
+                }
+                else if(e.Value is IMAP_r_u_QuotaRoot){
+                    retVal.Add((IMAP_r_u_QuotaRoot)e.Value);
+                }
+            });
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
-
-            List<IMAP_r> retVal = new List<IMAP_r>();
-            retVal.AddRange(quotaRoot.ToArray());
-            retVal.AddRange(quota.ToArray());
 
             return retVal.ToArray();
         }
@@ -2088,7 +1825,12 @@ namespace LumiSoft.Net.IMAP.Client
             SendCommand((m_CommandIndex++).ToString("d5") + " GETQUOTA " + IMAP_Utils.EncodeMailbox(quotaRootName,m_MailboxEncoding) +"\r\n");
 
             List<IMAP_r_u_Quota> retVal  = new List<IMAP_r_u_Quota>();
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,retVal,null,null,null,null);
+
+            IMAP_r_ServerStatus response = ReadFinalResponse(delegate(object sender,EventArgs<IMAP_r_u> e){
+                if(e.Value is IMAP_r_u_Quota){
+                    retVal.Add((IMAP_r_u_Quota)e.Value);
+                }
+            });
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -2185,7 +1927,12 @@ namespace LumiSoft.Net.IMAP.Client
             SendCommand((m_CommandIndex++).ToString("d5") + " GETACL " + IMAP_Utils.EncodeMailbox(folder,m_MailboxEncoding) + "\r\n");
 
             List<IMAP_r_u_Acl> retVal  = new List<IMAP_r_u_Acl>();
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,retVal,null,null,null,null,null,null,null,null);
+
+            IMAP_r_ServerStatus response = ReadFinalResponse(delegate(object sender,EventArgs<IMAP_r_u> e){
+                if(e.Value is IMAP_r_u_Acl){
+                    retVal.Add((IMAP_r_u_Acl)e.Value);
+                }
+            });
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -2286,10 +2033,10 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand(command.ToString());
 
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadFinalResponse(null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
-            } 
+            }
         }
 
         #endregion
@@ -2352,7 +2099,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " DELETEACL " + TextUtils.QuoteString(user) + " " + IMAP_Utils.EncodeMailbox(folder,m_MailboxEncoding) + "\r\n");
 
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadFinalResponse(null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -2430,7 +2177,12 @@ namespace LumiSoft.Net.IMAP.Client
             SendCommand((m_CommandIndex++).ToString("d5") + " LISTRIGHTS " + IMAP_Utils.EncodeMailbox(folder,m_MailboxEncoding) + " " + TextUtils.QuoteString(identifier) + "\r\n");
 
             List<IMAP_r_u_ListRights> retVal = new List<IMAP_r_u_ListRights>();
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,retVal,null,null,null,null,null,null);
+
+            IMAP_r_ServerStatus response = ReadFinalResponse(delegate(object sender,EventArgs<IMAP_r_u> e){
+                if(e.Value is IMAP_r_u_ListRights){
+                    retVal.Add((IMAP_r_u_ListRights)e.Value);
+                }
+            });
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -2451,7 +2203,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected or not-authenticated state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
-        public IMAP_Response_MyRights[] GetFolderMyRights(string folder)
+        public IMAP_r_u_MyRights[] GetFolderMyRights(string folder)
         {
             if(folder == null){
                 throw new ArgumentNullException("folder");
@@ -2489,8 +2241,13 @@ namespace LumiSoft.Net.IMAP.Client
             
             SendCommand((m_CommandIndex++).ToString("d5") + " MYRIGHTS " + IMAP_Utils.EncodeMailbox(folder,m_MailboxEncoding) + "\r\n");
 
-            List<IMAP_Response_MyRights> retVal = new List<IMAP_Response_MyRights>();
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,retVal,null,null,null,null,null,null,null);
+            List<IMAP_r_u_MyRights> retVal = new List<IMAP_r_u_MyRights>();
+
+            IMAP_r_ServerStatus response = ReadFinalResponse(delegate(object sender,EventArgs<IMAP_r_u> e){
+                if(e.Value is IMAP_r_u_MyRights){
+                    retVal.Add((IMAP_r_u_MyRights)e.Value);
+                }
+            });
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -2650,8 +2407,8 @@ namespace LumiSoft.Net.IMAP.Client
             SendCommand(command.ToString());
 
             // We must get + here.
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
-            if(!response.ResponseCode.Equals("+",StringComparison.InvariantCultureIgnoreCase)){
+            IMAP_r_ServerStatus response = ReadFinalResponse(null);
+            if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
 
@@ -2673,10 +2430,10 @@ namespace LumiSoft.Net.IMAP.Client
             // Send command line terminating CRLF.
             WriteLine("\r\n");
 
-            response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
+            response = ReadFinalResponse(null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
-            } 
+            }
         }
 
         #endregion
@@ -2733,8 +2490,13 @@ namespace LumiSoft.Net.IMAP.Client
             
             SendCommand(cmd.ToString());
 
-            List<IMAP_r_u_Enable> retVal = new List<IMAP_r_u_Enable>();            
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
+            List<IMAP_r_u_Enable> retVal = new List<IMAP_r_u_Enable>();
+
+            IMAP_r_ServerStatus response = ReadFinalResponse(delegate(object sender,EventArgs<IMAP_r_u> e){
+                if(e.Value is IMAP_r_u_Enable){
+                    retVal.Add((IMAP_r_u_Enable)e.Value);
+                }
+            });
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -2835,7 +2597,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " CLOSE\r\n");
 
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadFinalResponse(null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -2846,19 +2608,20 @@ namespace LumiSoft.Net.IMAP.Client
         #endregion
 
         #region method Fetch
-
+                
         /// <summary>
         /// Fetches specified message items.
         /// </summary>
         /// <param name="uid">Specifies if argument <b>seqSet</b> contains messages UID or sequence numbers.</param>
         /// <param name="seqSet">Sequence set of messages to fetch.</param>
         /// <param name="items">Fetch items to fetch.</param>
-        /// <param name="handler">Fetch responses handler.</param>
-        /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b>,<b>items</b> or <b>handler</b> is null reference.</exception>
+        /// <param name="callback">Optional callback to be called for each server returned untagged response.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b> or <b>items</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected, not-authenticated or not-selected state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
-        public void Fetch(bool uid,IMAP_SequenceSet seqSet,IMAP_Fetch_DataItem[] items,IMAP_Client_FetchHandler handler)
+        /// <remarks>Fetch raises <see cref="UntaggedResponse"/> for ecach fetched message.</remarks>
+        public void Fetch(bool uid,IMAP_t_SeqSet seqSet,IMAP_t_Fetch_i[] items,EventHandler<EventArgs<IMAP_r_u>> callback)
         {
             if(seqSet == null){
                 throw new ArgumentNullException("seqSet");
@@ -2868,9 +2631,6 @@ namespace LumiSoft.Net.IMAP.Client
             }
             if(items.Length < 1){
                 throw new ArgumentException("Argument 'items' must conatain at least 1 value.","items");
-            }
-            if(handler == null){
-                throw new ArgumentNullException("handler");
             }
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
@@ -2885,51 +2645,346 @@ namespace LumiSoft.Net.IMAP.Client
                 throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
 
-            /* RFC 3501 6.4.5. FETCH Command.
-                Arguments:  sequence set
-                            message data item names or macro
-
-                Responses:  untagged responses: FETCH
-
-                Result:     OK - fetch completed
-                            NO - fetch error: can't fetch that data
-                            BAD - command unknown or arguments invalid
-
-                The FETCH command retrieves data associated with a message in the
-                mailbox.  The data items to be fetched can be either a single atom
-                or a parenthesized list.
-
-                Most data items, identified in the formal syntax under the
-                msg-att-static rule, are static and MUST NOT change for any
-                particular message.  Other data items, identified in the formal
-                syntax under the msg-att-dynamic rule, MAY change, either as a
-                result of a STORE command or due to external events.
-
-                    For example, if a client receives an ENVELOPE for a
-                    message when it already knows the envelope, it can
-                    safely ignore the newly transmitted envelope.
-            */
-
-            StringBuilder command = new StringBuilder();
-            command.Append((m_CommandIndex++).ToString("d5"));
-            if(uid){
-                command.Append(" UID");
-            }
-            command.Append(" FETCH " + seqSet.ToSequenceSetString() + " (");
-            for(int i=0;i<items.Length;i++){
-                if(i > 0){
-                    command.Append(" ");
+            ManualResetEvent wait = new ManualResetEvent(false);
+            using(FetchAsyncOP op = new FetchAsyncOP(uid,seqSet,items,callback)){
+                op.CompletedAsync += delegate(object s1,EventArgs<FetchAsyncOP> e1){
+                    wait.Set();
+                };
+                if(!this.FetchAsync(op)){
+                    wait.Set();
                 }
-                command.Append(items[i].ToString());
-            }
-            command.Append(")\r\n");
-     
-            SendCommand(command.ToString());
+                wait.WaitOne();
+                wait.Close();
 
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,handler,null);
-            if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
-                throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
+                if(op.Error != null){
+                    throw op.Error;
+                }
             }
+        }
+
+        #endregion
+
+        #region method FetchAsync
+
+        #region class FetchAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="IMAP_Client.FetchAsync"/> asynchronous operation.
+        /// </summary>
+        public class FetchAsyncOP : IDisposable,IAsyncOP
+        {
+            private object                            m_pLock          = new object();
+            private AsyncOP_State                     m_State          = AsyncOP_State.WaitingForStart;
+            private Exception                         m_pException     = null;
+            private IMAP_r_ServerStatus               m_pFinalResponse = null;
+            private IMAP_Client                       m_pImapClient    = null;
+            private bool                              m_RiseCompleted  = false;
+            private bool                              m_Uid            = false;
+            private IMAP_t_SeqSet                     m_pSeqSet        = null;
+            private IMAP_t_Fetch_i[]                  m_pDataItems     = null;
+            private EventHandler<EventArgs<IMAP_r_u>> m_pCallback      = null;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="uid">Specifies if argument <b>seqSet</b> contains messages UID or sequence numbers.</param>
+            /// <param name="seqSet">Sequence set of messages to fetch.</param>
+            /// <param name="items">Fetch items to fetch.</param>
+            /// <param name="callback">Optional callback to be called for each server returned untagged response.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b> or <b>items</b> is null reference.</exception>
+            /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+            public FetchAsyncOP(bool uid,IMAP_t_SeqSet seqSet,IMAP_t_Fetch_i[] items,EventHandler<EventArgs<IMAP_r_u>> callback)
+            {
+                if(seqSet == null){
+                    throw new ArgumentNullException("seqSet");
+                }
+                if(items == null){
+                    throw new ArgumentNullException("items");
+                }                
+                if(items.Length < 1){
+                    throw new ArgumentException("Argument 'items' must conatain at least 1 value.","items");
+                }
+
+                m_Uid        = uid;
+                m_pSeqSet    = seqSet;
+                m_pDataItems = items;
+                m_pCallback  = callback;
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resource being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+
+                m_pException     = null;
+                m_pImapClient    = null;
+                m_pFinalResponse = null;
+                m_pSeqSet        = null;
+                m_pDataItems     = null;
+                m_pCallback      = null;
+                
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner IMAP client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            internal bool Start(IMAP_Client owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+                
+                m_pImapClient = owner;
+                
+                SetState(AsyncOP_State.Active);
+
+                try{ 
+                    /* RFC 3501 6.4.5. FETCH Command.
+                        Arguments:  sequence set
+                                    message data item names or macro
+
+                        Responses:  untagged responses: FETCH
+
+                        Result:     OK - fetch completed
+                                    NO - fetch error: can't fetch that data
+                                    BAD - command unknown or arguments invalid
+
+                        The FETCH command retrieves data associated with a message in the
+                        mailbox.  The data items to be fetched can be either a single atom
+                        or a parenthesized list.
+
+                        Most data items, identified in the formal syntax under the
+                        msg-att-static rule, are static and MUST NOT change for any
+                        particular message.  Other data items, identified in the formal
+                        syntax under the msg-att-dynamic rule, MAY change, either as a
+                        result of a STORE command or due to external events.
+
+                            For example, if a client receives an ENVELOPE for a
+                            message when it already knows the envelope, it can
+                            safely ignore the newly transmitted envelope.
+                    */
+
+                    StringBuilder command = new StringBuilder();
+                    command.Append((m_pImapClient.m_CommandIndex++).ToString("d5"));
+                    if(m_Uid){
+                        command.Append(" UID");
+                    }
+                    command.Append(" FETCH " + m_pSeqSet.ToString() + " (");
+                    for(int i=0;i<m_pDataItems.Length;i++){
+                        if(i > 0){
+                            command.Append(" ");
+                        }
+                        command.Append(m_pDataItems[i].ToString());
+                    }
+                    command.Append(")\r\n");
+     
+
+                    byte[] buffer = Encoding.UTF8.GetBytes(command.ToString());
+
+                    // Log
+                    m_pImapClient.LogAddWrite(buffer.Length,command.ToString().TrimEnd());
+
+                    // Start command sending.
+                    m_pImapClient.TcpStream.BeginWrite(buffer,0,buffer.Length,this.FetchCommandSendingCompleted,null);
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pImapClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method FetchCommandSendingCompleted
+
+            /// <summary>
+            /// Is called when FETCH command sending has finished.
+            /// </summary>
+            /// <param name="ar">Asynchronous result.</param>
+            private void FetchCommandSendingCompleted(IAsyncResult ar)
+            {
+                try{
+                    m_pImapClient.TcpStream.EndWrite(ar);
+
+                    ReadFinalResponseAsyncOP args = new ReadFinalResponseAsyncOP(m_pCallback);
+                    args.CompletedAsync += delegate(object sender,EventArgs<ReadFinalResponseAsyncOP> e){
+                        // Fetch failed.
+                        if(args.Error != null){
+                            m_pException = e.Value.Error;
+                        }
+                        else{
+                            m_pFinalResponse = (IMAP_r_ServerStatus)args.FinalResponse;
+                        }
+
+                        SetState(AsyncOP_State.Completed);
+                    };
+                    // Read final response completed synchronously.
+                    if(!m_pImapClient.ReadFinalResponseAsync(args)){
+                        // Fetch failed.
+                        if(args.Error != null){
+                            m_pException = args.Error;
+                        }
+                        else{
+                            m_pFinalResponse = (IMAP_r_ServerStatus)args.FinalResponse;
+                        }
+
+                        SetState(AsyncOP_State.Completed);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pImapClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            /// <summary>
+            /// Gets IMAP server final response.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public IMAP_r_ServerStatus FinalResponse
+            {
+                get{
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Response' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pFinalResponse; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<FetchAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<FetchAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Starts executing FETCH command.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="ReadFinalResponseAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <remarks>Fetch raises <see cref="UntaggedResponse"/> for ecach fetched message.</remarks>
+        public bool FetchAsync(FetchAsyncOP op)
+        {
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+                        
+            return op.Start(this);
         }
 
         #endregion
@@ -3016,7 +3071,7 @@ namespace LumiSoft.Net.IMAP.Client
                         cmdBuffer.SetLength(0);
 
                         // Read IMAP server response.
-                        IMAP_r_ServerStatus response1 = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
+                        IMAP_r_ServerStatus response1 = ReadFinalResponse(null);
                         if(!response1.ResponseCode.Equals("+",StringComparison.InvariantCultureIgnoreCase)){
                             throw new IMAP_ClientException(response1.ResponseCode,response1.ResponseText);
                         }
@@ -3056,7 +3111,12 @@ namespace LumiSoft.Net.IMAP.Client
 
             // Read IMAP server response.
             List<int> retVal = new List<int>();
-            IMAP_r_ServerStatus response = ReadResponse(null,null,retVal,null,null,null,null,null,null,null,null,null,null,null);
+
+            IMAP_r_ServerStatus response = ReadFinalResponse(delegate(object sender,EventArgs<IMAP_r_u> e){
+                if(e.Value is IMAP_r_u_Search){
+                    retVal.AddRange(((IMAP_r_u_Search)e.Value).Values);
+                }
+            });
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -3204,10 +3264,10 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand(command.ToString());
 
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadFinalResponse(null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
-            } 
+            }
         }
 
         #endregion
@@ -3287,7 +3347,7 @@ namespace LumiSoft.Net.IMAP.Client
                 SendCommand((m_CommandIndex++).ToString("d5") + " COPY " + seqSet.ToSequenceSetString() + " " + IMAP_Utils.EncodeMailbox(targetFolder,m_MailboxEncoding) + "\r\n");
             }
 
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadFinalResponse(null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -3393,7 +3453,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " EXPUNGE\r\n");
 
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadFinalResponse(null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -3481,7 +3541,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " IDLE\r\n");
 
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadFinalResponse(null);
             if(!response.ResponseCode.Equals("+",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -3489,7 +3549,7 @@ namespace LumiSoft.Net.IMAP.Client
             m_pIdle = new object();
 
             // Start idling asynchronously.
-            ReadFinalResponseAsyncOP args = new ReadFinalResponseAsyncOP();
+            ReadFinalResponseAsyncOP args = new ReadFinalResponseAsyncOP(null);
             args.CompletedAsync += delegate(object sender,EventArgs<ReadFinalResponseAsyncOP> e){
                 // IDLE failed.
                 if(e.Value.Error != null){
@@ -3603,7 +3663,12 @@ namespace LumiSoft.Net.IMAP.Client
             SendCommand((m_CommandIndex++).ToString("d5") + " CAPABILITY\r\n");
 
             List<IMAP_r_u_Capability> retVal = new List<IMAP_r_u_Capability>();
-            IMAP_r_ServerStatus response = ReadResponse(retVal,null,null,null,null,null,null,null,null,null,null,null,null,null);
+
+            IMAP_r_ServerStatus response = ReadFinalResponse(delegate(object sender,EventArgs<IMAP_r_u> e){
+                if(e.Value is IMAP_r_u_Capability){
+                    retVal.Add((IMAP_r_u_Capability)e.Value);
+                }
+            });
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -3655,7 +3720,7 @@ namespace LumiSoft.Net.IMAP.Client
 
             SendCommand((m_CommandIndex++).ToString("d5") + " NOOP\r\n");
 
-            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,null,null);
+            IMAP_r_ServerStatus response = ReadFinalResponse(null);
             if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
                 throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
             }
@@ -3685,7 +3750,7 @@ namespace LumiSoft.Net.IMAP.Client
 
         #endregion
                         
-
+        
         #region method SendCommand
 
         /// <summary>
@@ -3705,6 +3770,1369 @@ namespace LumiSoft.Net.IMAP.Client
         }
 
         #endregion
+                
+        #region method ReadResponseAsync
+
+        #region class ReadResponseAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="IMAP_Client.ReadResponseAsync"/> asynchronous operation.
+        /// </summary>
+        private class ReadResponseAsyncOP : IDisposable,IAsyncOP
+        {
+            private object                      m_pLock         = new object();
+            private AsyncOP_State               m_State         = AsyncOP_State.WaitingForStart;
+            private Exception                   m_pException    = null;
+            private IMAP_r                      m_pResponse     = null;
+            private IMAP_Client                 m_pImapClient   = null;
+            private bool                        m_RiseCompleted = false;
+            private SmartStream.ReadLineAsyncOP m_pReadLineOP   = null;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            public ReadResponseAsyncOP()
+            {
+                m_pReadLineOP = new SmartStream.ReadLineAsyncOP(new byte[64000],SizeExceededAction.JunkAndThrowException);
+                m_pReadLineOP.Completed += new EventHandler<EventArgs<SmartStream.ReadLineAsyncOP>>(m_pReadLineOP_Completed);
+            }
+                        
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resource being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+
+                m_pException  = null;
+                m_pImapClient = null;
+                m_pResponse   = null;
+                if(m_pReadLineOP != null){
+                    m_pReadLineOP.Dispose();
+                }
+                m_pReadLineOP = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+                                    
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner IMAP client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            internal bool Start(IMAP_Client owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+
+                m_pImapClient = owner;
+
+                SetState(AsyncOP_State.Active);
+
+                try{
+                    // Read line completed synchronously.
+                    if(owner.TcpStream.ReadLine(m_pReadLineOP,true)){
+                        ReadLineCompleted(m_pReadLineOP);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pImapClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
+            }
+
+            #endregion
+
+            #region method Reuse
+
+            /// <summary>
+            /// Prepares this class for reuse.
+            /// </summary>
+            /// <exception cref="InvalidOperationException">Is raised when this is not valid state.</exception>
+            public void Reuse()
+            {
+                if(m_State != AsyncOP_State.Completed){
+                    throw new InvalidOperationException("Reuse is valid only in Completed state.");
+                }
+
+                m_State         = AsyncOP_State.WaitingForStart;
+                m_pException    = null;
+                m_pResponse     = null;
+                m_pImapClient   = null;
+                m_RiseCompleted = false;
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method m_pReadLineOP_Completed
+
+            /// <summary>
+            /// Is called when TcpStream.ReadLine has completed.
+            /// </summary>
+            /// <param name="sender">Sender.</param>
+            /// <param name="e">Event data.</param>
+            private void m_pReadLineOP_Completed(object sender,EventArgs<SmartStream.ReadLineAsyncOP> e)
+            {
+                try{
+                    ReadLineCompleted(m_pReadLineOP);
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    SetState(AsyncOP_State.Completed);
+                }
+            }
+
+            #endregion
+
+            #region method ReadLineCompleted
+
+            /// <summary>
+            /// Is called when read line has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+            private void ReadLineCompleted(SmartStream.ReadLineAsyncOP op)
+            {
+                if(op == null){
+                    throw new ArgumentNullException("op");
+                }
+
+                try{
+                    // Line reading failed, we are done.
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                    }
+                    // Remote host shut down socket.                        
+                    else if(op.BytesInBuffer == 0){
+                        m_pException = new IOException("The remote host shut-down socket.");
+                    }
+                    // Line reading succeeded.
+                    else{
+                        string responseLine = op.LineUtf8;
+
+                        // Log.
+                        m_pImapClient.LogAddRead(op.BytesInBuffer,responseLine);
+
+                        // Untagged response.
+                        if(responseLine.StartsWith("*")){
+                            string[] parts = responseLine.Split(new char[]{' '},4);
+                            string   word  = responseLine.Split(' ')[1];
+
+                            #region Untagged status responses. RFC 3501 7.1.
+
+                            // OK,NO,BAD,PREAUTH,BYE
+
+                            if(word.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_ServerStatus.Parse(responseLine);
+
+                                // Process optional response-codes(7.2). ALERT,BADCHARSET,CAPABILITY,PARSE,PERMANENTFLAGS,READ-ONLY,
+                                // READ-WRITE,TRYCREATE,UIDNEXT,UIDVALIDITY,UNSEEN
+                                /*
+                                if(!string.IsNullOrEmpty(response.OptionalResponseCode)){
+                                    if(response.OptionalResponseCode.Equals("PERMANENTFLAGS",StringComparison.InvariantCultureIgnoreCase)){
+                                        if(folderInfo != null){
+                                            StringReader r = new StringReader(response.OptionalResponseArgs);
+
+                                            folderInfo.SetPermanentFlags(r.ReadParenthesized().Split(' '));
+                                        }
+                                    }
+                                    else if(response.OptionalResponseCode.Equals("READ-ONLY",StringComparison.InvariantCultureIgnoreCase)){
+                                        if(folderInfo != null){
+                                            folderInfo.SetReadOnly(true);
+                                        }
+                                    }
+                                    else if(response.OptionalResponseCode.Equals("READ-WRITE",StringComparison.InvariantCultureIgnoreCase)){
+                                        if(folderInfo != null){
+                                            folderInfo.SetReadOnly(true);
+                                        }
+                                    }
+                                    else if(response.OptionalResponseCode.Equals("UIDNEXT",StringComparison.InvariantCultureIgnoreCase)){
+                                        if(folderInfo != null){
+                                            folderInfo.SetUidNext(Convert.ToInt64(response.OptionalResponseArgs));
+                                        }
+                                    }
+                                    else if(response.OptionalResponseCode.Equals("UIDVALIDITY",StringComparison.InvariantCultureIgnoreCase)){
+                                        if(folderInfo != null){
+                                            folderInfo.SetUidValidity(Convert.ToInt64(response.OptionalResponseArgs));
+                                        }
+                                    }
+                                    else if(response.OptionalResponseCode.Equals("UNSEEN",StringComparison.InvariantCultureIgnoreCase)){
+                                        if(folderInfo != null){
+                                            folderInfo.SetFirstUnseen(Convert.ToInt32(response.OptionalResponseArgs));
+                                        }
+                                    }
+                                    // We don't care about other response codes.                            
+                                }*/
+
+                                m_pImapClient.OnUntaggedStatusResponse((IMAP_r_u)m_pResponse);
+                            }
+                            else if(word.Equals("NO",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_ServerStatus.Parse(responseLine);
+
+                                m_pImapClient.OnUntaggedStatusResponse((IMAP_r_u)m_pResponse);
+                            }
+                            else if(word.Equals("BAD",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_ServerStatus.Parse(responseLine);
+
+                                m_pImapClient.OnUntaggedStatusResponse((IMAP_r_u)m_pResponse);
+                            }
+                            else if(word.Equals("PREAUTH",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_ServerStatus.Parse(responseLine);
+
+                                m_pImapClient.OnUntaggedStatusResponse((IMAP_r_u)m_pResponse);
+                            }
+                            else if(word.Equals("BYE",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_ServerStatus.Parse(responseLine);
+
+                                m_pImapClient.OnUntaggedStatusResponse((IMAP_r_u)m_pResponse);
+                            }
+
+                            #endregion
+
+                            #region Untagged server and mailbox status. RFC 3501 7.2.
+
+                            // CAPABILITY,LIST,LSUB,STATUS,SEARCH,FLAGS
+
+                            #region CAPABILITY
+
+                            else if(word.Equals("CAPABILITY",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Capability.Parse(responseLine);                                
+                            }
+
+                            #endregion
+
+                            #region LIST
+
+                            else if(word.Equals("LIST",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_List.Parse(responseLine);
+                            }
+
+                            #endregion
+
+                            #region LSUB
+
+                            else if(word.Equals("LSUB",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_LSub.Parse(responseLine);
+                            }
+
+                            #endregion
+
+                            #region STATUS
+
+                            else if(word.Equals("STATUS",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Status.Parse(responseLine);
+                            }
+
+                            #endregion
+
+                            #region SEARCH
+
+                            else if(word.Equals("SEARCH",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Search.Parse(responseLine);
+                            }
+
+                            #endregion
+
+                            #region FLAGS
+
+                            else if(word.Equals("FLAGS",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Flags.Parse(responseLine);
+
+                                if(m_pImapClient.m_pSelectedFolder != null){
+                                    m_pImapClient.m_pSelectedFolder.SetFlags(((IMAP_r_u_Flags)m_pResponse).Flags);
+                                }
+                            }
+
+                            #endregion
+
+                            #endregion
+
+                            #region Untagged mailbox size. RFC 3501 7.3.
+
+                            // EXISTS,RECENT
+
+                            else if(Net_Utils.IsInteger(word) && parts[2].Equals("EXISTS",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Exists.Parse(responseLine);
+
+                                if(m_pImapClient.m_pSelectedFolder != null){
+                                    m_pImapClient.m_pSelectedFolder.SetMessagesCount(((IMAP_r_u_Exists)m_pResponse).MessageCount);
+                                }
+                            }
+                            else if(Net_Utils.IsInteger(word) && parts[2].Equals("RECENT",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Recent.Parse(responseLine);
+
+                                if(m_pImapClient.m_pSelectedFolder != null){
+                                    m_pImapClient.m_pSelectedFolder.SetRecentMessagesCount(((IMAP_r_u_Exists)m_pResponse).MessageCount);
+                                }
+                            }
+                                                
+                            #endregion
+
+                            #region Untagged message status. RFC 3501 7.4.
+
+                            // EXPUNGE,FETCH
+
+                            else if(Net_Utils.IsInteger(word) && parts[2].Equals("EXPUNGE",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Expunge.Parse(responseLine);
+                                m_pImapClient.OnMessageExpunged((IMAP_r_u_Expunge)m_pResponse);
+                            }
+                            else if(Net_Utils.IsInteger(word) && parts[2].Equals("FETCH",StringComparison.InvariantCultureIgnoreCase)){
+                                // FETCH parsing may complete asynchornously, the method FetchParsingCompleted is called when parsing has completed.
+
+                                IMAP_r_u_Fetch fetch = new IMAP_r_u_Fetch(1);                                
+                                m_pResponse = fetch;
+                                fetch.ParseAsync(m_pImapClient,responseLine,this.FetchParsingCompleted);
+
+                                // Return skips SetState(AsyncOP_State.Completed), it will be called when fetch has completed.
+                                return;
+                            }
+
+                            #endregion
+
+                            #region Untagged acl realted. RFC 4314.
+
+                            else if(word.Equals("ACL",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Acl.Parse(responseLine);
+                            }
+                            else if(word.Equals("LISTRIGHTS",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_ListRights.Parse(responseLine);
+                            }
+                            else if(word.Equals("MYRIGHTS",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_MyRights.Parse(responseLine);
+                            }
+
+                            #endregion
+
+                            #region Untagged quota related. RFC 2087.
+
+                            else if(word.Equals("QUOTA",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Quota.Parse(responseLine);
+                            }
+                            else if(word.Equals("QUOTAROOT",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_QuotaRoot.Parse(responseLine);
+                            }
+
+                            #endregion
+
+                            #region Untagged namespace related. RFC 2342.
+
+                            else if(word.Equals("NAMESPACE",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Namespace.Parse(responseLine);
+                            }
+
+                            #endregion
+
+                            #region Untagged enable related. RFC 5161.
+
+                            else if(word.Equals("ENABLED",StringComparison.InvariantCultureIgnoreCase)){
+                                m_pResponse = IMAP_r_u_Enable.Parse(responseLine);
+                            }
+
+                            #endregion
+                            
+                            // Raise event 'UntaggedResponse'.
+                            m_pImapClient.OnUntaggedResponse((IMAP_r_u)m_pResponse);
+                        }
+                        // Command continuation response.
+                        else if(responseLine.StartsWith("+")){
+                            m_pResponse = new IMAP_r_ServerStatus("+","+",null,null,"+");
+                        }
+                        // Completion status response.
+                        else{
+                            // Command response reading has completed.
+                            m_pResponse = IMAP_r_ServerStatus.Parse(responseLine);
+                        }
+                    }                    
+                }
+                catch(Exception x){
+                    m_pException = x;
+                }
+
+                SetState(AsyncOP_State.Completed);
+            }
+
+            #endregion
+
+
+            #region method FetchParsingCompleted
+
+            /// <summary>
+            /// This method is called when FETCH parsing has completed.
+            /// </summary>
+            /// <param name="sender">Sender.</param>
+            /// <param name="e">Event data.</param>
+            private void FetchParsingCompleted(object sender,EventArgs<Exception> e)
+            {             
+                try{
+                    // Fetch parsing failed.
+                    if(e.Value != null){
+                        m_pException = e.Value;
+                    }
+
+                    // Raise event 'UntaggedResponse'.
+                    m_pImapClient.OnUntaggedResponse((IMAP_r_u)m_pResponse);
+                }
+                catch(Exception x){
+                    m_pException = x;
+                }
+
+                SetState(AsyncOP_State.Completed);
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            /// <summary>
+            /// Returns IMAP server response.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public IMAP_r Response
+            {
+                get{
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Response' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pResponse; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<ReadResponseAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<ReadResponseAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Starts reading IMAP server response.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="ReadResponseAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any oth the arguments has invalid value.</exception>
+        private bool ReadResponseAsync(ReadResponseAsyncOP op)
+        {
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+
+            return op.Start(this);
+        }
+
+        #endregion
+
+        #region method ReadFinalResponse
+
+        /// <summary>
+        /// Reads final response from IMAP server.
+        /// </summary>
+        /// <param name="callback">Optional callback to be called for each server returned untagged response.</param>
+        /// <returns>Returns final response.</returns>
+        private IMAP_r_ServerStatus ReadFinalResponse(EventHandler<EventArgs<IMAP_r_u>> callback)
+        {
+            ManualResetEvent wait = new ManualResetEvent(false);
+            using(ReadFinalResponseAsyncOP op = new ReadFinalResponseAsyncOP(callback)){
+                op.CompletedAsync += delegate(object s1,EventArgs<ReadFinalResponseAsyncOP> e1){
+                    wait.Set();
+                };
+                if(!this.ReadFinalResponseAsync(op)){
+                    wait.Set();
+                }
+                wait.WaitOne();
+                wait.Close();
+
+                if(op.Error != null){
+                    throw op.Error;
+                }
+                else{
+                    return op.FinalResponse;
+                }
+            }
+        }
+
+        #endregion
+
+        #region method ReadFinalResponseAsync
+
+        #region class ReadFinalResponseAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="IMAP_Client.ReadFinalResponseAsyncOP"/> asynchronous operation.
+        /// </summary>
+        private class ReadFinalResponseAsyncOP : IDisposable,IAsyncOP
+        {
+            private object                            m_pLock          = new object();
+            private AsyncOP_State                     m_State          = AsyncOP_State.WaitingForStart;
+            private Exception                         m_pException     = null;
+            private IMAP_r_ServerStatus               m_pFinalResponse = null;
+            private IMAP_Client                       m_pImapClient    = null;
+            private bool                              m_RiseCompleted  = false;
+            private EventHandler<EventArgs<IMAP_r_u>> m_pCallback      = null;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="callback">Optional callback to be called for each received untagged response.</param>
+            public ReadFinalResponseAsyncOP(EventHandler<EventArgs<IMAP_r_u>> callback)
+            {
+                m_pCallback = callback;
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resource being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+
+                m_pException     = null;
+                m_pImapClient    = null;
+                m_pFinalResponse = null;
+                m_pCallback      = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner IMAP client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            internal bool Start(IMAP_Client owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+
+                
+                m_pImapClient = owner;
+                
+                SetState(AsyncOP_State.Active);
+
+                try{                    
+                    ReadResponseAsyncOP args = new ReadResponseAsyncOP();
+                    args.CompletedAsync += delegate(object sender,EventArgs<ReadResponseAsyncOP> e){
+                        try{
+                            ResponseReadingCompleted(e.Value);
+                            args.Reuse();
+
+                            // Read responses while we get final response.
+                            while(m_State == AsyncOP_State.Active && !m_pImapClient.ReadResponseAsync(args)){
+                                ResponseReadingCompleted(args);
+                                args.Reuse();
+                            }
+                        }
+                        catch(Exception x){
+                            m_pException = x;
+                            m_pImapClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                            SetState(AsyncOP_State.Completed);
+                        }
+                    };
+                    // Read responses while reading completes synchronously.
+                    while(m_State == AsyncOP_State.Active && !m_pImapClient.ReadResponseAsync(args)){
+                        ResponseReadingCompleted(args);
+                        args.Reuse();
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pImapClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method ResponseReadingCompleted
+
+            /// <summary>
+            /// Is called when IMAP server response reading has completed.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            /// <exception cref="ReadResponseAsyncOP">Is raiswed when <b>op</b> is null reference.</exception>
+            private void ResponseReadingCompleted(ReadResponseAsyncOP op)
+            {
+                if(op == null){
+                    throw new ArgumentNullException("op");
+                }
+
+                try{
+                    // Response reading failed.
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                        SetState(AsyncOP_State.Completed);
+                    }
+                    else{
+                        // We are done, we got final response.
+                        if(op.Response is IMAP_r_ServerStatus){
+                            m_pFinalResponse = (IMAP_r_ServerStatus)op.Response;
+                            SetState(AsyncOP_State.Completed);
+                        }
+                        else{
+                            if(m_pCallback != null){
+                                m_pCallback(this,new EventArgs<IMAP_r_u>((IMAP_r_u)op.Response));
+                            }
+                        }
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    SetState(AsyncOP_State.Completed);
+                }
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            /// <summary>
+            /// Returns IMAP server final response.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public IMAP_r_ServerStatus FinalResponse
+            {
+                get{
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Response' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pFinalResponse; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<ReadFinalResponseAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<ReadFinalResponseAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Starts reading IMAP server final(OK/BAD/NO/+) response.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="ReadFinalResponseAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any oth the arguments has invalid value.</exception>
+        private bool ReadFinalResponseAsync(ReadFinalResponseAsyncOP op)
+        {            
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+                        
+            return op.Start(this);
+        }
+
+        #endregion
+
+        #region method ReadStringLiteral
+
+        /// <summary>
+        /// Reads IMAP <b>string-literal</b> from remote endpoint.
+        /// </summary>
+        /// <param name="count">Number of bytes to read.</param>
+        /// <returns>Returns readed string-literal.</returns>
+        private string ReadStringLiteral(int count)
+        {
+            /* RFC 3501 4.3.            
+                string-literal = {bytes_count} CRLF      - Number of bytes after CRLF.
+                quoted-string  = DQUOTE string DQUOTE    - Normal quoted-string.
+            */
+
+            string retVal = this.TcpStream.ReadFixedCountString(count);            
+            LogAddRead(count,"Readed string-literal " + count.ToString() + " bytes.");
+
+            return retVal;
+        }
+
+        /// <summary>
+        /// Reads IMAP <b>string-literal</b> from remote endpoint.
+        /// </summary>
+        /// <param name="count">Number of bytes to read.</param>
+        /// <param name="stream">Stream where to store readed data.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>stream</b> is null reference.</exception>
+        private void ReadStringLiteral(int count,Stream stream)
+        {
+            if(stream == null){
+                throw new ArgumentNullException("stream");
+            }
+
+            this.TcpStream.ReadFixedCount(stream,count);
+            LogAddRead(count,"Readed string-literal " + count.ToString() + " bytes.");
+        }
+
+        #endregion
+
+        #region method ReadStringLiteralAsync
+
+        #region class ReadStringLiteralAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="IMAP_Client.ReadStringLiteralAsync"/> asynchronous operation.
+        /// </summary>
+        internal class ReadStringLiteralAsyncOP : IDisposable,IAsyncOP
+        {
+            private object        m_pLock         = new object();
+            private AsyncOP_State m_State         = AsyncOP_State.WaitingForStart;
+            private Exception     m_pException    = null;
+            private Stream        m_pStream       = null;
+            private int           m_LiteralSize   = 0;
+            private IMAP_Client   m_pImapClient   = null;
+            private bool          m_RiseCompleted = false;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="stream">Store stream.</param>
+            /// <param name="literalSize">String literal size in bytes.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>stream</b> is null reference.</exception>
+            public ReadStringLiteralAsyncOP(Stream stream,int literalSize)
+            {
+                if(stream == null){
+                    throw new ArgumentNullException("stream");
+                }
+
+                m_pStream     = stream;
+                m_LiteralSize = literalSize;
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resource being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+
+                m_pException  = null;
+                m_pImapClient = null;
+                m_pStream   = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner IMAP client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            public bool Start(IMAP_Client owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+
+                m_pImapClient = owner;
+
+                SetState(AsyncOP_State.Active);
+
+                owner.TcpStream.BeginReadFixedCount(m_pStream,m_LiteralSize,this.ReadingCompleted,null);
+
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method ReadingCompleted
+
+            /// <summary>
+            /// This method is called when string-literal reading has completed.
+            /// </summary>
+            /// <param name="result">Asynchronous result.</param>
+            private void ReadingCompleted(IAsyncResult result)
+            {
+                try{
+                    m_pImapClient.TcpStream.EndReadFixedCount(result);
+
+                    // Log
+                    m_pImapClient.LogAddRead(m_LiteralSize,"Readed string-literal " + m_LiteralSize.ToString() + " bytes.");
+                }
+                catch(Exception x){
+                    m_pException = x;
+                }
+
+                SetState(AsyncOP_State.Completed);
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            /// <summary>
+            /// Gets literal stream.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Stream Stream
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pStream; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<ReadStringLiteralAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<ReadStringLiteralAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Starts reading string-literal from IMAP server.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="ReadStringLiteralAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any oth the arguments has invalid value.</exception>
+        internal bool ReadStringLiteralAsync(ReadStringLiteralAsyncOP op)
+        {
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+
+            return op.Start(this);
+        }
+
+        #endregion
+
+        #region method SupportsCapability
+
+        /// <summary>
+        /// Gets if IMAP server supports the specified capability.
+        /// </summary>
+        /// <param name="capability">IMAP capability.</param>
+        /// <returns>Return true if IMAP server supports the specified capability.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>capability</b> is null reference.</exception>
+        private bool SupportsCapability(string capability)
+        {
+            if(capability == null){
+                throw new ArgumentNullException("capability");
+            }
+
+            if(m_pCapabilities == null){
+                return false;
+            }
+            else{
+                foreach(string c in m_pCapabilities){
+                    if(string.Equals(c,capability,StringComparison.InvariantCultureIgnoreCase)){
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        #endregion
+
+
+        #region Properties implementation
+
+        /// <summary>
+        /// Gets session authenticated user identity, returns null if not authenticated.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when this property is accessed and IMAP client is not connected.</exception>
+        public override GenericIdentity AuthenticatedUserIdentity
+        {
+            get{ 
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+                if(!this.IsConnected){
+				    throw new InvalidOperationException("You must connect first.");
+			    }
+
+                return m_pAuthenticatedUser; 
+            }
+        }
+
+        /// <summary>
+        /// Get IMAP server greeting text.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when this property is accessed and IMAP client is not connected.</exception>
+        public string GreetingText
+        {
+            get{ 
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+                if(!this.IsConnected){
+				    throw new InvalidOperationException("You must connect first.");
+			    }
+
+                return m_GreetingText; 
+            }
+        }
+
+        /// <summary>
+        /// Get IMAP server(CAPABILITY command cached) supported capabilities.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when this property is accessed and IMAP client is not connected.</exception>
+        public string[] Capabilities
+        {
+            get{ 
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+                if(!this.IsConnected){
+				    throw new InvalidOperationException("You must connect first.");
+			    }
+
+                return m_pCapabilities.ToArray(); 
+            }
+        }
+
+        /// <summary>
+        /// Gets IMAP server folder separator.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when this property is accessed and IMAP client is not connected.</exception>
+        public char FolderSeparator
+        {
+            get{ 
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+                if(!this.IsConnected){
+				    throw new InvalidOperationException("You must connect first.");
+			    }
+
+                SendCommand((m_CommandIndex++).ToString("d5") + " LIST \"\" \"\"\r\n");
+
+                List<IMAP_r_u_List> retVal = new List<IMAP_r_u_List>();
+
+                IMAP_r_ServerStatus response = ReadFinalResponse(delegate(object sender,EventArgs<IMAP_r_u> e){
+                if(e.Value is IMAP_r_u_List){
+                    retVal.Add((IMAP_r_u_List)e.Value);
+                }
+                });
+                if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
+                    throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
+                }
+
+                if(retVal.Count == 0){
+                    throw new Exception("Unexpected result: IMAP server didn't return LIST response for [... LIST \"\" \"\"].");
+                }
+                else{
+                    return retVal[0].HierarchyDelimiter;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets selected folder. Returns null if no folder selected.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when this property is accessed and IMAP client is not connected.</exception>
+        public IMAP_Client_SelectedFolder SelectedFolder
+        {
+            get{ 
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+                if(!this.IsConnected){
+				    throw new InvalidOperationException("You must connect first.");
+			    }
+
+                return m_pSelectedFolder; 
+            }
+        }
+
+        #endregion
+
+        #region Events implementation
+        
+        /// <summary>
+        /// This event is raised when IMAP server sends untagged status response.
+        /// </summary>
+        public event EventHandler<EventArgs<IMAP_r_u>> UntaggedStatusResponse = null;
+
+        #region method OnUntaggedStatusResponse
+
+        /// <summary>
+        /// Raises <b>UntaggedStatusResponse</b> event.
+        /// </summary>
+        /// <param name="response">Untagged response.</param>
+        private void OnUntaggedStatusResponse(IMAP_r_u response)
+        {
+            if(this.UntaggedStatusResponse != null){
+                this.UntaggedStatusResponse(this,new EventArgs<IMAP_r_u>(response));
+            }
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Is raised when IMAP server sends any untagged response.
+        /// </summary>
+        /// <remarks>NOTE: This event may raised from thread pool thread, so UI event handlers need to use Invoke.</remarks>
+        public event EventHandler<EventArgs<IMAP_r_u>> UntaggedResponse = null;
+
+        #region method OnUntaggedResponse
+
+        /// <summary>
+        /// Raises <b>UntaggedResponse</b> event.
+        /// </summary>
+        /// <param name="response">Untagged IMAP server response.</param>
+        private void OnUntaggedResponse(IMAP_r_u response)
+        {
+            if(this.UntaggedResponse != null){
+                this.UntaggedResponse(this,new EventArgs<IMAP_r_u>(response));
+            }
+        }
+
+        #endregion
+                
+        /// <summary>
+        /// This event is raised when IMAP server expunges message and sends EXPUNGE response.
+        /// </summary>
+        public event EventHandler<EventArgs<IMAP_r_u_Expunge>> MessageExpunged = null;
+
+        #region method OnMessageExpunged
+
+        /// <summary>
+        /// Raises <b>MessageExpunged</b> event.
+        /// </summary>
+        /// <param name="response">Expunge response.</param>
+        private void OnMessageExpunged(IMAP_r_u_Expunge response)
+        {
+            if(this.MessageExpunged != null){
+                this.MessageExpunged(this,new EventArgs<IMAP_r_u_Expunge>(response));
+            }
+        }
+
+        #endregion
+
+        /// <summary>
+        /// This event is raised when FETCH response parsing allows to specify stream where to store binary data.
+        /// </summary>
+        /// <remarks>Thhis event is raised for FETCH BODY[]/RFC822/RFC822.HEADER/RFC822.TEXT data-items.</remarks>
+        public event EventHandler<IMAP_Client_e_FetchGetStoreStream> FetchGetStoreStream = null;
+
+        #region method OnFetchGetStoreStream
+
+        /// <summary>
+        /// Raises <b>FetchGetStoreStream</b> event.
+        /// </summary>
+        /// <param name="e">Event data.</param>
+        internal void OnFetchGetStoreStream(IMAP_Client_e_FetchGetStoreStream e)
+        {
+            if(this.FetchGetStoreStream != null){
+                this.FetchGetStoreStream(this,e);
+            }
+        }
+
+        #endregion
+
+        #endregion
+
+
+        //--- OBSOLETE ------------------------
 
         #region method ReadResponse
 
@@ -3728,6 +5156,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="fetchHandler">Fetch data-items handler.</param>
         /// <param name="enable">List where to store ENABLE command result. This value can be null.</param>
         /// <returns>Returns command completion status response.</returns>
+        [Obsolete("deprecated")]
         private IMAP_r_ServerStatus ReadResponse(List<IMAP_r_u_Capability> capability,IMAP_Client_SelectedFolder folderInfo,List<int> search,List<IMAP_r_u_List> list,List<IMAP_r_u_LSub> lsub,List<IMAP_r_u_Acl> acl,List<IMAP_Response_MyRights> myRights,List<IMAP_r_u_ListRights> listRights,List<IMAP_r_u_Status> status,List<IMAP_r_u_Quota> quota,List<IMAP_r_u_QuotaRoot> quotaRoot,List<IMAP_r_u_Namespace> nspace,IMAP_Client_FetchHandler fetchHandler,List<IMAP_r_u_Enable> enable)
         {
             /* RFC 3501 2.2.2.
@@ -4026,1021 +5455,6 @@ namespace LumiSoft.Net.IMAP.Client
 
         #endregion
 
-        #region method ReadResponseAsync
-
-        #region class ReadResponseAsyncOP
-
-        /// <summary>
-        /// This class represents <see cref="IMAP_Client.ReadResponseAsync"/> asynchronous operation.
-        /// </summary>
-        private class ReadResponseAsyncOP : IDisposable,IAsyncOP
-        {
-            private object        m_pLock         = new object();
-            private AsyncOP_State m_State         = AsyncOP_State.WaitingForStart;
-            private Exception     m_pException    = null;
-            private IMAP_r        m_pResponse     = null;
-            private IMAP_Client   m_pImapClient   = null;
-            private bool          m_RiseCompleted = false;
-
-            /// <summary>
-            /// Default constructor.
-            /// </summary>
-            public ReadResponseAsyncOP()
-            {
-            }
-
-            #region method Dispose
-
-            /// <summary>
-            /// Cleans up any resource being used.
-            /// </summary>
-            public void Dispose()
-            {
-                if(m_State == AsyncOP_State.Disposed){
-                    return;
-                }
-                SetState(AsyncOP_State.Disposed);
-
-                m_pException  = null;
-                m_pImapClient = null;
-                m_pResponse   = null;
-
-                this.CompletedAsync = null;
-            }
-
-            #endregion
-
-
-            #region method Start
-
-            /// <summary>
-            /// Starts operation processing.
-            /// </summary>
-            /// <param name="owner">Owner IMAP client.</param>
-            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
-            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
-            internal bool Start(IMAP_Client owner)
-            {
-                if(owner == null){
-                    throw new ArgumentNullException("owner");
-                }
-
-                m_pImapClient = owner;
-
-                SetState(AsyncOP_State.Active);
-
-                try{                    
-                    // Read IMAP server response.
-                    SmartStream.ReadLineAsyncOP op = new SmartStream.ReadLineAsyncOP(new byte[32000],SizeExceededAction.JunkAndThrowException);
-                    op.Completed += delegate(object s,EventArgs<SmartStream.ReadLineAsyncOP> e){   
-                        try{
-                            ReadLineCompleted(op);
-                            SetState(AsyncOP_State.Completed);        
-                        }
-                        catch(Exception x){
-                            m_pException = x;
-                            SetState(AsyncOP_State.Completed);
-                        }
-                    };
-                    // Read line completed synchronously.
-                    if(owner.TcpStream.ReadLine(op,true)){
-                        ReadLineCompleted(op);
-                        SetState(AsyncOP_State.Completed);
-
-                        return false;        
-                    }
-                }
-                catch(Exception x){
-                    m_pException = x;
-                    m_pImapClient.LogAddException("Exception: " + m_pException.Message,m_pException);
-                    SetState(AsyncOP_State.Completed);
-                }
-
-                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
-                // If already completed sync, that flag has no effect.
-                lock(m_pLock){
-                    m_RiseCompleted = true;
-
-                    return m_State == AsyncOP_State.Active;
-                }
-            }
-
-            #endregion
-
-            #region method Reuse
-
-            /// <summary>
-            /// Prepares this class for reuse.
-            /// </summary>
-            /// <exception cref="InvalidOperationException">Is riased when this is not valid state.</exception>
-            public void Reuse()
-            {
-                if(m_State != AsyncOP_State.Completed){
-                    throw new InvalidOperationException("Reuse is valid only in Completed state.");
-                }
-
-                m_State         = AsyncOP_State.WaitingForStart;
-                m_pException    = null;
-                m_pResponse     = null;
-                m_pImapClient   = null;
-                m_RiseCompleted = false;
-            }
-
-            #endregion
-
-
-            #region method SetState
-
-            /// <summary>
-            /// Sets operation state.
-            /// </summary>
-            /// <param name="state">New state.</param>
-            private void SetState(AsyncOP_State state)
-            {
-                if(m_State == AsyncOP_State.Disposed){
-                    return;
-                }
-
-                lock(m_pLock){
-                    m_State = state;
-
-                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
-                        OnCompletedAsync();
-                    }
-                }
-            }
-
-            #endregion
-
-            #region method ReadLineCompleted
-
-            /// <summary>
-            /// Is called when read line has completed.
-            /// </summary>
-            /// <param name="op">Asynchronous operation.</param>
-            /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
-            private void ReadLineCompleted(SmartStream.ReadLineAsyncOP op)
-            {
-                if(op == null){
-                    throw new ArgumentNullException("op");
-                }
-
-                try{
-                    // Line reading failed, we are done.
-                    if(op.Error != null){
-                        m_pException = op.Error;
-                    }
-                    // Remote host shut down socket.                        
-                    else if(op.BytesInBuffer == 0){
-                        m_pException = new IOException("The remote host shut-down socket.");
-                    }
-                    // Line reading succeeded.
-                    else{
-                        string responseLine = op.LineUtf8;
-
-                        // Log.
-                        m_pImapClient.LogAddRead(op.BytesInBuffer,responseLine);
-
-                        // Untagged response.
-                        if(responseLine.StartsWith("*")){
-                            string[] parts = responseLine.Split(new char[]{' '},4);
-                            string   word  = responseLine.Split(' ')[1];
-
-                            #region Untagged status responses. RFC 3501 7.1.
-
-                            // OK,NO,BAD,PREAUTH,BYE
-
-                            if(word.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_ServerStatus.Parse(responseLine);
-
-                                // Process optional response-codes(7.2). ALERT,BADCHARSET,CAPABILITY,PARSE,PERMANENTFLAGS,READ-ONLY,
-                                // READ-WRITE,TRYCREATE,UIDNEXT,UIDVALIDITY,UNSEEN
-                                /*
-                                if(!string.IsNullOrEmpty(response.OptionalResponseCode)){
-                                    if(response.OptionalResponseCode.Equals("PERMANENTFLAGS",StringComparison.InvariantCultureIgnoreCase)){
-                                        if(folderInfo != null){
-                                            StringReader r = new StringReader(response.OptionalResponseArgs);
-
-                                            folderInfo.SetPermanentFlags(r.ReadParenthesized().Split(' '));
-                                        }
-                                    }
-                                    else if(response.OptionalResponseCode.Equals("READ-ONLY",StringComparison.InvariantCultureIgnoreCase)){
-                                        if(folderInfo != null){
-                                            folderInfo.SetReadOnly(true);
-                                        }
-                                    }
-                                    else if(response.OptionalResponseCode.Equals("READ-WRITE",StringComparison.InvariantCultureIgnoreCase)){
-                                        if(folderInfo != null){
-                                            folderInfo.SetReadOnly(true);
-                                        }
-                                    }
-                                    else if(response.OptionalResponseCode.Equals("UIDNEXT",StringComparison.InvariantCultureIgnoreCase)){
-                                        if(folderInfo != null){
-                                            folderInfo.SetUidNext(Convert.ToInt64(response.OptionalResponseArgs));
-                                        }
-                                    }
-                                    else if(response.OptionalResponseCode.Equals("UIDVALIDITY",StringComparison.InvariantCultureIgnoreCase)){
-                                        if(folderInfo != null){
-                                            folderInfo.SetUidValidity(Convert.ToInt64(response.OptionalResponseArgs));
-                                        }
-                                    }
-                                    else if(response.OptionalResponseCode.Equals("UNSEEN",StringComparison.InvariantCultureIgnoreCase)){
-                                        if(folderInfo != null){
-                                            folderInfo.SetFirstUnseen(Convert.ToInt32(response.OptionalResponseArgs));
-                                        }
-                                    }
-                                    // We don't care about other response codes.                            
-                                }*/
-
-                                m_pImapClient.OnUntaggedStatusResponse((IMAP_r_u)m_pResponse);
-                            }
-                            else if(word.Equals("NO",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_ServerStatus.Parse(responseLine);
-
-                                m_pImapClient.OnUntaggedStatusResponse((IMAP_r_u)m_pResponse);
-                            }
-                            else if(word.Equals("BAD",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_ServerStatus.Parse(responseLine);
-
-                                m_pImapClient.OnUntaggedStatusResponse((IMAP_r_u)m_pResponse);
-                            }
-                            else if(word.Equals("PREAUTH",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_ServerStatus.Parse(responseLine);
-
-                                m_pImapClient.OnUntaggedStatusResponse((IMAP_r_u)m_pResponse);
-                            }
-                            else if(word.Equals("BYE",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_ServerStatus.Parse(responseLine);
-
-                                m_pImapClient.OnUntaggedStatusResponse((IMAP_r_u)m_pResponse);
-                            }
-
-                            #endregion
-
-                            #region Untagged server and mailbox status. RFC 3501 7.2.
-
-                            // CAPABILITY,LIST,LSUB,STATUS,SEARCH,FLAGS
-
-                            #region CAPABILITY
-
-                            else if(word.Equals("CAPABILITY",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_Capability.Parse(responseLine);                                
-                            }
-
-                            #endregion
-
-                            #region LIST
-
-                            else if(word.Equals("LIST",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_List.Parse(responseLine);
-                            }
-
-                            #endregion
-
-                            #region LSUB
-
-                            else if(word.Equals("LSUB",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_LSub.Parse(responseLine);
-                            }
-
-                            #endregion
-
-                            #region STATUS
-
-                            else if(word.Equals("STATUS",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_Status.Parse(responseLine);
-                            }
-
-                            #endregion
-
-                            #region SEARCH
-
-                            else if(word.Equals("SEARCH",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_Search.Parse(responseLine);
-                            }
-
-                            #endregion
-
-                            #region FLAGS
-
-                            else if(word.Equals("FLAGS",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_Flags.Parse(responseLine);
-
-                                m_pImapClient.m_pSelectedFolder.SetFlags(((IMAP_r_u_Flags)m_pResponse).Flags);
-                            }
-
-                            #endregion
-
-                            #endregion
-
-                            #region Untagged mailbox size. RFC 3501 7.3.
-
-                            // EXISTS,RECENT
-
-                            else if(Net_Utils.IsInteger(word) && parts[2].Equals("EXISTS",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_Exists.Parse(responseLine);
-
-                                m_pImapClient.m_pSelectedFolder.SetMessagesCount(((IMAP_r_u_Exists)m_pResponse).MessageCount);
-                            }
-                            else if(Net_Utils.IsInteger(word) && parts[2].Equals("RECENT",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_Recent.Parse(responseLine);
-
-                                m_pImapClient.m_pSelectedFolder.SetRecentMessagesCount(((IMAP_r_u_Exists)m_pResponse).MessageCount);
-                            }
-                                                
-                            #endregion
-
-                            #region Untagged message status. RFC 3501 7.4.
-
-                            // EXPUNGE,FETCH
-
-                            else if(Net_Utils.IsInteger(word) && parts[2].Equals("EXPUNGE",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_Expunge.Parse(responseLine);
-                                m_pImapClient.OnMessageExpunged((IMAP_r_u_Expunge)m_pResponse);
-                            }
-                            else if(Net_Utils.IsInteger(word) && parts[2].Equals("FETCH",StringComparison.InvariantCultureIgnoreCase)){
-                                // Currently we eat all fetch responses here, because we don't use ReadResponseAsync for fetch responses
-                                // at moment.
-                                IMAP_Client_FetchHandler fetchHandler = new IMAP_Client_FetchHandler();
-
-                                // User din't provide us FETCH handler, make dummy one which eats up all fetch responses.
-                                if(fetchHandler == null){
-                                    fetchHandler = new IMAP_Client_FetchHandler();
-                                }
-
-                                _FetchResponseReader r = new _FetchResponseReader(m_pImapClient,responseLine,fetchHandler);
-                                r.Start();                        
-                            }
-
-                            #endregion
-
-                            #region Untagged acl realted. RFC 4314.
-
-                            else if(word.Equals("ACL",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_Acl.Parse(responseLine);
-                            }
-                            else if(word.Equals("LISTRIGHTS",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_ListRights.Parse(responseLine);
-                            }
-                            else if(word.Equals("MYRIGHTS",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_Response_MyRights.Parse(responseLine);
-                            }
-
-                            #endregion
-
-                            #region Untagged quota related. RFC 2087.
-
-                            else if(word.Equals("QUOTA",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_Quota.Parse(responseLine);
-                            }
-                            else if(word.Equals("QUOTAROOT",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_QuotaRoot.Parse(responseLine);
-                            }
-
-                            #endregion
-
-                            #region Untagged namespace related. RFC 2342.
-
-                            else if(word.Equals("NAMESPACE",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_Namespace.Parse(responseLine);
-                            }
-
-                            #endregion
-
-                            #region Untagged enable related. RFC 5161.
-
-                            else if(word.Equals("ENABLED",StringComparison.InvariantCultureIgnoreCase)){
-                                m_pResponse = IMAP_r_u_Enable.Parse(responseLine);
-                            }
-
-                            #endregion
-                            
-                            // Raise event 'UntaggedResponse'.
-                            m_pImapClient.OnUntaggedResponse((IMAP_r_u)m_pResponse);
-                        }
-                        // Command continuation response.
-                        else if(responseLine.StartsWith("+")){
-                            m_pResponse = new IMAP_r_ServerStatus("+","+",null,null,"+");
-                        }
-                        // Completion status response.
-                        else{
-                            // Command response reading has completed.
-                            m_pResponse = IMAP_r_ServerStatus.Parse(responseLine);
-                        }
-                    }                    
-                }
-                catch(Exception x){
-                    m_pException = x;
-                }
-            }
-
-            #endregion
-
-
-            #region Properties implementation
-
-            /// <summary>
-            /// Gets asynchronous operation state.
-            /// </summary>
-            public AsyncOP_State State
-            {
-                get{ return m_State; }
-            }
-
-            /// <summary>
-            /// Gets error happened during operation. Returns null if no error.
-            /// </summary>
-            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
-            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
-            public Exception Error
-            {
-                get{ 
-                    if(m_State == AsyncOP_State.Disposed){
-                        throw new ObjectDisposedException(this.GetType().Name);
-                    }
-                    if(m_State != AsyncOP_State.Completed){
-                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
-                    }
-
-                    return m_pException; 
-                }
-            }
-
-            /// <summary>
-            /// Returns IMAP server response.
-            /// </summary>
-            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
-            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
-            public IMAP_r Response
-            {
-                get{
-                    if(m_State == AsyncOP_State.Disposed){
-                        throw new ObjectDisposedException(this.GetType().Name);
-                    }
-                    if(m_State != AsyncOP_State.Completed){
-                        throw new InvalidOperationException("Property 'Response' is accessible only in 'AsyncOP_State.Completed' state.");
-                    }
-
-                    return m_pResponse; 
-                }
-            }
-
-            #endregion
-
-            #region Events implementation
-
-            /// <summary>
-            /// Is called when asynchronous operation has completed.
-            /// </summary>
-            public event EventHandler<EventArgs<ReadResponseAsyncOP>> CompletedAsync = null;
-
-            #region method OnCompletedAsync
-
-            /// <summary>
-            /// Raises <b>CompletedAsync</b> event.
-            /// </summary>
-            private void OnCompletedAsync()
-            {
-                if(this.CompletedAsync != null){
-                    this.CompletedAsync(this,new EventArgs<ReadResponseAsyncOP>(this));
-                }
-            }
-
-            #endregion
-
-            #endregion
-        }
-
-        #endregion
-
-        /// <summary>
-        /// Starts reading IMAP server response.
-        /// </summary>
-        /// <param name="op">Asynchronous operation.</param>
-        /// <returns>Returns true if aynchronous operation is pending (The <see cref="ReadResponseAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
-        /// Returns false if operation completed synchronously.</returns>
-        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
-        /// <exception cref="ArgumentException">Is raised when any oth the arguments has invalid value.</exception>
-        private bool ReadResponseAsync(ReadResponseAsyncOP op)
-        {
-            if(op == null){
-                throw new ArgumentNullException("op");
-            }
-            if(op.State != AsyncOP_State.WaitingForStart){
-                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
-            }
-
-            return op.Start(this);
-        }
-
-        #endregion
-
-        #region method ReadFinalResponseAsync
-
-        #region class ReadFinalResponseAsyncOP
-
-        /// <summary>
-        /// This class represents <see cref="IMAP_Client.ReadFinalResponseAsyncOP"/> asynchronous operation.
-        /// </summary>
-        private class ReadFinalResponseAsyncOP : IDisposable,IAsyncOP
-        {
-            private object        m_pLock          = new object();
-            private AsyncOP_State m_State          = AsyncOP_State.WaitingForStart;
-            private Exception     m_pException     = null;
-            private IMAP_r        m_pFinalResponse = null;
-            private IMAP_Client   m_pImapClient    = null;
-            private bool          m_RiseCompleted  = false;
-
-            /// <summary>
-            /// Default constructor.
-            /// </summary>
-            public ReadFinalResponseAsyncOP()
-            {
-            }
-
-            #region method Dispose
-
-            /// <summary>
-            /// Cleans up any resource being used.
-            /// </summary>
-            public void Dispose()
-            {
-                if(m_State == AsyncOP_State.Disposed){
-                    return;
-                }
-                SetState(AsyncOP_State.Disposed);
-
-                m_pException     = null;
-                m_pImapClient    = null;
-                m_pFinalResponse = null;
-
-                this.CompletedAsync = null;
-            }
-
-            #endregion
-
-
-            #region method Start
-
-            /// <summary>
-            /// Starts operation processing.
-            /// </summary>
-            /// <param name="owner">Owner IMAP client.</param>
-            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
-            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
-            internal bool Start(IMAP_Client owner)
-            {
-                if(owner == null){
-                    throw new ArgumentNullException("owner");
-                }
-
-                
-                m_pImapClient = owner;
-                
-                SetState(AsyncOP_State.Active);
-
-                try{                    
-                    ReadResponseAsyncOP args = new ReadResponseAsyncOP();
-                    args.CompletedAsync += delegate(object sender,EventArgs<ReadResponseAsyncOP> e){
-                        try{
-                            ResponseReadingCompleted(e.Value);
-                            args.Reuse();
-
-                            // Read responses while we get final response.
-                            while(m_State == AsyncOP_State.Active && !m_pImapClient.ReadResponseAsync(args)){
-                                ResponseReadingCompleted(args);
-                                args.Reuse();
-                            }
-                        }
-                        catch(Exception x){
-                            m_pException = x;
-                            m_pImapClient.LogAddException("Exception: " + m_pException.Message,m_pException);
-                            SetState(AsyncOP_State.Completed);
-                        }
-                    };
-                    // Read responses while reading completes synchronously.
-                    while(m_State == AsyncOP_State.Active && !m_pImapClient.ReadResponseAsync(args)){
-                        ResponseReadingCompleted(args);
-                        args.Reuse();
-                    }
-                }
-                catch(Exception x){
-                    m_pException = x;
-                    m_pImapClient.LogAddException("Exception: " + m_pException.Message,m_pException);
-                    SetState(AsyncOP_State.Completed);
-                }
-
-                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
-                // If already completed sync, that flag has no effect.
-                lock(m_pLock){
-                    m_RiseCompleted = true;
-
-                    return m_State == AsyncOP_State.Active;
-                }
-            }
-
-            #endregion
-
-
-            #region method SetState
-
-            /// <summary>
-            /// Sets operation state.
-            /// </summary>
-            /// <param name="state">New state.</param>
-            private void SetState(AsyncOP_State state)
-            {
-                if(m_State == AsyncOP_State.Disposed){
-                    return;
-                }
-
-                lock(m_pLock){
-                    m_State = state;
-
-                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
-                        OnCompletedAsync();
-                    }
-                }
-            }
-
-            #endregion
-
-            #region method ResponseReadingCompleted
-
-            /// <summary>
-            /// Is called when IMAP server response reading has completed.
-            /// </summary>
-            /// <param name="op">Asynchronous operation.</param>
-            /// <exception cref="ReadResponseAsyncOP">Is raiswed when <b>op</b> is null reference.</exception>
-            private void ResponseReadingCompleted(ReadResponseAsyncOP op)
-            {
-                if(op == null){
-                    throw new ArgumentNullException("op");
-                }
-
-                // Response reading failed.
-                if(op.Error != null){
-                    m_pException = op.Error;
-                    SetState(AsyncOP_State.Completed);
-                }
-                else{
-                    // We are done, we got final response.
-                    if(op.Response is IMAP_r_ServerStatus){
-                        m_pFinalResponse = op.Response;
-                        SetState(AsyncOP_State.Completed);
-                    }
-                }
-            }
-
-            #endregion
-
-
-            #region Properties implementation
-
-            /// <summary>
-            /// Gets asynchronous operation state.
-            /// </summary>
-            public AsyncOP_State State
-            {
-                get{ return m_State; }
-            }
-
-            /// <summary>
-            /// Gets error happened during operation. Returns null if no error.
-            /// </summary>
-            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
-            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
-            public Exception Error
-            {
-                get{ 
-                    if(m_State == AsyncOP_State.Disposed){
-                        throw new ObjectDisposedException(this.GetType().Name);
-                    }
-                    if(m_State != AsyncOP_State.Completed){
-                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
-                    }
-
-                    return m_pException; 
-                }
-            }
-
-            /// <summary>
-            /// Returns IMAP server final response.
-            /// </summary>
-            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
-            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
-            public IMAP_r FinalResponse
-            {
-                get{
-                    if(m_State == AsyncOP_State.Disposed){
-                        throw new ObjectDisposedException(this.GetType().Name);
-                    }
-                    if(m_State != AsyncOP_State.Completed){
-                        throw new InvalidOperationException("Property 'Response' is accessible only in 'AsyncOP_State.Completed' state.");
-                    }
-
-                    return m_pFinalResponse; 
-                }
-            }
-
-            #endregion
-
-            #region Events implementation
-
-            /// <summary>
-            /// Is called when asynchronous operation has completed.
-            /// </summary>
-            public event EventHandler<EventArgs<ReadFinalResponseAsyncOP>> CompletedAsync = null;
-
-            #region method OnCompletedAsync
-
-            /// <summary>
-            /// Raises <b>CompletedAsync</b> event.
-            /// </summary>
-            private void OnCompletedAsync()
-            {
-                if(this.CompletedAsync != null){
-                    this.CompletedAsync(this,new EventArgs<ReadFinalResponseAsyncOP>(this));
-                }
-            }
-
-            #endregion
-
-            #endregion
-        }
-
-        #endregion
-
-        /// <summary>
-        /// Starts reading IMAP server final(OK/BAD/NO/+) response.
-        /// </summary>
-        /// <param name="op">Asynchronous operation.</param>
-        /// <returns>Returns true if aynchronous operation is pending (The <see cref="ReadResponseAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
-        /// Returns false if operation completed synchronously.</returns>
-        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
-        /// <exception cref="ArgumentException">Is raised when any oth the arguments has invalid value.</exception>
-        private bool ReadFinalResponseAsync(ReadFinalResponseAsyncOP op)
-        {            
-            if(op == null){
-                throw new ArgumentNullException("op");
-            }
-            if(op.State != AsyncOP_State.WaitingForStart){
-                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
-            }
-                        
-            return op.Start(this);            
-        }
-
-        #endregion
-
-        #region method ReadStringLiteral
-
-        /// <summary>
-        /// Reads IMAP <b>string-literal</b> from remote endpoint.
-        /// </summary>
-        /// <param name="count">Number of bytes to read.</param>
-        /// <returns>Returns readed string-literal.</returns>
-        private string ReadStringLiteral(int count)
-        {
-            /* RFC 3501 4.3.            
-                string-literal = {bytes_count} CRLF      - Number of bytes after CRLF.
-                quoted-string  = DQUOTE string DQUOTE    - Normal quoted-string.
-            */
-
-            string retVal = this.TcpStream.ReadFixedCountString(count);            
-            LogAddRead(count,"Readed string-literal " + count.ToString() + " bytes.");
-
-            return retVal;
-        }
-
-        /// <summary>
-        /// Reads IMAP <b>string-literal</b> from remote endpoint.
-        /// </summary>
-        /// <param name="count">Number of bytes to read.</param>
-        /// <param name="stream">Stream where to store readed data.</param>
-        /// <exception cref="ArgumentNullException">Is raised when <b>stream</b> is null reference.</exception>
-        private void ReadStringLiteral(int count,Stream stream)
-        {
-            if(stream == null){
-                throw new ArgumentNullException("stream");
-            }
-
-            this.TcpStream.ReadFixedCount(stream,count);
-            LogAddRead(count,"Readed string-literal " + count.ToString() + " bytes.");
-        }
-
-        #endregion
-
-        #region method SupportsCapability
-
-        /// <summary>
-        /// Gets if IMAP server supports the specified capability.
-        /// </summary>
-        /// <param name="capability">IMAP capability.</param>
-        /// <returns>Return true if IMAP server supports the specified capability.</returns>
-        /// <exception cref="ArgumentNullException">Is raised when <b>capability</b> is null reference.</exception>
-        private bool SupportsCapability(string capability)
-        {
-            if(capability == null){
-                throw new ArgumentNullException("capability");
-            }
-
-            if(m_pCapabilities == null){
-                return false;
-            }
-            else{
-                foreach(string c in m_pCapabilities){
-                    if(string.Equals(c,capability,StringComparison.InvariantCultureIgnoreCase)){
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        #endregion
-
-
-        #region Properties implementation
-
-        /// <summary>
-        /// Gets session authenticated user identity, returns null if not authenticated.
-        /// </summary>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when this property is accessed and IMAP client is not connected.</exception>
-        public override GenericIdentity AuthenticatedUserIdentity
-        {
-            get{ 
-                if(this.IsDisposed){
-                    throw new ObjectDisposedException(this.GetType().Name);
-                }
-                if(!this.IsConnected){
-				    throw new InvalidOperationException("You must connect first.");
-			    }
-
-                return m_pAuthenticatedUser; 
-            }
-        }
-
-        /// <summary>
-        /// Get IMAP server greeting text.
-        /// </summary>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when this property is accessed and IMAP client is not connected.</exception>
-        public string GreetingText
-        {
-            get{ 
-                if(this.IsDisposed){
-                    throw new ObjectDisposedException(this.GetType().Name);
-                }
-                if(!this.IsConnected){
-				    throw new InvalidOperationException("You must connect first.");
-			    }
-
-                return m_GreetingText; 
-            }
-        }
-
-        /// <summary>
-        /// Get IMAP server(CAPABILITY command cached) supported capabilities.
-        /// </summary>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when this property is accessed and IMAP client is not connected.</exception>
-        public string[] Capabilities
-        {
-            get{ 
-                if(this.IsDisposed){
-                    throw new ObjectDisposedException(this.GetType().Name);
-                }
-                if(!this.IsConnected){
-				    throw new InvalidOperationException("You must connect first.");
-			    }
-
-                return m_pCapabilities.ToArray(); 
-            }
-        }
-
-        /// <summary>
-        /// Gets IMAP server folder separator.
-        /// </summary>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when this property is accessed and IMAP client is not connected.</exception>
-        public char FolderSeparator
-        {
-            get{ 
-                if(this.IsDisposed){
-                    throw new ObjectDisposedException(this.GetType().Name);
-                }
-                if(!this.IsConnected){
-				    throw new InvalidOperationException("You must connect first.");
-			    }
-
-                SendCommand((m_CommandIndex++).ToString("d5") + " LIST \"\" \"\"\r\n");
-
-                List<IMAP_r_u_List> retVal = new List<IMAP_r_u_List>();
-                IMAP_r_ServerStatus response = ReadResponse(null,null,null,retVal,null,null,null,null,null,null,null,null,null,null);
-                if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
-                    throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
-                }
-
-                if(retVal.Count == 0){
-                    throw new Exception("Unexpected result: IMAP server didn't return LIST response for [... LIST \"\" \"\"].");
-                }
-                else{
-                    return retVal[0].HierarchyDelimiter;
-                }
-            }
-        }
-
-        /// <summary>
-        /// Gets selected folder. Returns null if no folder selected.
-        /// </summary>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when this property is accessed and IMAP client is not connected.</exception>
-        public IMAP_Client_SelectedFolder SelectedFolder
-        {
-            get{ 
-                if(this.IsDisposed){
-                    throw new ObjectDisposedException(this.GetType().Name);
-                }
-                if(!this.IsConnected){
-				    throw new InvalidOperationException("You must connect first.");
-			    }
-
-                return m_pSelectedFolder; 
-            }
-        }
-
-        #endregion
-
-        #region Events implementation
-        
-        /// <summary>
-        /// This event is raised when IMAP server sends untagged status response.
-        /// </summary>
-        public event EventHandler<EventArgs<IMAP_r_u>> UntaggedStatusResponse = null;
-
-        #region method OnUntaggedStatusResponse
-
-        /// <summary>
-        /// Raises <b>UntaggedStatusResponse</b> event.
-        /// </summary>
-        /// <param name="response">Untagged response.</param>
-        private void OnUntaggedStatusResponse(IMAP_r_u response)
-        {
-            if(this.UntaggedStatusResponse != null){
-                this.UntaggedStatusResponse(this,new EventArgs<IMAP_r_u>(response));
-            }
-        }
-
-        #endregion
-
-        /// <summary>
-        /// Is raised when IMAP server sends any untagged response.
-        /// </summary>
-        public event EventHandler<EventArgs<IMAP_r_u>> UntaggedResponse = null;
-
-        #region method OnUntaggedResponse
-
-        /// <summary>
-        /// Raises <b>UntaggedResponse</b> event.
-        /// </summary>
-        /// <param name="response">Untagged IMAP server response.</param>
-        private void OnUntaggedResponse(IMAP_r_u response)
-        {
-            if(this.UntaggedResponse != null){
-                this.UntaggedResponse(this,new EventArgs<IMAP_r_u>(response));
-            }
-        }
-
-        #endregion
-                
-        /// <summary>
-        /// This event is raised when IMAP server expunges message and sends EXPUNGE response.
-        /// </summary>
-        public event EventHandler<EventArgs<IMAP_r_u_Expunge>> MessageExpunged = null;
-
-        #region method OnMessageExpunged
-
-        /// <summary>
-        /// Raises <b>MessageExpunged</b> event.
-        /// </summary>
-        /// <param name="response">Expunge response.</param>
-        private void OnMessageExpunged(IMAP_r_u_Expunge response)
-        {
-            if(this.MessageExpunged != null){
-                this.MessageExpunged(this,new EventArgs<IMAP_r_u_Expunge>(response));
-            }
-        }
-
-        #endregion
-                
-        #endregion
-
-
-        //--- OBSOLETE
-
         #region method Search
 
         /// <summary>
@@ -5093,6 +5507,467 @@ namespace LumiSoft.Net.IMAP.Client
             }
            
             return retVal.ToArray();
+        }
+
+        #endregion
+
+        #region method Fetch
+
+        /// <summary>
+        /// Fetches specified message items.
+        /// </summary>
+        /// <param name="uid">Specifies if argument <b>seqSet</b> contains messages UID or sequence numbers.</param>
+        /// <param name="seqSet">Sequence set of messages to fetch.</param>
+        /// <param name="items">Fetch items to fetch.</param>
+        /// <param name="handler">Fetch responses handler.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b>,<b>items</b> or <b>handler</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected, not-authenticated or not-selected state).</exception>
+        /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
+        [Obsolete("Use Fetch(bool uid,IMAP_t_SeqSet seqSet,IMAP_Fetch_DataItem[] items,EventHandler<EventArgs<IMAP_r_u>> callback) intead.")]
+        public void Fetch(bool uid,IMAP_SequenceSet seqSet,IMAP_Fetch_DataItem[] items,IMAP_Client_FetchHandler handler)
+        {
+            if(seqSet == null){
+                throw new ArgumentNullException("seqSet");
+            }
+            if(items == null){
+                throw new ArgumentNullException("items");
+            }
+            if(items.Length < 1){
+                throw new ArgumentException("Argument 'items' must conatain at least 1 value.","items");
+            }
+            if(handler == null){
+                throw new ArgumentNullException("handler");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(!this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }
+            if(m_pSelectedFolder == null){
+                throw new InvalidOperationException("Not selected state, you need to select some folder first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
+            }
+
+            /* RFC 3501 6.4.5. FETCH Command.
+                Arguments:  sequence set
+                            message data item names or macro
+
+                Responses:  untagged responses: FETCH
+
+                Result:     OK - fetch completed
+                            NO - fetch error: can't fetch that data
+                            BAD - command unknown or arguments invalid
+
+                The FETCH command retrieves data associated with a message in the
+                mailbox.  The data items to be fetched can be either a single atom
+                or a parenthesized list.
+
+                Most data items, identified in the formal syntax under the
+                msg-att-static rule, are static and MUST NOT change for any
+                particular message.  Other data items, identified in the formal
+                syntax under the msg-att-dynamic rule, MAY change, either as a
+                result of a STORE command or due to external events.
+
+                    For example, if a client receives an ENVELOPE for a
+                    message when it already knows the envelope, it can
+                    safely ignore the newly transmitted envelope.
+            */
+
+            StringBuilder command = new StringBuilder();
+            command.Append((m_CommandIndex++).ToString("d5"));
+            if(uid){
+                command.Append(" UID");
+            }
+            command.Append(" FETCH " + seqSet.ToSequenceSetString() + " (");
+            for(int i=0;i<items.Length;i++){
+                if(i > 0){
+                    command.Append(" ");
+                }
+                command.Append(items[i].ToString());
+            }
+            command.Append(")\r\n");
+     
+            SendCommand(command.ToString());
+
+            IMAP_r_ServerStatus response = ReadResponse(null,null,null,null,null,null,null,null,null,null,null,null,handler,null);
+            if(!response.ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase)){
+                throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
+            }
+        }
+
+        #endregion
+
+        #region class _FetchResponseReader
+
+        /// <summary>
+        /// This class implements FETCH response reader.
+        /// </summary>
+        [Obsolete("deprecated")]
+        internal class _FetchResponseReader
+        {
+            private IMAP_Client              m_pImap        = null;
+            private string                   m_FetchLine    = null;
+            private StringReader             m_pFetchReader = null;
+            private IMAP_Client_FetchHandler m_pHandler     = null;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="imap">IMAP client.</param>
+            /// <param name="fetchLine">Initial FETCH response line.</param>
+            /// <param name="handler">Fetch data-items handler.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>imap</b>,<b>fetchLine</b> or <b>handler</b> is null reference.</exception>
+            public _FetchResponseReader(IMAP_Client imap,string fetchLine,IMAP_Client_FetchHandler handler)
+            {
+                if(imap == null){
+                    throw new ArgumentNullException("imap");
+                }
+                if(fetchLine == null){
+                    throw new ArgumentNullException("fetchLine");
+                }
+                if(handler == null){
+                    throw new ArgumentNullException("handler");
+                }
+
+                m_pImap     = imap;
+                m_FetchLine = fetchLine;
+                m_pHandler  = handler;
+            }
+
+            #region method Start
+
+            /// <summary>
+            /// Starts reading FETCH response.
+            /// </summary>
+            public void Start()
+            {
+                // * seqNo FETCH 1data-item/(1*data-item)
+
+                int seqNo = Convert.ToInt32(m_FetchLine.Split(' ')[1]);
+
+                // Notify that current message has changed.
+                m_pHandler.SetCurrentSeqNo(seqNo);
+                m_pHandler.OnNextMessage();
+
+                m_pFetchReader = new StringReader(m_FetchLine.Split(new char[]{' '},4)[3]);
+                if(m_pFetchReader.StartsWith("(")){
+                    m_pFetchReader.ReadSpecifiedLength(1);
+                }
+
+                // Read data-items.
+                while(m_pFetchReader.Available > 0){
+                    m_pFetchReader.ReadToFirstChar();
+//*
+                    #region BODY
+
+                    if(m_pFetchReader.StartsWith("BODY ",false)){
+                    }
+
+                    #endregion
+
+                    #region BODY[<section>]<<origin octet>>
+
+                    else if(m_pFetchReader.StartsWith("BODY[",false)){
+                        // Eat BODY word.
+                        m_pFetchReader.ReadWord();
+
+                        // Read body-section.
+                        string section = m_pFetchReader.ReadParenthesized();
+
+                        // Read origin if any.
+                        int offset = -1;
+                        if(m_pFetchReader.StartsWith("<")){
+                            offset = Convert.ToInt32(m_pFetchReader.ReadParenthesized().Split(' ')[0]);
+                        }
+
+
+                        // Get Message store stream.
+                        IMAP_Client_Fetch_Body_EArgs eArgs = new IMAP_Client_Fetch_Body_EArgs(section,offset);
+                        m_pHandler.OnBody(eArgs);
+
+                        // We don't have BODY[].
+                        m_pFetchReader.ReadToFirstChar();
+                        if(m_pFetchReader.StartsWith("NIL",false)){
+                            // Eat NIL.
+                            m_pFetchReader.ReadWord();
+                        }
+                        // BODY[] value is returned as string-literal.
+                        else if(m_pFetchReader.StartsWith("{",false)){
+                            if(eArgs.Stream == null){
+                                m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()),new JunkingStream());
+                            }
+                            else{
+                                m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()),eArgs.Stream);
+                            }
+                            
+                            // Read continuing FETCH line.
+                            m_pFetchReader = new StringReader(m_pImap.ReadLine());
+                        }
+                        // BODY[] is quoted-string.
+                        else{
+                            m_pFetchReader.ReadWord();
+                        }
+
+                        // Notify that message storing has completed.
+                        eArgs.OnStoringCompleted();
+                    }
+
+                    #endregion
+//*
+                    #region BODYSTRUCTURE
+
+                    else if(m_pFetchReader.StartsWith("BODYSTRUCTURE ",false)){
+                    }
+
+                    #endregion
+
+                    #region ENVELOPE
+
+                    else if(m_pFetchReader.StartsWith("ENVELOPE ",false)){
+                        m_pHandler.OnEnvelope(IMAP_Envelope.Parse(this));
+                    }
+
+                    #endregion
+
+                    #region  FLAGS
+
+                    else if(m_pFetchReader.StartsWith("FLAGS ",false)){
+                        // Eat FLAGS word.
+                        m_pFetchReader.ReadWord();
+
+                        string   flagsList = m_pFetchReader.ReadParenthesized();
+                        string[] flags     = new string[0];
+                        if(!string.IsNullOrEmpty(flagsList)){
+                            flags = flagsList.Split(' ');
+                        }
+
+                        m_pHandler.OnFlags(flags);
+                    }
+
+                    #endregion
+
+                    #region INTERNALDATE
+
+                    else if(m_pFetchReader.StartsWith("INTERNALDATE ",false)){
+                         // Eat INTERNALDATE word.
+                        m_pFetchReader.ReadWord();
+
+                        m_pHandler.OnInternalDate(IMAP_Utils.ParseDate(m_pFetchReader.ReadWord()));
+                    }
+
+                    #endregion
+
+                    #region RFC822
+
+                    else if(m_pFetchReader.StartsWith("RFC822 ",false)){
+                        // Eat RFC822 word.
+                        m_pFetchReader.ReadWord(false,new char[]{' '},false);
+                        m_pFetchReader.ReadToFirstChar();
+
+                        // Get Message store stream.
+                        IMAP_Client_Fetch_Rfc822_EArgs eArgs = new IMAP_Client_Fetch_Rfc822_EArgs();
+                        m_pHandler.OnRfc822(eArgs);
+
+                        // We don't have RFC822.
+                        if(m_pFetchReader.StartsWith("NIL",false)){
+                            // Eat NIL.
+                            m_pFetchReader.ReadWord();
+                        }
+                        // RFC822 value is returned as string-literal.
+                        else if(m_pFetchReader.StartsWith("{",false)){
+                            if(eArgs.Stream == null){
+                                m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()),new JunkingStream());
+                            }
+                            else{
+                                m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()),eArgs.Stream);
+                            }
+                            
+                            // Read continuing FETCH line.
+                            m_pFetchReader = new StringReader(m_pImap.ReadLine());
+                        }
+                        // RFC822 is quoted-string.
+                        else{
+                            m_pFetchReader.ReadWord();
+                        }
+
+                        // Notify that message storing has completed.
+                        eArgs.OnStoringCompleted();
+                    }
+
+                    #endregion
+
+                    #region RFC822.HEADER
+
+                    else if(m_pFetchReader.StartsWith("RFC822.HEADER ",false)){
+                        // Eat RFC822.HEADER word.
+                        m_pFetchReader.ReadWord(false,new char[]{' '},false);
+                        m_pFetchReader.ReadToFirstChar();
+                        
+                        string text = null;
+                        // We don't have HEADER.
+                        if(m_pFetchReader.StartsWith("NIL",false)){
+                            // Eat NIL.
+                            m_pFetchReader.ReadWord();
+
+                            text = null;
+                        }
+                        // HEADER value is returned as string-literal.
+                        else if(m_pFetchReader.StartsWith("{",false)){
+                            text = m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()));
+                            
+                            // Read continuing FETCH line.
+                            m_pFetchReader = new StringReader(m_pImap.ReadLine());
+                        }
+                        // HEADER is quoted-string.
+                        else{
+                            text = m_pFetchReader.ReadWord();
+                        }
+
+                        m_pHandler.OnRfc822Header(text);
+                    }
+
+                    #endregion
+
+                    #region RFC822.SIZE
+
+                    else if(m_pFetchReader.StartsWith("RFC822.SIZE ",false)){
+                        // Eat RFC822.SIZE word.
+                        m_pFetchReader.ReadWord(false,new char[]{' '},false);
+
+                        m_pHandler.OnSize(Convert.ToInt32(m_pFetchReader.ReadWord()));
+                    }
+
+                    #endregion
+
+                    #region RFC822.TEXT
+
+                    else if(m_pFetchReader.StartsWith("RFC822.TEXT ",false)){
+                        // Eat RFC822.TEXT word.
+                        m_pFetchReader.ReadWord(false,new char[]{' '},false);
+                        m_pFetchReader.ReadToFirstChar();
+                        
+                        string text = null;
+                        // We don't have TEXT.
+                        if(m_pFetchReader.StartsWith("NIL",false)){
+                            // Eat NIL.
+                            m_pFetchReader.ReadWord();
+
+                            text = null;
+                        }
+                        // TEXT value is returned as string-literal.
+                        else if(m_pFetchReader.StartsWith("{",false)){
+                            text = m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()));
+                            
+                            // Read continuing FETCH line.
+                            m_pFetchReader = new StringReader(m_pImap.ReadLine());
+                        }
+                        // TEXT is quoted-string.
+                        else{
+                            text = m_pFetchReader.ReadWord();
+                        }
+
+                        m_pHandler.OnRfc822Text(text);
+                    }
+
+                    #endregion
+
+                    #region UID
+
+                    else if(m_pFetchReader.StartsWith("UID ",false)){
+                        // Eat UID word.
+                        m_pFetchReader.ReadWord();
+
+                        m_pHandler.OnUID(Convert.ToInt64(m_pFetchReader.ReadWord()));
+                    }
+
+                    #endregion
+
+                    #region X-GM-MSGID
+
+                    else if(m_pFetchReader.StartsWith("X-GM-MSGID ",false)){
+                        // Eat X-GM-MSGID word.
+                        m_pFetchReader.ReadWord();
+
+                        m_pHandler.OnX_GM_MSGID(Convert.ToUInt64(m_pFetchReader.ReadWord()));
+                    }
+
+                    #endregion
+
+                    #region X-GM-THRID
+
+                    else if(m_pFetchReader.StartsWith("X-GM-THRID ",false)){
+                        // Eat X-GM-THRID word.
+                        m_pFetchReader.ReadWord();
+
+                        m_pHandler.OnX_GM_THRID(Convert.ToUInt64(m_pFetchReader.ReadWord()));
+                    }
+
+                    #endregion
+
+                    #region Fetch closing ")"
+
+                    else if(m_pFetchReader.StartsWith(")",false)){
+                        break;
+                    }
+
+                    #endregion
+
+                    else{
+                        throw new NotSupportedException("Not supported IMAP FETCH data-item '" + m_pFetchReader.ReadToEnd() + "'.");
+                    }
+                }
+            }
+
+            #endregion
+
+
+            #region method GetReader
+
+            /// <summary>
+            /// Gets FETCH current line data reader.
+            /// </summary>
+            internal StringReader GetReader()
+            {
+                return m_pFetchReader;
+            }
+
+            #endregion
+
+            #region method ReadString
+
+            /// <summary>
+            /// Reads string. Quoted-string-string-literal and NIL supported.
+            /// </summary>
+            /// <returns>Returns readed string.</returns>
+            internal string ReadString()
+            {                        
+                m_pFetchReader.ReadToFirstChar();
+                // NIL string.
+                if(m_pFetchReader.StartsWith("NIL",false)){
+                    m_pFetchReader.ReadWord();
+
+                    return null;
+                }
+                // string-literal.
+                else if(m_pFetchReader.StartsWith("{")){
+                    string retVal = m_pImap.ReadStringLiteral(Convert.ToInt32(m_pFetchReader.ReadParenthesized()));
+
+                    // Read continuing FETCH line.
+                    m_pFetchReader = new StringReader(m_pImap.ReadLine());
+
+                    return retVal;
+                }
+                // quoted-string or atom.
+                else{
+                    return MIME_Encoding_EncodedWord.DecodeS(m_pFetchReader.ReadWord());
+                }
+            }
+
+            #endregion
         }
 
         #endregion

@@ -7,7 +7,8 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP MYRIGHTS response. Defined in RFC 4314 3.8.
     /// </summary>
-    public class IMAP_r_u_MyRights : IMAP_r_u
+    [Obsolete("Use class IMAP_r_u_MyRights instead.")]
+    public class IMAP_Response_MyRights : IMAP_r_u
     {
         private string m_FolderName = "";
         private string m_pRights    = null;
@@ -19,7 +20,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="rights">Rights values.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        public IMAP_r_u_MyRights(string folder,string rights)
+        public IMAP_Response_MyRights(string folder,string rights)
         {
             if(folder == null){
                 throw new ArgumentNullException("folder");
@@ -42,7 +43,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="myRightsResponse">MYRIGHTS response line.</param>
         /// <returns>Returns parsed MYRIGHTS response.</returns>
         /// <exception cref="ArgumentNullException">Is raised when <b>myRightsResponse</b> is null reference.</exception>
-        public static IMAP_r_u_MyRights Parse(string myRightsResponse)
+        public static IMAP_Response_MyRights Parse(string myRightsResponse)
         {
             if(myRightsResponse == null){
                 throw new ArgumentNullException("myRightsResponse");
@@ -73,7 +74,7 @@ namespace LumiSoft.Net.IMAP
             string folder = IMAP_Utils.Decode_IMAP_UTF7_String(r.ReadWord(true));
             string rights = r.ReadToEnd().Trim();
 
-            return new IMAP_r_u_MyRights(folder,rights);
+            return new IMAP_Response_MyRights(folder,rights);
         }
 
         #endregion
