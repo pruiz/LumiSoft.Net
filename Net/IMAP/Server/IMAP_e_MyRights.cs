@@ -9,9 +9,9 @@ namespace LumiSoft.Net.IMAP.Server
     /// </summary>
     public class IMAP_e_MyRights : EventArgs
     {
-        private IMAP_Response_MyRights m_pMyRightsResponse = null;
-        private IMAP_r_ServerStatus    m_pResponse         = null;
-        private string                 m_Folder            = null;
+        private IMAP_r_u_MyRights   m_pMyRightsResponse = null;
+        private IMAP_r_ServerStatus m_pResponse         = null;
+        private string              m_Folder            = null;
 
         /// <summary>
         /// Default constructor.
@@ -38,7 +38,7 @@ namespace LumiSoft.Net.IMAP.Server
         /// <summary>
         /// Gets or sets MYRIGHTS response.
         /// </summary>
-        public IMAP_Response_MyRights MyRightsResponse
+        public IMAP_r_u_MyRights MyRightsResponse
         {
             get{ return m_pMyRightsResponse; }
 
