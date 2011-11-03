@@ -3294,8 +3294,8 @@ namespace LumiSoft.Net.IMAP.Server
 
             #region Parse data-items
 
-            List<IMAP_Fetch_DataItem> dataItems     = new List<IMAP_Fetch_DataItem>();
-            bool                      msgDataNeeded = false;
+            List<IMAP_t_Fetch_i> dataItems     = new List<IMAP_t_Fetch_i>();
+            bool                 msgDataNeeded = false;
 
             // Remove parenthesizes.
             string dataItemsString = parts[1].Trim();
@@ -3320,7 +3320,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                 if(r.StartsWith("BODYSTRUCTURE",false)){
                     r.ReadWord();
-                    dataItems.Add(new IMAP_Fetch_DataItem_BodyStructure());
+                    dataItems.Add(new IMAP_t_Fetch_i_BodyStructure());
                     msgDataNeeded = true;
                     fetchDataType = IMAP_Fetch_DataType.MessageStructure;
                 }
@@ -3425,10 +3425,10 @@ namespace LumiSoft.Net.IMAP.Server
                     #endregion
 
                     if(peek){
-                        dataItems.Add(new IMAP_Fetch_DataItem_BodyPeek(section,offset,maxCount));
+                        dataItems.Add(new IMAP_t_Fetch_i_BodyPeek(section,offset,maxCount));
                     }
                     else{
-                        dataItems.Add(new IMAP_Fetch_DataItem_Body(section,offset,maxCount));
+                        dataItems.Add(new IMAP_t_Fetch_i_Body(section,offset,maxCount));
                     }
                     msgDataNeeded = true;
                     fetchDataType = IMAP_Fetch_DataType.FullMessage;
@@ -3440,7 +3440,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                 else if(r.StartsWith("BODY",false)){
                     r.ReadWord();
-                    dataItems.Add(new IMAP_Fetch_DataItem_BodyS());
+                    dataItems.Add(new IMAP_t_Fetch_i_BodyS());
                     msgDataNeeded = true;
                     fetchDataType = IMAP_Fetch_DataType.MessageStructure;
                 }
@@ -3451,7 +3451,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                 else if(r.StartsWith("ENVELOPE",false)){
                     r.ReadWord();
-                    dataItems.Add(new IMAP_Fetch_DataItem_Envelope());
+                    dataItems.Add(new IMAP_t_Fetch_i_Envelope());
                     msgDataNeeded = true;
                     fetchDataType = IMAP_Fetch_DataType.MessageHeader;
                 }
@@ -3462,7 +3462,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                 else if(r.StartsWith("FLAGS",false)){
                     r.ReadWord();
-                    dataItems.Add(new IMAP_Fetch_DataItem_Flags());
+                    dataItems.Add(new IMAP_t_Fetch_i_Flags());
                 }
 
                 #endregion
@@ -3471,7 +3471,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                 else if(r.StartsWith("INTERNALDATE",false)){
                     r.ReadWord();
-                    dataItems.Add(new IMAP_Fetch_DataItem_InternalDate());
+                    dataItems.Add(new IMAP_t_Fetch_i_InternalDate());
                 }
 
                 #endregion
@@ -3480,7 +3480,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                 else if(r.StartsWith("RFC822.HEADER",false)){
                     r.ReadWord();
-                    dataItems.Add(new IMAP_Fetch_DataItem_Rfc822Header());
+                    dataItems.Add(new IMAP_t_Fetch_i_Rfc822Header());
                     msgDataNeeded = true;
                     fetchDataType = IMAP_Fetch_DataType.MessageHeader;
                 }
@@ -3491,7 +3491,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                 else if(r.StartsWith("RFC822.SIZE",false)){
                     r.ReadWord();
-                    dataItems.Add(new IMAP_Fetch_DataItem_Rfc822Size());
+                    dataItems.Add(new IMAP_t_Fetch_i_Rfc822Size());
                 }
 
                 #endregion
@@ -3500,7 +3500,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                 else if(r.StartsWith("RFC822.TEXT",false)){
                     r.ReadWord();
-                    dataItems.Add(new IMAP_Fetch_DataItem_Rfc822Text());
+                    dataItems.Add(new IMAP_t_Fetch_i_Rfc822Text());
                     msgDataNeeded = true;
                     fetchDataType = IMAP_Fetch_DataType.FullMessage;
                 }
@@ -3511,7 +3511,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                 else if(r.StartsWith("RFC822",false)){
                     r.ReadWord();
-                    dataItems.Add(new IMAP_Fetch_DataItem_Rfc822());
+                    dataItems.Add(new IMAP_t_Fetch_i_Rfc822());
                     msgDataNeeded = true;
                     fetchDataType = IMAP_Fetch_DataType.FullMessage;
                 }
@@ -3522,7 +3522,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                 else if(r.StartsWith("UID",false)){
                     r.ReadWord();
-                    dataItems.Add(new IMAP_Fetch_DataItem_Uid());
+                    dataItems.Add(new IMAP_t_Fetch_i_Uid());
                 }
 
                 #endregion
@@ -3543,14 +3543,14 @@ namespace LumiSoft.Net.IMAP.Server
             // UID FETCH must always return UID data-item, even if user didn't request it.
             if(uid){
                 bool add = true;
-                foreach(IMAP_Fetch_DataItem item in dataItems){                    
-                    if(item is IMAP_Fetch_DataItem_Uid){
+                foreach(IMAP_t_Fetch_i item in dataItems){                    
+                    if(item is IMAP_t_Fetch_i_Uid){
                         add = false;
                         break;
                     }
                 }
                 if(add){
-                    dataItems.Add(new IMAP_Fetch_DataItem_Uid());
+                    dataItems.Add(new IMAP_t_Fetch_i_Uid());
                 }
             }
 
@@ -3569,7 +3569,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                 // Return requested data-items for the returned message.
                 for(int i=0;i<dataItems.Count;i++){
-                    IMAP_Fetch_DataItem dataItem = dataItems[i];
+                    IMAP_t_Fetch_i dataItem = dataItems[i];
                                       
                     // Add data-items separator.
                     if(i > 0){
@@ -3578,7 +3578,7 @@ namespace LumiSoft.Net.IMAP.Server
                                        
                     #region BODY
 
-                    if(dataItem is IMAP_Fetch_DataItem_BodyS){
+                    if(dataItem is IMAP_t_Fetch_i_BodyS){
                         reponseBuffer.Append(ConstructBodyStructure(message,false));
                     }
 
@@ -3586,19 +3586,19 @@ namespace LumiSoft.Net.IMAP.Server
 
                     #region BODY[<section>]<<partial>> and BODY.PEEK[<section>]<<partial>>
 
-                    else if(dataItem is IMAP_Fetch_DataItem_Body || dataItem is IMAP_Fetch_DataItem_BodyPeek){
+                    else if(dataItem is IMAP_t_Fetch_i_Body || dataItem is IMAP_t_Fetch_i_BodyPeek){
                         string section  = "";
                         int    offset   = -1;
                         int    maxCount = -1;
-                        if(dataItem is IMAP_Fetch_DataItem_Body){
-                            section  = ((IMAP_Fetch_DataItem_Body)dataItem).Section;
-                            offset   = ((IMAP_Fetch_DataItem_Body)dataItem).Offset;
-                            maxCount = ((IMAP_Fetch_DataItem_Body)dataItem).MaxCount;
+                        if(dataItem is IMAP_t_Fetch_i_Body){
+                            section  = ((IMAP_t_Fetch_i_Body)dataItem).Section;
+                            offset   = ((IMAP_t_Fetch_i_Body)dataItem).Offset;
+                            maxCount = ((IMAP_t_Fetch_i_Body)dataItem).MaxCount;
                         }
                         else{
-                            section  = ((IMAP_Fetch_DataItem_BodyPeek)dataItem).Section;
-                            offset   = ((IMAP_Fetch_DataItem_BodyPeek)dataItem).Offset;
-                            maxCount = ((IMAP_Fetch_DataItem_BodyPeek)dataItem).MaxCount;
+                            section  = ((IMAP_t_Fetch_i_BodyPeek)dataItem).Section;
+                            offset   = ((IMAP_t_Fetch_i_BodyPeek)dataItem).Offset;
+                            maxCount = ((IMAP_t_Fetch_i_BodyPeek)dataItem).MaxCount;
                         }
 
                         using(MemoryStreamEx tmpFs = new MemoryStreamEx(32000)){
@@ -3749,7 +3749,7 @@ namespace LumiSoft.Net.IMAP.Server
                         }
 
                         // Set Seen flag.
-                        if(!m_pSelectedFolder.IsReadOnly && dataItem is IMAP_Fetch_DataItem_Body){
+                        if(!m_pSelectedFolder.IsReadOnly && dataItem is IMAP_t_Fetch_i_Body){
                             try{
                                 OnStore(e.MessageInfo,IMAP_Flags_SetType.Add,new string[]{"Seen"},new IMAP_r_ServerStatus("dummy","OK","This is FETCH set Seen flag, this response not used."));
                             }
@@ -3762,7 +3762,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                     #region BODYSTRUCTURE
 
-                    else if(dataItem is IMAP_Fetch_DataItem_BodyStructure){
+                    else if(dataItem is IMAP_t_Fetch_i_BodyStructure){
                         reponseBuffer.Append(ConstructBodyStructure(message,true));
                     }
 
@@ -3770,15 +3770,15 @@ namespace LumiSoft.Net.IMAP.Server
 
                     #region ENVELOPE
 
-                    else if(dataItem is IMAP_Fetch_DataItem_Envelope){
-                        reponseBuffer.Append(IMAP_Envelope.ConstructEnvelope(message));
+                    else if(dataItem is IMAP_t_Fetch_i_Envelope){
+                        reponseBuffer.Append(IMAP_t_Fetch_r_i_Envelope.ConstructEnvelope(message));
                     }
 
                     #endregion
 
                     #region FLAGS
 
-                    else if(dataItem is IMAP_Fetch_DataItem_Flags){
+                    else if(dataItem is IMAP_t_Fetch_i_Flags){
                         reponseBuffer.Append("FLAGS " + e.MessageInfo.FlagsToImapString());
                     }
 
@@ -3786,7 +3786,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                     #region INTERNALDATE
 
-                    else if(dataItem is IMAP_Fetch_DataItem_InternalDate){
+                    else if(dataItem is IMAP_t_Fetch_i_InternalDate){
                         reponseBuffer.Append("INTERNALDATE \"" + IMAP_Utils.DateTimeToString(e.MessageInfo.InternalDate) + "\"");
                     }
 
@@ -3794,7 +3794,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                     #region RFC822
 
-                    else if(dataItem is IMAP_Fetch_DataItem_Rfc822){
+                    else if(dataItem is IMAP_t_Fetch_i_Rfc822){
                         using(MemoryStreamEx tmpFs = new MemoryStreamEx(32000)){
                             message.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8);
                             tmpFs.Position = 0;
@@ -3812,7 +3812,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                     #region RFC822.HEADER
 
-                    else if(dataItem is IMAP_Fetch_DataItem_Rfc822Header){
+                    else if(dataItem is IMAP_t_Fetch_i_Rfc822Header){
                         MemoryStream ms = new MemoryStream();
                         message.Header.ToStream(ms,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8);
                         ms.Position = 0;
@@ -3829,7 +3829,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                     #region RFC822.SIZE
 
-                    else if(dataItem is IMAP_Fetch_DataItem_Rfc822Size){
+                    else if(dataItem is IMAP_t_Fetch_i_Rfc822Size){
                         reponseBuffer.Append("RFC822.SIZE " + e.MessageInfo.Size);
                     }
 
@@ -3837,7 +3837,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                     #region RFC822.TEXT
 
-                    else if(dataItem is IMAP_Fetch_DataItem_Rfc822Text){
+                    else if(dataItem is IMAP_t_Fetch_i_Rfc822Text){
                         using(MemoryStreamEx tmpFs = new MemoryStreamEx(32000)){
                             message.Body.ToStream(tmpFs,new MIME_Encoding_EncodedWord(MIME_EncodedWordEncoding.B,Encoding.UTF8),Encoding.UTF8,false);
                             tmpFs.Position = 0;
@@ -3855,7 +3855,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                     #region UID
 
-                    else if(dataItem is IMAP_Fetch_DataItem_Uid){ 
+                    else if(dataItem is IMAP_t_Fetch_i_Uid){ 
                         reponseBuffer.Append("UID " + e.MessageInfo.UID);
                     }
 
@@ -5486,7 +5486,7 @@ namespace LumiSoft.Net.IMAP.Server
 
 				// envelope ---> FOR ContentType: message/rfc822 ONLY ###
 				if(entity.Body is MIME_b_MessageRfc822){                    
-					retVal.Append(" " + IMAP_Envelope.ConstructEnvelope(((MIME_b_MessageRfc822)entity.Body).Message));
+					retVal.Append(" " + IMAP_t_Fetch_r_i_Envelope.ConstructEnvelope(((MIME_b_MessageRfc822)entity.Body).Message));
 
                     // TODO: BODYSTRUCTURE,LINES
 				}
