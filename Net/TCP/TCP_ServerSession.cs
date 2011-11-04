@@ -110,6 +110,7 @@ namespace LumiSoft.Net.TCP
             socket.SendBufferSize = 32000;
 
             if(ssl){
+                m_pTcpStream = new SmartStream(new NetworkStream(socket,true),true);
                 SwitchToSecure();
             }
             else{
