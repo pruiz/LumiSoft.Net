@@ -173,6 +173,14 @@ namespace LumiSoft.Net.IMAP
             get{ return m_ResponseText; }
         }
 
+        /// <summary>
+        /// Gets if this response is error response.
+        /// </summary>
+        public bool IsError
+        {
+            get{ return !m_ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase); }
+        }
+
         #endregion
     }
 }
