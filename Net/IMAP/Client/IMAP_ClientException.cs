@@ -9,9 +9,22 @@ namespace LumiSoft.Net.IMAP.Client
     /// </summary>
     public class IMAP_ClientException : Exception
     {
-        private string m_StatusCode   = "";
-        private string m_ResponseText = "";
+        private IMAP_r_ServerStatus m_pResponse = null;
         
+        /// <summary>
+        /// Default constructor.
+        /// </summary>
+        /// <param name="response">IMAP server response.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>response</b> is null reference.</exception>
+        public IMAP_ClientException(IMAP_r_ServerStatus response) : base(response.ToString())
+        {
+            if(response == null){
+                throw new ArgumentNullException("response");
+            }
+
+            m_pResponse = response;            
+        }
+
         /// <summary>
         /// Default constructor.
         /// </summary>
@@ -23,12 +36,7 @@ namespace LumiSoft.Net.IMAP.Client
                 throw new ArgumentNullException("responseLine");
             }
 
-            // <status-code> SP <response-text>
-            string[] code_text = responseLine.Split(new char[]{ },2);
-            m_StatusCode = code_text[0];
-            if(code_text.Length == 2){
-                m_ResponseText = code_text[1];
-            }
+            m_pResponse = IMAP_r_ServerStatus.Parse(responseLine);
         }
 
         /// <summary>
@@ -53,19 +61,26 @@ namespace LumiSoft.Net.IMAP.Client
                 throw new ArgumentException("Argument 'responseText' value must be specified.","responseText");
             }
 
-            m_StatusCode   = responseCode;
-            m_ResponseText = responseText;
+            m_pResponse = IMAP_r_ServerStatus.Parse(responseCode + " " + responseText);
         }
 
 
         #region Properties Implementation
 
         /// <summary>
+        /// Gets IMAP server response.
+        /// </summary>
+        public IMAP_r_ServerStatus Response
+        {
+            get{ return m_pResponse; }
+        }
+
+        /// <summary>
         /// Gets IMAP server error status code.
         /// </summary>
         public string StatusCode
         {
-            get{ return m_StatusCode; }
+            get{ return m_pResponse.ResponseCode; }
         }
 
         /// <summary>
@@ -73,7 +88,7 @@ namespace LumiSoft.Net.IMAP.Client
         /// </summary>
         public string ResponseText
         {
-            get{ return m_ResponseText; }
+            get{ return m_pResponse.ResponseText; }
         }
 
         #endregion
