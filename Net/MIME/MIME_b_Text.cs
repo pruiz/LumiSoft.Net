@@ -117,6 +117,10 @@ namespace LumiSoft.Net.MIME
                 if(this.Entity.ContentType.Param_Charset.ToLower().StartsWith("x-")){
                     return Encoding.GetEncoding(this.Entity.ContentType.Param_Charset.Substring(2));
                 }
+                // Cp1252 is not IANA reggistered, some mail clients send it, it equal to windows-1252.
+                else if(string.Equals(this.Entity.ContentType.Param_Charset,"cp1252",StringComparison.InvariantCultureIgnoreCase)){
+                    return Encoding.GetEncoding("windows-1252");
+                }
                 else{
                     return Encoding.GetEncoding(this.Entity.ContentType.Param_Charset);
                 }
