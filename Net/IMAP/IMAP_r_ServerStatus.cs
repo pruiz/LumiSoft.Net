@@ -181,6 +181,14 @@ namespace LumiSoft.Net.IMAP
             get{ return !m_ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase); }
         }
 
+        /// <summary>
+        /// Gets if this response is continuation response.
+        /// </summary>
+        public bool IsContinue
+        {
+            get{ return !m_ResponseCode.Equals("+",StringComparison.InvariantCultureIgnoreCase); }
+        }
+
         #endregion
     }
 }
