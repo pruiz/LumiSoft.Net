@@ -80,25 +80,35 @@ namespace LumiSoft.Net.IMAP
                 throw new ArgumentNullException("responseLine");
             }
 
-            string[] parts           = responseLine.Split(new char[]{' '},3);
-            string   commandTag      = parts[0];
-            string   responseCode    = parts[1];
-            string   optResponseCode = null;
-            string   optResponseArgs = null;
-            string   responseText    = parts[2];
+            // We continuation "+" response.
+            if(responseLine.StartsWith("+")){
+                string[] parts        = responseLine.Split(new char[]{' '},2);
+                string   responseText = parts.Length == 2 ? parts[1] : null;
 
-            // Optional status code.
-            if(parts[2].StartsWith("[")){
-                StringReader r = new StringReader(parts[2]);
-                string[] code_args = r.ReadParenthesized().Split(new char[]{' '},2);
-                optResponseCode = code_args[0];
-                if(code_args.Length == 2){
-                    optResponseArgs = code_args[1];
-                }
-                responseText    = r.ReadToEnd();
+                return new IMAP_r_ServerStatus("+","+",responseText);
             }
+            // OK/BAD/NO
+            else{
+                string[] parts           = responseLine.Split(new char[]{' '},3);
+                string   commandTag      = parts[0];
+                string   responseCode    = parts[1];
+                string   optResponseCode = null;
+                string   optResponseArgs = null;
+                string   responseText    = parts[2];
 
-            return new IMAP_r_ServerStatus(commandTag,responseCode,optResponseCode,optResponseArgs,responseText);
+                // Optional status code.
+                if(parts[2].StartsWith("[")){
+                    StringReader r = new StringReader(parts[2]);
+                    string[] code_args = r.ReadParenthesized().Split(new char[]{' '},2);
+                    optResponseCode = code_args[0];
+                    if(code_args.Length == 2){
+                        optResponseArgs = code_args[1];
+                    }
+                    responseText    = r.ReadToEnd();
+                }
+
+                return new IMAP_r_ServerStatus(commandTag,responseCode,optResponseCode,optResponseArgs,responseText);
+            }
         }
 
         #endregion
@@ -186,7 +196,7 @@ namespace LumiSoft.Net.IMAP
         /// </summary>
         public bool IsContinue
         {
-            get{ return !m_ResponseCode.Equals("+",StringComparison.InvariantCultureIgnoreCase); }
+            get{ return m_ResponseCode.Equals("+",StringComparison.InvariantCultureIgnoreCase); }
         }
 
         #endregion
