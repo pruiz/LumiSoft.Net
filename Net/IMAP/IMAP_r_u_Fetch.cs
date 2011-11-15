@@ -748,7 +748,22 @@ namespace LumiSoft.Net.IMAP
             get{ return m_pDataItems.ToArray(); }
         }
 
-        // BODY
+        /// <summary>
+        /// Gets BODY[] values.
+        /// </summary>
+        public IMAP_t_Fetch_r_i_Body[] Body
+        {
+            get{
+                List<IMAP_t_Fetch_r_i_Body> retVal = new List<IMAP_t_Fetch_r_i_Body>();
+                foreach(IMAP_t_Fetch_r_i item in m_pDataItems){
+                    if(item is IMAP_t_Fetch_r_i_Body){
+                        retVal.Add((IMAP_t_Fetch_r_i_Body)item);
+                    }
+                }
+                return retVal.ToArray(); 
+            }
+        }
+        
         // BODYSTRUCTURE
 
         /// <summary>
@@ -760,7 +775,7 @@ namespace LumiSoft.Net.IMAP
         }
 
         /// <summary>
-        /// Gets FALGS value. Returns null if fetch response doesn't contain specified data-item.
+        /// Gets FLAGS value. Returns null if fetch response doesn't contain specified data-item.
         /// </summary>
         public IMAP_t_Fetch_r_i_Flags Flags
         {
