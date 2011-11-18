@@ -1070,12 +1070,7 @@ namespace LumiSoft.Net.IO
 
         #endregion
         
-        
-        // TODO: 
-        //  *) timeout support for sync versions
-        //  *) WriteHeader SmartStream buffers !!! we may not do this if stream wont support seeking.
-        
-                                
+                                        
         #region method ReadLine
 
         /// <summary>
@@ -1595,6 +1590,341 @@ namespace LumiSoft.Net.IO
 
         #endregion
 
+        #region method WriteStreamAsync
+
+        #region class WriteStreamAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="SmartStream.WriteStreamAsync"/> asynchronous operation.
+        /// </summary>
+        public class WriteStreamAsyncOP : IDisposable,IAsyncOP
+        {
+            private object        m_pLock         = new object();
+            private AsyncOP_State m_State         = AsyncOP_State.WaitingForStart;
+            private Exception     m_pException    = null;
+            private bool          m_RiseCompleted = false;
+            private SmartStream   m_pOwner        = null;
+            private Stream        m_pStream       = null;
+            private long          m_Count         = 0;
+            private byte[]        m_pBuffer       = null;
+            private long          m_BytesWritten  = 0;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            /// <param name="stream">Stream which data to write.</param>
+            /// <param name="count">Number of bytes to write. Value -1 means all stream data will be written.</param>
+            /// <exception cref="ArgumentNullException">Is raised when <b>stream</b> is null reference.</exception>
+            public WriteStreamAsyncOP(Stream stream,long count)
+            {
+                if(stream == null){
+                    throw new ArgumentNullException("stream");
+                }
+
+                m_pStream = stream;
+                m_Count   = count;
+                m_pBuffer = new byte[32000];
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resources being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+                
+                m_pException = null;
+                m_pStream    = null;
+                m_pOwner     = null;
+                m_pBuffer    = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner SmartStream.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            internal bool Start(SmartStream owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+                
+                m_pOwner = owner;
+
+                SetState(AsyncOP_State.Active);
+                
+                BeginReadData();
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method BeginReadData
+
+            /// <summary>
+            /// Starts reading data.
+            /// </summary>
+            private void BeginReadData()
+            {                
+                try{
+                    while(true){
+                        int count = m_Count == -1 ? m_pBuffer.Length : (int)Math.Min(m_pBuffer.Length,m_Count - m_BytesWritten);
+                        IAsyncResult readResult = m_pStream.BeginRead(
+                            m_pBuffer,
+                            0,
+                            count,
+                            delegate(IAsyncResult r){
+                                ProcessReadDataResult(r);
+                            },
+                            null
+                        );
+                        // Read data completed synchonously.
+                        if(readResult.CompletedSynchronously){
+                            // Operation completed asynchronously, it will continue processing.
+                            if(ProcessReadDataResult(readResult)){
+                                break;
+                            }
+                            // Error happened in ProcessReadDataResult method.
+                            if(this.State != AsyncOP_State.Active){
+                                break;
+                            }
+                        }
+                        // Read data completed asynchonously.
+                        else{
+                            break;
+                        }
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    SetState(AsyncOP_State.Completed);
+                }
+            }
+
+            #endregion
+
+            #region method ProcessReadDataResult
+
+            /// <summary>
+            /// Processes read data result.
+            /// </summary>
+            /// <param name="readResult">Asynchronous result.</param>
+            /// <returns>Retruns true if this method completed asynchronously, otherwise false.</returns>
+            private bool ProcessReadDataResult(IAsyncResult readResult)
+            {
+                try{
+                    int countReaded = m_pStream.EndRead(readResult);
+                    if(countReaded == 0){
+                        // We readed all stream data and write count not specified, we are done.
+                        if(m_Count == -1){
+                            SetState(AsyncOP_State.Completed);
+                        }
+                        // Source stream has less data than specified by count.
+                        else{
+                            m_pException = new ArgumentException("Argument 'stream' has less data than specified in 'count'.","stream");
+                            SetState(AsyncOP_State.Completed);
+                        }
+                    }
+                    else{
+                        IAsyncResult writeResult = m_pOwner.BeginWrite(
+                            m_pBuffer,
+                            0,
+                            countReaded,
+                            delegate(IAsyncResult r){
+                                try{
+                                    m_pOwner.EndWrite(r);
+                                    m_BytesWritten += countReaded;
+
+                                    // We have read and sent all requested data.
+                                    if(m_Count == m_BytesWritten){
+                                        SetState(AsyncOP_State.Completed);
+                                    }
+                                    // Start reading next data block(s).
+                                    else{                                        
+                                        BeginReadData();
+                                    }
+                                }
+                                catch(Exception x){
+                                    m_pException = x;
+                                    SetState(AsyncOP_State.Completed);
+                                }
+                            },
+                            null
+                        );
+                        if(writeResult.CompletedSynchronously){
+                            m_pOwner.EndWrite(writeResult);
+                            m_BytesWritten += countReaded;
+
+                            // We have read and sent all requested data.
+                            if(m_Count == m_BytesWritten){
+                                SetState(AsyncOP_State.Completed);
+                            }
+                        }
+                        else{
+                            return true;
+                        }
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                return false;
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            /// <summary>
+            /// Gets number of bytes written.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public long BytesWritten
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Socket' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+                    if(m_pException != null){
+                        throw m_pException;
+                    }
+
+                    return m_BytesWritten; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<WriteStreamAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<WriteStreamAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Starts writing stream data to this stream.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="WriteStreamAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        public bool WriteStreamAsync(WriteStreamAsyncOP op)
+        {
+            if(this.m_IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+
+            return op.Start(this);
+        }
+
+        #endregion
+
         #region method WritePeriodTerminated
 
         /// <summary>
@@ -1958,7 +2288,6 @@ namespace LumiSoft.Net.IO
         /// <returns>Returns true if aynchronous operation is pending (The <see cref="WritePeriodTerminatedAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
         /// Returns false if operation completed synchronously.</returns>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when SMTP client is not connected.</exception>
         /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
         public bool WritePeriodTerminatedAsync(WritePeriodTerminatedAsyncOP op)
         {
