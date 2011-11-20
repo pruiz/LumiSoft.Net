@@ -178,7 +178,7 @@ namespace LumiSoft.Net.MIME
         }
 
         /// <summary>
-        /// Gets or sets the suggested file name. Value DateTime.MinValue means not specified. Defined in RFC 2183 2.3.
+        /// Gets or sets the suggested file name. Value null means not specified. Defined in RFC 2183 2.3.
         /// </summary>
         public string Param_FileName
         {
