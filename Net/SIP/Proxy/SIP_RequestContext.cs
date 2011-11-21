@@ -54,6 +54,7 @@ namespace LumiSoft.Net.SIP.Proxy
         public void ForwardStatelessly()
         {
             // TODO:
+            throw new NotImplementedException();
         }
 
         #endregion
@@ -65,6 +66,7 @@ namespace LumiSoft.Net.SIP.Proxy
         /// </summary>
         public void ChallengeRequest()
         {
+            throw new NotImplementedException();
         }
 
         #endregion
