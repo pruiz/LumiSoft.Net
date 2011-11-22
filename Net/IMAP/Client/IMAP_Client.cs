@@ -314,7 +314,7 @@ namespace LumiSoft.Net.IMAP.Client
         private List<string>               m_pCapabilities      = null;
         private IMAP_Client_SelectedFolder m_pSelectedFolder    = null;
         private IMAP_Mailbox_Encoding      m_MailboxEncoding    = IMAP_Mailbox_Encoding.ImapUtf7;
-        private object                     m_pIdle              = null;
+        private IdleAsyncOP                m_pIdle              = null;
 
         /// <summary>
         /// Default constructor.
@@ -7289,21 +7289,402 @@ namespace LumiSoft.Net.IMAP.Client
 
         #endregion
 
-        #region method StartIdle
+        #region method IdleAsync
+
+        #region class IdleAsyncOP
 
         /// <summary>
-        /// Starts idling.
+        /// This class represents <see cref="IMAP_Client.IdleAsync"/> asynchronous operation.
         /// </summary>
-        /// <param name="errorCallback">Callback to be called when error happens on asynchronous IDLE. Value null means not notifed.</param>
-        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected, not-authenticated, not-selected or idle state).</exception>
-        /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
-        /// <remarks>IMAP server must support IDLE capability, otherwise error raised when this method is called.
-        /// Server IDLE notifications raise event <see cref="UntaggedResponse"/> when any changes in mailbox.
-        /// StartIdle and stop idle should be called periodically to refresh IDLE, otherwise IMAP server session timeout timer will close connection.</remarks>
-        public void StartIdle(EventHandler<ExceptionEventArgs> errorCallback)
+        public class IdleAsyncOP : IDisposable,IAsyncOP
         {
+            private object                            m_pLock          = new object();
+            private AsyncOP_State                     m_State          = AsyncOP_State.WaitingForStart;
+            private Exception                         m_pException     = null;
+            private IMAP_r_ServerStatus               m_pFinalResponse = null;
+            private IMAP_Client                       m_pImapClient    = null;
+            private bool                              m_RiseCompleted  = false;
+            private EventHandler<EventArgs<IMAP_r_u>> m_pCallback      = null;
+            private bool                              m_DoneSent       = false;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>             
+            /// <param name="callback">Optional callback to be called for each received untagged response.</param>
+            /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+            public IdleAsyncOP(EventHandler<EventArgs<IMAP_r_u>> callback)
+            {
+                m_pCallback = callback;
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resource being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+
+                m_pException     = null;
+                m_pImapClient    = null;
+                m_pFinalResponse = null;
+                m_pCallback      = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Done
+
+            /// <summary>
+            /// Starts exiting IDLE state.
+            /// </summary>
+            /// <exception cref="InvalidOperationException">Is raised when this not in valid state.</exception>
+            public void Done()
+            {
+                if(this.State != AsyncOP_State.Active){
+                    throw new InvalidOperationException("Mehtod 'Done' can be called only AsyncOP_State.Active state.");
+                }
+                if(m_DoneSent){
+                    throw new InvalidOperationException("Mehtod 'Done' already called, Done is in progress.");
+                }
+                m_DoneSent = true;
+
+                byte[] cmdLine = Encoding.ASCII.GetBytes("DONE\r\n");
+
+                // Log
+                m_pImapClient.LogAddWrite(cmdLine.Length,"DONE");
+
+                // Start command sending.
+                m_pImapClient.TcpStream.BeginWrite(
+                    cmdLine,
+                    0,
+                    cmdLine.Length,
+                    delegate(IAsyncResult ar){
+                        try{
+                            m_pImapClient.TcpStream.EndWrite(ar);
+                        }
+                        catch(Exception x){
+                            m_pException = x;
+                            m_pImapClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                            SetState(AsyncOP_State.Completed);
+                        }
+                    },
+                    null
+                );
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner IMAP client.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            internal bool Start(IMAP_Client owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+                                
+                m_pImapClient = owner;
+                        
+                SetState(AsyncOP_State.Active);
+
+                try{
+                    /* RFC 2177.3. IDLE Command.
+                        Arguments:  none
+
+                        Responses:  continuation data will be requested; the client sends
+                                    the continuation data "DONE" to end the command
+
+                        Result:     OK - IDLE completed after client sent "DONE"
+                                    NO - failure: the server will not allow the IDLE
+                                         command at this time
+                                    BAD - command unknown or arguments invalid
+
+                        The IDLE command may be used with any IMAP4 server implementation
+                        that returns "IDLE" as one of the supported capabilities to the
+                        CAPABILITY command.  If the server does not advertise the IDLE
+                        capability, the client MUST NOT use the IDLE command and must poll
+                        for mailbox updates.  In particular, the client MUST continue to be
+                        able to accept unsolicited untagged responses to ANY command, as
+                        specified in the base IMAP specification.
+
+                        The IDLE command is sent from the client to the server when the
+                        client is ready to accept unsolicited mailbox update messages.  The
+                        server requests a response to the IDLE command using the continuation
+                        ("+") response.  The IDLE command remains active until the client
+                        responds to the continuation, and as long as an IDLE command is
+                        active, the server is now free to send untagged EXISTS, EXPUNGE, and
+                        other messages at any time.
+
+                        The IDLE command is terminated by the receipt of a "DONE"
+                        continuation from the client; such response satisfies the server's
+                        continuation request.  At that point, the server MAY send any
+                        remaining queued untagged responses and then MUST immediately send
+                        the tagged response to the IDLE command and prepare to process other
+                        commands. As in the base specification, the processing of any new
+                        command may cause the sending of unsolicited untagged responses,
+                        subject to the ambiguity limitations.  The client MUST NOT send a
+                        command while the server is waiting for the DONE, since the server
+                        will not be able to distinguish a command from a continuation.             
+                     
+                        Example:    C: A001 SELECT INBOX
+                                    S: * FLAGS (Deleted Seen)
+                                    S: * 3 EXISTS
+                                    S: * 0 RECENT
+                                    S: * OK [UIDVALIDITY 1]
+                                    S: A001 OK SELECT completed
+                                    C: A002 IDLE
+                                    S: + idling
+                                    ...time passes; new mail arrives...
+                                    S: * 4 EXISTS
+                                    C: DONE
+                                    S: A002 OK IDLE terminated
+                    */
+
+                    m_pImapClient.m_pIdle = this;
+                    
+                    byte[] cmdLine    = Encoding.UTF8.GetBytes((m_pImapClient.m_CommandIndex++).ToString("d5") + " IDLE\r\n");
+                    string cmdLineLog = Encoding.UTF8.GetString(cmdLine).TrimEnd();
+
+                    SendCmdAndReadRespAsyncOP args = new SendCmdAndReadRespAsyncOP(cmdLine,cmdLineLog,m_pCallback);
+                    args.CompletedAsync += delegate(object sender,EventArgs<SendCmdAndReadRespAsyncOP> e){
+                        ProecessCmdResult(e.Value);
+                    };
+                    // Operation completed synchronously.
+                    if(!m_pImapClient.SendCmdAndReadRespAsync(args)){
+                        ProecessCmdResult(args);
+                    }
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    m_pImapClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method ProecessCmdResult
+
+            /// <summary>
+            /// Processes command result.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            private void ProecessCmdResult(SendCmdAndReadRespAsyncOP op)
+            {
+                try{
+                    // Command send/receive failed.
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                        m_pImapClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    }
+                    // Command send/receive succeeded.
+                    else{ 
+                        // IMAP server returned error response.
+                        if(op.FinalResponse.IsError){
+                            m_pException = new IMAP_ClientException(op.FinalResponse);
+                            SetState(AsyncOP_State.Completed);
+                        }
+                        // IMAP server returned "+" continue response.
+                        else if(op.FinalResponse.IsContinue){
+                            ReadFinalResponseAsyncOP readFinalRespOP = new ReadFinalResponseAsyncOP(m_pCallback);
+                            readFinalRespOP.CompletedAsync += delegate(object sender,EventArgs<ReadFinalResponseAsyncOP> e){
+                                ProcessReadFinalResponseResult(e.Value);
+                            };
+                            // Operation completed synchronously.
+                            if(!m_pImapClient.ReadFinalResponseAsync(readFinalRespOP)){
+                                ProcessReadFinalResponseResult(readFinalRespOP);
+                            }
+                        }
+                        // IMAP server returned success response. We should not get such response, but consider it as IDLE done.
+                        else{
+                            m_pFinalResponse = op.FinalResponse;
+                            SetState(AsyncOP_State.Completed);
+                        }
+                    }                    
+                }
+                finally{
+                    op.Dispose();
+                }
+            }
+
+            #endregion
+
+            #region method ProcessReadFinalResponseResult
+
+            /// <summary>
+            /// Processes IDLE final(final response after +) response reading result.
+            /// </summary>
+            /// <param name="op">Asynchronous operation.</param>
+            private void ProcessReadFinalResponseResult(ReadFinalResponseAsyncOP op)
+            {
+                try{
+                    // Command send/receive failed.
+                    if(op.Error != null){
+                        m_pException = op.Error;
+                        m_pImapClient.LogAddException("Exception: " + m_pException.Message,m_pException);
+                    }
+                    // Command send/receive succeeded.
+                    else{ 
+                        // IMAP server returned error response.
+                        if(op.FinalResponse.IsError){
+                            m_pException = new IMAP_ClientException(op.FinalResponse);
+                            SetState(AsyncOP_State.Completed);
+                        }
+                        // IMAP server returned success response.
+                        else{
+                            m_pImapClient.m_pIdle = null;
+                            m_pFinalResponse = op.FinalResponse;
+                            SetState(AsyncOP_State.Completed);
+                        }
+                    }                    
+                }
+                finally{
+                    op.Dispose();
+                }
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            /// <summary>
+            /// Returns IMAP server final response.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public IMAP_r_ServerStatus FinalResponse
+            {
+                get{
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Response' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pFinalResponse; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<IdleAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<IdleAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Executes IDLE command.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="CmdAsyncOP{T}.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state. For example 'not connected'.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        public bool IdleAsync(IdleAsyncOP op)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
             if(!this.IsConnected){
-                throw new InvalidOperationException("Not connected, you need to connect first.");
+                throw new InvalidOperationException("You must connect first.");
             }
             if(!this.IsAuthenticated){
                 throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
@@ -7314,112 +7695,14 @@ namespace LumiSoft.Net.IMAP.Client
             if(m_pIdle != null){
                 throw new InvalidOperationException("Already idling !");
             }
-
-            /* RFC 2177.3. IDLE Command.
-                Arguments:  none
-
-                Responses:  continuation data will be requested; the client sends
-                            the continuation data "DONE" to end the command
-
-                Result:     OK - IDLE completed after client sent "DONE"
-                            NO - failure: the server will not allow the IDLE
-                                 command at this time
-                            BAD - command unknown or arguments invalid
-
-                The IDLE command may be used with any IMAP4 server implementation
-                that returns "IDLE" as one of the supported capabilities to the
-                CAPABILITY command.  If the server does not advertise the IDLE
-                capability, the client MUST NOT use the IDLE command and must poll
-                for mailbox updates.  In particular, the client MUST continue to be
-                able to accept unsolicited untagged responses to ANY command, as
-                specified in the base IMAP specification.
-
-                The IDLE command is sent from the client to the server when the
-                client is ready to accept unsolicited mailbox update messages.  The
-                server requests a response to the IDLE command using the continuation
-                ("+") response.  The IDLE command remains active until the client
-                responds to the continuation, and as long as an IDLE command is
-                active, the server is now free to send untagged EXISTS, EXPUNGE, and
-                other messages at any time.
-
-                The IDLE command is terminated by the receipt of a "DONE"
-                continuation from the client; such response satisfies the server's
-                continuation request.  At that point, the server MAY send any
-                remaining queued untagged responses and then MUST immediately send
-                the tagged response to the IDLE command and prepare to process other
-                commands. As in the base specification, the processing of any new
-                command may cause the sending of unsolicited untagged responses,
-                subject to the ambiguity limitations.  The client MUST NOT send a
-                command while the server is waiting for the DONE, since the server
-                will not be able to distinguish a command from a continuation.             
-             
-                Example:    C: A001 SELECT INBOX
-                            S: * FLAGS (Deleted Seen)
-                            S: * 3 EXISTS
-                            S: * 0 RECENT
-                            S: * OK [UIDVALIDITY 1]
-                            S: A001 OK SELECT completed
-                            C: A002 IDLE
-                            S: + idling
-                            ...time passes; new mail arrives...
-                            S: * 4 EXISTS
-                            C: DONE
-                            S: A002 OK IDLE terminated
-            */
-
-            SendCommand((m_CommandIndex++).ToString("d5") + " IDLE\r\n");
-
-            IMAP_r_ServerStatus response = ReadFinalResponse(null);
-            if(!response.ResponseCode.Equals("+",StringComparison.InvariantCultureIgnoreCase)){
-                throw new IMAP_ClientException(response.ResponseCode,response.ResponseText);
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
             }
 
-            m_pIdle = new object();
-
-            // Start idling asynchronously.
-            ReadFinalResponseAsyncOP args = new ReadFinalResponseAsyncOP(null);
-            args.CompletedAsync += delegate(object sender,EventArgs<ReadFinalResponseAsyncOP> e){
-                // IDLE failed.
-                if(e.Value.Error != null){
-                    if(errorCallback != null){
-                        errorCallback(this,new ExceptionEventArgs(e.Value.Error));
-                    }
-                }
-            };                
-            if(!ReadFinalResponseAsync(args)){
-                if(args.Error != null){
-                    throw args.Error;
-                }
-            }
-        }
-
-        #endregion
-
-        #region method StopIdle
-
-        /// <summary>
-        /// Stops idling.
-        /// </summary>
-        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected, not-authenticated, not-selected or not-idle state).</exception>
-        /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
-        public void StopIdle()
-        {
-            if(!this.IsConnected){
-                throw new InvalidOperationException("Not connected, you need to connect first.");
-            }
-            if(!this.IsAuthenticated){
-                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
-            }
-            if(m_pSelectedFolder == null){
-                throw new InvalidOperationException("Not selected state, you need to select some folder first.");
-            }
-            if(m_pIdle == null){
-                throw new InvalidOperationException("Not in idling, you neet to switch in IDLE sate first.");
-            }
-
-            SendCommand("DONE\r\n");
-
-            m_pIdle = null;
+            return op.Start(this);
         }
 
         #endregion
@@ -9271,6 +9554,25 @@ namespace LumiSoft.Net.IMAP.Client
 			    }
 
                 return m_pSelectedFolder; 
+            }
+        }
+
+        /// <summary>
+        /// Gets active IDLE operation or null if no active IDLE operation.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when this property is accessed and IMAP client is not connected.</exception>
+        public IdleAsyncOP IdleOP
+        {
+            get{ 
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+                if(!this.IsConnected){
+				    throw new InvalidOperationException("You must connect first.");
+			    }
+
+                return m_pIdle; 
             }
         }
 
