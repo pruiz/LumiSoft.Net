@@ -188,7 +188,17 @@ namespace LumiSoft.Net.IMAP
         /// </summary>
         public bool IsError
         {
-            get{ return !m_ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase); }
+            get{ 
+                if(m_ResponseCode.Equals("NO",StringComparison.InvariantCultureIgnoreCase)){
+                    return true;
+                }
+                else if(m_ResponseCode.Equals("BAD",StringComparison.InvariantCultureIgnoreCase)){
+                    return true;
+                }
+                else{
+                    return false;
+                }
+            }
         }
 
         /// <summary>
