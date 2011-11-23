@@ -9,105 +9,7 @@ namespace LumiSoft.Net.IMAP
 	/// Provides utility methods for IMAP.
 	/// </summary>
 	public class IMAP_Utils
-	{
-		#region method ParseMessageFlags
-
-		/// <summary>
-		/// Parses message flags from string.
-		/// </summary>
-		/// <param name="flagsString">Message flags string.</param>
-		/// <returns></returns>
-		public static IMAP_MessageFlags ParseMessageFlags(string flagsString)
-		{
-			IMAP_MessageFlags mFlags = 0;
-
-			flagsString = flagsString.ToUpper();
-			
-			if(flagsString.IndexOf("ANSWERED") > -1){
-				mFlags |= IMAP_MessageFlags.Answered;
-			}
-			if(flagsString.IndexOf("FLAGGED") > -1){
-				mFlags |= IMAP_MessageFlags.Flagged;
-			}
-			if(flagsString.IndexOf("DELETED") > -1){
-				mFlags |= IMAP_MessageFlags.Deleted;
-			}
-			if(flagsString.IndexOf("SEEN") > -1){
-				mFlags |= IMAP_MessageFlags.Seen;
-			}
-			if(flagsString.IndexOf("DRAFT") > -1){
-				mFlags |= IMAP_MessageFlags.Draft;
-			}
-
-			return mFlags;
-		}
-
-		#endregion
-
-		#region static method MessageFlagsToString
-
-		/// <summary>
-		/// Converts message flags to string. Eg. \SEEN \DELETED .
-		/// </summary>
-        /// <param name="msgFlags">IMAP message flags.</param>
-		/// <returns>Returns message flags as string list.</returns>
-        [Obsolete("Use method 'MessageFlagsToStringArray' instead.")]
-		public static string MessageFlagsToString(IMAP_MessageFlags msgFlags)
-		{
-			string retVal = "";
-			if(((int)IMAP_MessageFlags.Answered & (int)msgFlags) != 0){
-				retVal += " \\ANSWERED";
-			}
-			if(((int)IMAP_MessageFlags.Flagged & (int)msgFlags) != 0){
-				retVal += " \\FLAGGED";
-			}
-			if(((int)IMAP_MessageFlags.Deleted & (int)msgFlags) != 0){
-				retVal += " \\DELETED";
-			}
-			if(((int)IMAP_MessageFlags.Seen & (int)msgFlags) != 0){
-				retVal += " \\SEEN";
-			}
-			if(((int)IMAP_MessageFlags.Draft & (int)msgFlags) != 0){
-				retVal += " \\DRAFT";
-			}
-
-			return retVal.Trim();
-		}
-
-		#endregion
-
-        #region static method MessageFlagsToStringArray
-
-        /// <summary>
-        /// Converts standard IMAP message flags to string array.
-        /// </summary>
-        /// <param name="msgFlags">IMAP message flags.</param>
-        /// <returns>Returns IMAP message flags as string array.</returns>
-        public static string[] MessageFlagsToStringArray(IMAP_MessageFlags msgFlags)
-        {
-            List<string> retVal = new List<string>();
-
-            if(((int)IMAP_MessageFlags.Answered & (int)msgFlags) != 0){
-				retVal.Add("\\ANSWERED");
-			}
-			if(((int)IMAP_MessageFlags.Flagged & (int)msgFlags) != 0){
-				retVal.Add("\\FLAGGED");
-			}
-			if(((int)IMAP_MessageFlags.Deleted & (int)msgFlags) != 0){
-				retVal.Add("\\DELETED");
-			}
-			if(((int)IMAP_MessageFlags.Seen & (int)msgFlags) != 0){
-				retVal.Add("\\SEEN");
-			}
-			if(((int)IMAP_MessageFlags.Draft & (int)msgFlags) != 0){
-				retVal.Add("\\DRAFT");
-			}
-
-            return retVal.ToArray();
-        }
-
-        #endregion
-
+	{	        
         #region static method MessageFlagsAdd
 
         /// <summary>
@@ -743,5 +645,107 @@ namespace LumiSoft.Net.IMAP
 
         #endregion
 
+
+        //---- Obsolete
+
+        #region method ParseMessageFlags
+
+		/// <summary>
+		/// Parses message flags from string.
+		/// </summary>
+		/// <param name="flagsString">Message flags string.</param>
+		/// <returns></returns>
+        [Obsolete("Use class IMAP_t_MsgFlags instead.")]
+		public static IMAP_MessageFlags ParseMessageFlags(string flagsString)
+		{
+			IMAP_MessageFlags mFlags = 0;
+
+			flagsString = flagsString.ToUpper();
+			
+			if(flagsString.IndexOf("ANSWERED") > -1){
+				mFlags |= IMAP_MessageFlags.Answered;
+			}
+			if(flagsString.IndexOf("FLAGGED") > -1){
+				mFlags |= IMAP_MessageFlags.Flagged;
+			}
+			if(flagsString.IndexOf("DELETED") > -1){
+				mFlags |= IMAP_MessageFlags.Deleted;
+			}
+			if(flagsString.IndexOf("SEEN") > -1){
+				mFlags |= IMAP_MessageFlags.Seen;
+			}
+			if(flagsString.IndexOf("DRAFT") > -1){
+				mFlags |= IMAP_MessageFlags.Draft;
+			}
+
+			return mFlags;
+		}
+
+		#endregion
+
+        #region static method MessageFlagsToStringArray
+
+        /// <summary>
+        /// Converts standard IMAP message flags to string array.
+        /// </summary>
+        /// <param name="msgFlags">IMAP message flags.</param>
+        /// <returns>Returns IMAP message flags as string array.</returns>        
+        [Obsolete("Use class IMAP_t_MsgFlags instead.")]
+        public static string[] MessageFlagsToStringArray(IMAP_MessageFlags msgFlags)
+        {
+            List<string> retVal = new List<string>();
+
+            if(((int)IMAP_MessageFlags.Answered & (int)msgFlags) != 0){
+				retVal.Add("\\ANSWERED");
+			}
+			if(((int)IMAP_MessageFlags.Flagged & (int)msgFlags) != 0){
+				retVal.Add("\\FLAGGED");
+			}
+			if(((int)IMAP_MessageFlags.Deleted & (int)msgFlags) != 0){
+				retVal.Add("\\DELETED");
+			}
+			if(((int)IMAP_MessageFlags.Seen & (int)msgFlags) != 0){
+				retVal.Add("\\SEEN");
+			}
+			if(((int)IMAP_MessageFlags.Draft & (int)msgFlags) != 0){
+				retVal.Add("\\DRAFT");
+			}
+
+            return retVal.ToArray();
+        }
+
+        #endregion
+
+        #region static method MessageFlagsToString
+
+		/// <summary>
+		/// Converts message flags to string. Eg. \SEEN \DELETED .
+		/// </summary>
+        /// <param name="msgFlags">IMAP message flags.</param>
+		/// <returns>Returns message flags as string list.</returns>
+        [Obsolete("Use method 'MessageFlagsToStringArray' instead.")]
+		public static string MessageFlagsToString(IMAP_MessageFlags msgFlags)
+		{
+			string retVal = "";
+			if(((int)IMAP_MessageFlags.Answered & (int)msgFlags) != 0){
+				retVal += " \\ANSWERED";
+			}
+			if(((int)IMAP_MessageFlags.Flagged & (int)msgFlags) != 0){
+				retVal += " \\FLAGGED";
+			}
+			if(((int)IMAP_MessageFlags.Deleted & (int)msgFlags) != 0){
+				retVal += " \\DELETED";
+			}
+			if(((int)IMAP_MessageFlags.Seen & (int)msgFlags) != 0){
+				retVal += " \\SEEN";
+			}
+			if(((int)IMAP_MessageFlags.Draft & (int)msgFlags) != 0){
+				retVal += " \\DRAFT";
+			}
+
+			return retVal.Trim();
+		}
+
+		#endregion
     }
 }
