@@ -5,6 +5,7 @@ namespace LumiSoft.Net.IMAP
 	/// <summary>
 	/// IMAP message flags.
 	/// </summary>
+    [Obsolete("Use IMAP_t_MsgFlags instead.")]
 	public enum IMAP_MessageFlags
 	{
         /// <summary>

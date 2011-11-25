@@ -398,7 +398,7 @@
     <Compile Include="BalanceMode.cs" />
     <Compile Include="EventArgs.cs" />
     <Compile Include="ExceptionEventArgs.cs" />
-    <None Include="IO\ReadLineEventArgs.cs" />
+    <None Include="_Obsolete\ReadLineEventArgs.cs" />
     <Compile Include="Media\AudioIn.cs" />
     <Compile Include="Media\AudioInDevice.cs" />
     <Compile Include="Media\AudioOut.cs" />
@@ -416,7 +416,7 @@
     <Compile Include="HostEndPoint.cs" />
     <Compile Include="IMAP\Client\IMAP_ClientException.cs" />
     <Compile Include="IO\Base64Stream.cs" />
-    <Compile Include="IO\LineReader.cs" />
+    <Compile Include="_Obsolete\LineReader.cs" />
     <Compile Include="IO\MultiStream.cs" />
     <Compile Include="IO\PartialStream.cs" />
     <Compile Include="IO\SmartStream.cs" />
@@ -597,7 +597,7 @@
       <SubType>Code</SubType>
     </Compile>
     <None Include="_Obsolete\IMAP\IMAP_BODY.cs" />
-    <Compile Include="IMAP\IMAP_MessageFlags.cs">
+    <Compile Include="_Obsolete\IMAP\IMAP_MessageFlags.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="IMAP\IMAP_SequenceSet.cs">
