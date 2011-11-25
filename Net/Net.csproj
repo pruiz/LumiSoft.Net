@@ -116,6 +116,7 @@
     <Compile Include="AUTH\AUTH_SASL_Client_Ntlm.cs" />
     <Compile Include="AUTH\AUTH_SASL_Client_Plain.cs" />
     <Compile Include="AUTH\AUTH_SASL_Client_XOAuth.cs" />
+    <Compile Include="ByteBuilder.cs" />
     <Compile Include="DNS\Client\DNS_ClientCache.cs" />
     <Compile Include="DNS\Client\DNS_ClientTransaction.cs" />
     <Compile Include="DNS\Client\DNS_ClientTransactionState.cs" />
