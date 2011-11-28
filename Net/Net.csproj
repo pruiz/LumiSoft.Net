@@ -165,7 +165,6 @@
     <Compile Include="IMAP\IMAP_t_Fetch_r_i_X_GM_MSGID.cs" />
     <Compile Include="IMAP\IMAP_t_Fetch_r_i_X_GM_THRID.cs" />
     <Compile Include="IMAP\IMAP_t_MsgFlags.cs" />
-    <Compile Include="IMAP\IMAP_t_QuotedString.cs" />
     <Compile Include="IMAP\IMAP_t_SeqSet.cs" />
     <Compile Include="Media\_WaveIn.cs" />
     <Compile Include="SMTP\SMTP_t_ReplyLine.cs" />
