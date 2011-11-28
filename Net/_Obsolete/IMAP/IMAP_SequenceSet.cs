@@ -18,6 +18,7 @@ namespace LumiSoft.Net.IMAP
 	///			*) * means maximum value.
 	/// </code>
 	/// </summary>
+    [Obsolete("Use class 'IMAP_t_SeqSet' instead.")]
 	public class IMAP_SequenceSet
     {
         private List<Range_long> m_pSequenceParts = null;

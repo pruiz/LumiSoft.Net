@@ -13,14 +13,14 @@ namespace LumiSoft.Net.IMAP
     /// specified message sequence number set.</remarks>
     public class IMAP_Search_Key_SeqSet : IMAP_Search_Key
     {
-        private IMAP_SequenceSet m_pSeqSet = null;
-
+        private IMAP_t_SeqSet m_pSeqSet = null;
+        
         /// <summary>
         /// Default constructor.
         /// </summary>
         /// <param name="seqSet">IMAP sequence-set.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b> is null reference.</exception>
-        public IMAP_Search_Key_SeqSet(IMAP_SequenceSet seqSet)
+        public IMAP_Search_Key_SeqSet(IMAP_t_SeqSet seqSet)
         {
             if(seqSet == null){
                 throw new ArgumentNullException("seqSet");
@@ -28,7 +28,6 @@ namespace LumiSoft.Net.IMAP
 
             m_pSeqSet = seqSet;
         }
-
 
         #region static method Parse
 
@@ -50,15 +49,13 @@ namespace LumiSoft.Net.IMAP
             if(value == null){
                 throw new ParseException("Parse error: Invalid 'sequence-set' value.");
             }
-            IMAP_SequenceSet seqSet = new IMAP_SequenceSet();
+            
             try{
-                seqSet.Parse(value);
+                return new IMAP_Search_Key_SeqSet(IMAP_t_SeqSet.Parse(value));
             }
             catch{
                 throw new ParseException("Parse error: Invalid 'sequence-set' value.");
             }
-
-            return new IMAP_Search_Key_SeqSet(seqSet);
         }
 
         #endregion
@@ -72,7 +69,7 @@ namespace LumiSoft.Net.IMAP
         /// <returns>Returns this as string.</returns>
         public override string ToString()
         {
-            return m_pSeqSet.ToSequenceSetString();
+            return m_pSeqSet.ToString();
         }
 
         #endregion
@@ -102,11 +99,29 @@ namespace LumiSoft.Net.IMAP
         /// <summary>
         /// Gets sequence-set value.
         /// </summary>
-        public IMAP_SequenceSet Value
+        public IMAP_t_SeqSet Value
         {
             get{ return m_pSeqSet; }
         }
 
         #endregion
+
+
+        //--- OBSOLETE
+
+        /// <summary>
+        /// Default constructor.
+        /// </summary>
+        /// <param name="seqSet">IMAP sequence-set.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b> is null reference.</exception>
+        [Obsolete("Use constructor 'IMAP_Search_Key_SeqSet(IMAP_t_SeqSet seqSet)' instead.")]
+        public IMAP_Search_Key_SeqSet(IMAP_SequenceSet seqSet)
+        {
+            if(seqSet == null){
+                throw new ArgumentNullException("seqSet");
+            }
+
+            m_pSeqSet = IMAP_t_SeqSet.Parse(seqSet.ToSequenceSetString());
+        }
     }
 }

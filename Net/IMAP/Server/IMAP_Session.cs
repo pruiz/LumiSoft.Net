@@ -62,7 +62,7 @@ namespace LumiSoft.Net.IMAP.Server
             /// <param name="seqSet">Sequence set.</param>
             /// <returns>Returns messages which match to the specified sequence set.</returns>
             /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b> is null reference.</exception>
-            internal IMAP_MessageInfo[] Filter(bool uid,IMAP_SequenceSet seqSet)
+            internal IMAP_MessageInfo[] Filter(bool uid,IMAP_t_SeqSet seqSet)
             {
                 if(seqSet == null){
                     throw new ArgumentNullException("seqSet");
@@ -3282,9 +3282,9 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }
 
-            IMAP_SequenceSet seqSet = new IMAP_SequenceSet();
+            IMAP_t_SeqSet seqSet = null;
             try{                
-                seqSet.Parse(parts[0]);
+                IMAP_t_SeqSet.Parse(parts[0]);
             }
             catch{
                 WriteLine(cmdTag + " BAD Error in arguments: Invalid 'sequence-set' value.");
@@ -4231,9 +4231,9 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }
 
-            IMAP_SequenceSet seqSet = new IMAP_SequenceSet();
+            IMAP_t_SeqSet seqSet = null;
             try{                
-                seqSet.Parse(parts[0]);
+                IMAP_t_SeqSet.Parse(parts[0]);
             }
             catch{
                 WriteLine(cmdTag + " BAD Error in arguments.");
@@ -4362,9 +4362,9 @@ namespace LumiSoft.Net.IMAP.Server
 
                 return;
             }
-            IMAP_SequenceSet seqSet = new IMAP_SequenceSet();
+            IMAP_t_SeqSet seqSet = null;
             try{                
-                seqSet.Parse(parts[0]);
+                IMAP_t_SeqSet.Parse(parts[0]);
             }
             catch{
                 WriteLine(cmdTag + " BAD Error in arguments.");

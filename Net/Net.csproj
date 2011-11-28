@@ -600,7 +600,7 @@
     <Compile Include="_Obsolete\IMAP\IMAP_MessageFlags.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="IMAP\IMAP_SequenceSet.cs">
+    <Compile Include="_Obsolete\IMAP\IMAP_SequenceSet.cs">
       <SubType>Code</SubType>
     </Compile>
     <None Include="_Obsolete\IMAP\IMAP_BODY_Entity.cs" />

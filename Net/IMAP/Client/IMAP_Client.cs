@@ -6815,30 +6815,7 @@ namespace LumiSoft.Net.IMAP.Client
         #endregion
 
         #region method StoreMessageFlags
-
-        /// <summary>
-        /// Stores specified message flags to the sepcified messages.
-        /// </summary>
-        /// <param name="uid">Specifies if <b>seqSet</b> contains UIDs or sequence-numbers.</param>
-        /// <param name="seqSet">Messages sequence-set.</param>
-        /// <param name="setType">Specifies how flags are set.</param>
-        /// <param name="flags">Message flags. Value null means no flags. For example: new string[]{"\Seen","\Answered"}.</param>
-        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state. For example 'not connected'.</exception>
-        /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b> is null reference.</exception>
-        /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
-        public void StoreMessageFlags(bool uid,IMAP_SequenceSet seqSet,IMAP_Flags_SetType setType,string[] flags)
-        {
-            if(seqSet == null){
-                throw new ArgumentNullException("seqSet");
-            }
-            if(flags == null){
-                throw new ArgumentNullException("flags");
-            }
-
-            StoreMessageFlags(uid,IMAP_t_SeqSet.Parse(seqSet.ToSequenceSetString()),setType,new IMAP_t_MsgFlags(flags));
-        }        
-
+                
         /// <summary>
         /// Stores specified message flags to the sepcified messages.
         /// </summary>
@@ -7088,7 +7065,7 @@ namespace LumiSoft.Net.IMAP.Client
         #endregion
 
         #region method CopyMessages
-
+        
         /// <summary>
         /// Copies specified messages from current selected folder to the specified target folder.
         /// </summary>
@@ -7100,8 +7077,11 @@ namespace LumiSoft.Net.IMAP.Client
         /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b> or <b>targetFolder</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
-        public void CopyMessages(bool uid,IMAP_SequenceSet seqSet,string targetFolder)
-        {            
+        public void CopyMessages(bool uid,IMAP_t_SeqSet seqSet,string targetFolder)
+        {    
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
@@ -7123,11 +7103,8 @@ namespace LumiSoft.Net.IMAP.Client
             if(targetFolder == string.Empty){
                 throw new ArgumentException("Argument 'folder' value must be specified.","folder");
             }
-            if(this.IsDisposed){
-                throw new ObjectDisposedException(this.GetType().Name);
-            }
 
-            using(CopyMessagesAsyncOP op = new CopyMessagesAsyncOP(uid,IMAP_t_SeqSet.Parse(seqSet.ToSequenceSetString()),targetFolder,null)){
+            using(CopyMessagesAsyncOP op = new CopyMessagesAsyncOP(uid,seqSet,targetFolder,null)){
                 using(ManualResetEvent wait = new ManualResetEvent(false)){
                     op.CompletedAsync += delegate(object s1,EventArgs<CopyMessagesAsyncOP> e1){
                         wait.Set();
@@ -7281,7 +7258,7 @@ namespace LumiSoft.Net.IMAP.Client
         #endregion
                 
         #region method MoveMessages
-        
+               
         /// <summary>
         /// Moves specified messages from current selected folder to the specified target folder.
         /// </summary>
@@ -7290,21 +7267,12 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="targetFolder">Target folder name with path.</param>
         /// <param name="expunge">If ture messages are expunged from selected folder, otherwise they are marked as <b>Deleted</b>.
         /// Note: If true - then all messages marked as <b>Deleted</b> are expunged !</param>
-        /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b> or <b>targetFolder</b> is null reference.</exception>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state. For example 'not connected'.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected, not-authenticated or not-selected state).</exception>
         /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
-        public void MoveMessages(bool uid,IMAP_SequenceSet seqSet,string targetFolder,bool expunge)
-        {
-            if(seqSet == null){
-                throw new ArgumentNullException("seqSet");
-            }
-            if(targetFolder == null){
-                throw new ArgumentNullException("folder");
-            }
-            if(targetFolder == string.Empty){
-                throw new ArgumentException("Argument 'folder' value must be specified.","folder");
-            }
+        public void MoveMessages(bool uid,IMAP_t_SeqSet seqSet,string targetFolder,bool expunge)
+        {            
             if(!this.IsConnected){
                 throw new InvalidOperationException("Not connected, you need to connect first.");
             }
@@ -7317,9 +7285,18 @@ namespace LumiSoft.Net.IMAP.Client
             if(m_pIdle != null){
                 throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
             }
+            if(seqSet == null){
+                throw new ArgumentNullException("seqSet");
+            }
+            if(targetFolder == null){
+                throw new ArgumentNullException("folder");
+            }
+            if(targetFolder == string.Empty){
+                throw new ArgumentException("Argument 'folder' value must be specified.","folder");
+            }
 
             CopyMessages(uid,seqSet,targetFolder);
-            StoreMessageFlags(uid,seqSet,IMAP_Flags_SetType.Add,new string[]{IMAP_t_MsgFlags.Deleted});
+            StoreMessageFlags(uid,seqSet,IMAP_Flags_SetType.Add,IMAP_t_MsgFlags.Parse(IMAP_t_MsgFlags.Deleted));
             if(expunge){
                 Expunge();
             }
@@ -10396,6 +10373,30 @@ namespace LumiSoft.Net.IMAP.Client
         /// <param name="uid">Specifies if <b>seqSet</b> contains UIDs or sequence-numbers.</param>
         /// <param name="seqSet">Messages sequence-set.</param>
         /// <param name="setType">Specifies how flags are set.</param>
+        /// <param name="flags">Message flags. Value null means no flags. For example: new string[]{"\Seen","\Answered"}.</param>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state. For example 'not connected'.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b> is null reference.</exception>
+        /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>        
+        [Obsolete("Use method public void StoreMessageFlags(bool uid,IMAP_t_SeqSet seqSet,IMAP_Flags_SetType setType,IMAP_t_MsgFlags flags) instead.")]
+        public void StoreMessageFlags(bool uid,IMAP_SequenceSet seqSet,IMAP_Flags_SetType setType,string[] flags)
+        {
+            if(seqSet == null){
+                throw new ArgumentNullException("seqSet");
+            }
+            if(flags == null){
+                throw new ArgumentNullException("flags");
+            }
+
+            StoreMessageFlags(uid,IMAP_t_SeqSet.Parse(seqSet.ToSequenceSetString()),setType,new IMAP_t_MsgFlags(flags));
+        }
+
+        /// <summary>
+        /// Stores specified message flags to the sepcified messages.
+        /// </summary>
+        /// <param name="uid">Specifies if <b>seqSet</b> contains UIDs or sequence-numbers.</param>
+        /// <param name="seqSet">Messages sequence-set.</param>
+        /// <param name="setType">Specifies how flags are set.</param>
         /// <param name="flags">Message flags.</param>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
         /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state. For example 'not connected'.</exception>
@@ -10405,6 +10406,96 @@ namespace LumiSoft.Net.IMAP.Client
         public void StoreMessageFlags(bool uid,IMAP_SequenceSet seqSet,IMAP_Flags_SetType setType,IMAP_MessageFlags flags)
         {
             StoreMessageFlags(uid,seqSet,setType,IMAP_Utils.MessageFlagsToStringArray(flags));
+        }
+
+        #endregion
+
+        #region method CopyMessages
+
+        /// <summary>
+        /// Copies specified messages from current selected folder to the specified target folder.
+        /// </summary>
+        /// <param name="uid">Specifies if <b>seqSet</b> contains UIDs or message-numberss.</param>
+        /// <param name="seqSet">Messages sequence set.</param>
+        /// <param name="targetFolder">Target folder name with path.</param>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state. For example 'not connected'.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b> or <b>targetFolder</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
+        [Obsolete("Use method 'CopyMessages(bool uid,IMAP_t_SeqSet seqSet,string targetFolder)' instead.")]
+        public void CopyMessages(bool uid,IMAP_SequenceSet seqSet,string targetFolder)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(!this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }
+            if(m_pSelectedFolder == null){
+                throw new InvalidOperationException("Not selected state, you need to select some folder first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
+            }
+            if(seqSet == null){
+                throw new ArgumentNullException("seqSet");
+            }
+            if(targetFolder == null){
+                throw new ArgumentNullException("folder");
+            }
+            if(targetFolder == string.Empty){
+                throw new ArgumentException("Argument 'folder' value must be specified.","folder");
+            }
+
+            CopyMessages(uid,IMAP_t_SeqSet.Parse(seqSet.ToSequenceSetString()),targetFolder);
+        }
+
+        #endregion
+
+        #region method MoveMessages
+
+        /// <summary>
+        /// Moves specified messages from current selected folder to the specified target folder.
+        /// </summary>
+        /// <param name="uid">Specifies if <b>seqSet</b> contains UIDs or message-numberss.</param>
+        /// <param name="seqSet">Messages sequence set.</param>
+        /// <param name="targetFolder">Target folder name with path.</param>
+        /// <param name="expunge">If ture messages are expunged from selected folder, otherwise they are marked as <b>Deleted</b>.
+        /// Note: If true - then all messages marked as <b>Deleted</b> are expunged !</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>seqSet</b> or <b>targetFolder</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state(not-connected, not-authenticated or not-selected state).</exception>
+        /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
+        [Obsolete("Use method 'MoveMessages(bool uid,IMAP_t_SeqSet seqSet,string targetFolder,bool expunge)' instead.")]
+        public void MoveMessages(bool uid,IMAP_SequenceSet seqSet,string targetFolder,bool expunge)
+        {
+            if(seqSet == null){
+                throw new ArgumentNullException("seqSet");
+            }
+            if(targetFolder == null){
+                throw new ArgumentNullException("folder");
+            }
+            if(targetFolder == string.Empty){
+                throw new ArgumentException("Argument 'folder' value must be specified.","folder");
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(!this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }
+            if(m_pSelectedFolder == null){
+                throw new InvalidOperationException("Not selected state, you need to select some folder first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
+            }
+
+            MoveMessages(uid,IMAP_t_SeqSet.Parse(seqSet.ToSequenceSetString()),targetFolder,expunge);
         }
 
         #endregion
