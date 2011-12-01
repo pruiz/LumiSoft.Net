@@ -97,7 +97,7 @@ namespace LumiSoft.Net.IMAP
         /// </summary>
         /// <param name="encoding">Specifies how mailbox name is encoded.</param>
         /// <returns>Returns this as string.</returns>
-        public string ToString(IMAP_Mailbox_Encoding encoding)
+        public override string ToString(IMAP_Mailbox_Encoding encoding)
         {
             // Example:    S: * LSUB (\Noselect) "/" ~/Mail/foo
 

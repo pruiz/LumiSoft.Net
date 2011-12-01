@@ -102,6 +102,29 @@ namespace LumiSoft.Net.IMAP
         #endregion
 
 
+        #region override method ToString
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString()
+        {
+            // Example:    S: * CAPABILITY IMAP4rev1 STARTTLS AUTH=GSSAPI XPIG-LATIN
+
+            StringBuilder retVal = new StringBuilder();
+            retVal.Append("* CAPABILITY");
+            foreach(string capability in m_pCapabilities){
+                retVal.Append(" " + capability);
+            }
+            retVal.Append("\r\n");
+
+            return retVal.ToString();
+        }
+
+        #endregion
+
+
         #region Properties impelementation
 
         /// <summary>

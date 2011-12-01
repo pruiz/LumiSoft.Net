@@ -126,6 +126,7 @@
     <Compile Include="IMAP\Client\IMAP_Client_CmdPart_Type.cs" />
     <Compile Include="IMAP\Client\IMAP_Client_e_FetchGetStoreStream.cs" />
     <None Include="IMAP\IMAP_t_Capabilities.cs" />
+    <Compile Include="IMAP\IMAP_r_u_Bye.cs" />
     <Compile Include="_Obsolete\IMAP\IMAP_Fetch_DataItem_X_GM_MSGID.cs" />
     <Compile Include="_Obsolete\IMAP\IMAP_Fetch_DataItem_X_GM_THRID.cs" />
     <Compile Include="IMAP\IMAP_Mailbox_Encoding.cs" />

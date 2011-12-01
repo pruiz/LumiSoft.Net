@@ -20,11 +20,11 @@ namespace LumiSoft.Net.IMAP
         /// Default constructor.
         /// </summary>
         /// <param name="folder">Folder name.</param>
-        /// <param name="messagesCount">Messages count.</param>
-        /// <param name="recentCount">The "recent" flag set messages count.</param>
-        /// <param name="uidNext">Next message predictable UID value.</param>
-        /// <param name="folderUid">Folder UID value.</param>
-        /// <param name="unseenCount">Unseen messages count.</param>
+        /// <param name="messagesCount">Messages count. Value -1 means not specified.</param>
+        /// <param name="recentCount">The "recent" flag set messages count. Value -1 means not specified.</param>
+        /// <param name="uidNext">Next message predictable UID value. Value -1 means not specified.</param>
+        /// <param name="folderUid">Folder UID value. Value -1 means not specified.</param>
+        /// <param name="unseenCount">Unseen messages count. Value -1 means not specified.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>folder</b> is null.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
         public IMAP_r_u_Status(string folder,int messagesCount,int recentCount,long uidNext,long folderUid,int unseenCount)
@@ -103,6 +103,71 @@ namespace LumiSoft.Net.IMAP
             }
 
             return new IMAP_r_u_Status(folder,messages,recent,uidNext,folderUid,unseen);
+        }
+
+        #endregion
+
+
+        #region override method ToString
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString()
+        {
+            return ToString(IMAP_Mailbox_Encoding.None);
+        }
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <param name="encoding">Specifies how mailbox name is encoded.</param>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString(IMAP_Mailbox_Encoding encoding)
+        {
+            // Example:    S: * STATUS blurdybloop (MESSAGES 231 UIDNEXT 44292)
+
+            StringBuilder retVal = new StringBuilder();
+            retVal.Append("* STATUS");
+            retVal.Append(" " + IMAP_Utils.EncodeMailbox(m_FolderName,encoding));
+            retVal.Append(" (");
+            bool firstItem = true;
+            if(m_MessageCount >= 0){ 
+                retVal.Append("MESSAGES " + m_MessageCount);   
+                firstItem = false;
+            }
+            if(m_RecentCount >= 0){ 
+                if(!firstItem){
+                    retVal.Append(' ');
+                }
+                retVal.Append("RECENT " + m_RecentCount);  
+                firstItem = false;
+            }
+            if(m_UidNext >= 0){ 
+                if(!firstItem){
+                    retVal.Append(' ');
+                }
+                retVal.Append("UIDNEXT " + m_UidNext);  
+                firstItem = false;
+            }
+            if(m_FolderUid >= 0){  
+                if(!firstItem){
+                    retVal.Append(' ');
+                }
+                retVal.Append("UIDVALIDITY " + m_FolderUid); 
+                firstItem = false;
+            }
+            if(m_UnseenCount >= 0){
+                if(!firstItem){
+                    retVal.Append(' ');
+                }
+                retVal.Append("UNSEEN " + m_UnseenCount);   
+                firstItem = false;
+            }
+            retVal.Append(")\r\n");
+            
+            return retVal.ToString();
         }
 
         #endregion

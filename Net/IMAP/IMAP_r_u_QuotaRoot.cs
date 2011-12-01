@@ -94,10 +94,20 @@ namespace LumiSoft.Net.IMAP
         /// <returns>Returns this as string.</returns>
         public override string ToString()
         {
+            return ToString(IMAP_Mailbox_Encoding.None);
+        }
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <param name="encoding">Specifies how mailbox name is encoded.</param>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString(IMAP_Mailbox_Encoding encoding)
+        {
             // Example:    S: * QUOTAROOT INBOX ""
 
             StringBuilder retVal = new StringBuilder();
-            retVal.Append("* QUOTAROOT \"" + m_FolderName + "\"");
+            retVal.Append("* QUOTAROOT " + IMAP_Utils.EncodeMailbox(m_FolderName,encoding));
             foreach(string root in m_QuotaRoots){
                 retVal.Append(" \"" + root + "\"");
             }

@@ -65,6 +65,19 @@ namespace LumiSoft.Net.IMAP
             m_ResponseText         = responseText;
         }
 
+        /// <summary>
+        /// Default cmdTag-less constructor.
+        /// </summary>
+        /// <param name="responseCode">Response code.</param>
+        /// <param name="responseText">Response text after response-code.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>responseCode</b> or <b>responseText</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        internal IMAP_r_ServerStatus(string responseCode,string responseText)
+        {
+            m_ResponseCode = responseCode;
+            m_ResponseText = responseText;
+        }
+
 
         #region static method Parse
 
@@ -123,7 +136,10 @@ namespace LumiSoft.Net.IMAP
         public override string ToString()
         {
             StringBuilder retVal = new StringBuilder();
-            retVal.Append(m_CommandTag + " " + m_ResponseCode + " ");
+            if(!string.IsNullOrEmpty(m_CommandTag)){
+                retVal.Append(m_CommandTag + " ");
+            }
+            retVal.Append(m_ResponseCode + " ");
             if(!string.IsNullOrEmpty(m_OptionalResponseCode)){
                 retVal.Append("[" + m_OptionalResponseCode);
                 if(!string.IsNullOrEmpty(m_OptionalResponseArgs)){

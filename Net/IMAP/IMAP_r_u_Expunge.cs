@@ -88,6 +88,22 @@ namespace LumiSoft.Net.IMAP
         #endregion
 
 
+        #region override method ToString
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString()
+        {
+            // Example:    S: * 44 EXPUNGE
+
+            return "* " + m_SeqNo.ToString() + " EXPUNGE\r\n";
+        }
+
+        #endregion
+
+
         #region Properties implementation
 
         /// <summary>

@@ -87,10 +87,20 @@ namespace LumiSoft.Net.IMAP
         /// <returns>Returns this as string.</returns>
         public override string ToString()
         {
+            return ToString(IMAP_Mailbox_Encoding.None);
+        }
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <param name="encoding">Specifies how mailbox name is encoded.</param>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString(IMAP_Mailbox_Encoding encoding)
+        {
             // Example:    S: * MYRIGHTS INBOX rwiptsldaex
 
             StringBuilder retVal = new StringBuilder();
-            retVal.Append("* MYRIGHTS \"" + m_FolderName + "\" \"" + m_pRights + "\"\r\n");
+            retVal.Append("* MYRIGHTS " + IMAP_Utils.EncodeMailbox(m_FolderName,encoding) + " \"" + m_pRights + "\"\r\n");
 
             return retVal.ToString();
         }

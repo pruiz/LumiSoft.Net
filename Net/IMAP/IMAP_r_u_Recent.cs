@@ -74,6 +74,22 @@ namespace LumiSoft.Net.IMAP
         #endregion
 
 
+        #region override method ToString
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString()
+        {
+            // Example:    S: * 5 RECENT
+
+            return "* " + m_MessageCount.ToString() + " RECENT\r\n";
+        }
+
+        #endregion
+
+
         #region Properties implementation
 
         /// <summary>

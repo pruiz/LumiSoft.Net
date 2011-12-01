@@ -12,7 +12,7 @@ namespace LumiSoft.Net.IMAP
         private string   m_FolderName        = "";
         private char     m_Delimiter         = '/';
         private string[] m_pFolderAttributes = new string[0];
-
+                
         /// <summary>
         /// Default constructor.
         /// </summary>
@@ -32,6 +32,16 @@ namespace LumiSoft.Net.IMAP
             if(attributes != null){
                 m_pFolderAttributes = attributes;
             }
+        }
+
+        /// <summary>
+        /// Default constructor. (Hierarchy delimiter request)
+        /// </summary>
+        /// <param name="delimiter">Hierarchy delimiter char.</param>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        internal IMAP_r_u_List(char delimiter)
+        {
+            m_Delimiter = delimiter;
         }
 
 
@@ -128,26 +138,38 @@ namespace LumiSoft.Net.IMAP
         /// </summary>
         /// <param name="encoding">Specifies how mailbox name is encoded.</param>
         /// <returns>Returns this as string.</returns>
-        public string ToString(IMAP_Mailbox_Encoding encoding)
+        public override string ToString(IMAP_Mailbox_Encoding encoding)
         {
-            // Example:    S: * LIST (\Noselect) "/" ~/Mail/foo
+            /*
+                Example:  S: * LIST (\Noselect) "/" ~/Mail/foo
+             
+                          C: A101 LIST "" ""
+                          S: * LIST (\Noselect) "/" ""
+                          S: A101 OK LIST Completed
+            */
 
-            StringBuilder retVal = new StringBuilder();
-            retVal.Append("* LIST (");
-            if(m_pFolderAttributes != null){
-                for(int i=0;i<m_pFolderAttributes.Length;i++){
-                    if(i > 0){
-                        retVal.Append(" ");
-                    }
-                    retVal.Append(m_pFolderAttributes[i]);
-                }
+            // Hierarchy delimiter request.
+            if(string.IsNullOrEmpty(m_FolderName)){
+                return "* LIST (\\Noselect) \"/\" \"\"\r\n";
             }
-            retVal.Append(") ");
-            retVal.Append("\"" + m_Delimiter + "\" ");
-            retVal.Append(IMAP_Utils.EncodeMailbox(m_FolderName,encoding));
-            retVal.Append("\r\n");
+            else{
+                StringBuilder retVal = new StringBuilder();
+                retVal.Append("* LIST (");
+                if(m_pFolderAttributes != null){
+                    for(int i=0;i<m_pFolderAttributes.Length;i++){
+                        if(i > 0){
+                            retVal.Append(" ");
+                        }
+                        retVal.Append(m_pFolderAttributes[i]);
+                    }
+                }
+                retVal.Append(") ");
+                retVal.Append("\"" + m_Delimiter + "\" ");
+                retVal.Append(IMAP_Utils.EncodeMailbox(m_FolderName,encoding));
+                retVal.Append("\r\n");
 
-            return retVal.ToString();
+                return retVal.ToString();
+            }
         }
 
         #endregion

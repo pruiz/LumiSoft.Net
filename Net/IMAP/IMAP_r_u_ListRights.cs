@@ -111,10 +111,20 @@ namespace LumiSoft.Net.IMAP
         /// <returns>Returns this as string.</returns>
         public override string ToString()
         {
+            return ToString(IMAP_Mailbox_Encoding.None);
+        }
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <param name="encoding">Specifies how mailbox name is encoded.</param>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString(IMAP_Mailbox_Encoding encoding)
+        {
             // Example:    S: * LISTRIGHTS ~/Mail/saved smith la r swicdkxte
 
             StringBuilder retVal = new StringBuilder();
-            retVal.Append("* LISTRIGHTS \"" + m_FolderName + "\" \"" + m_RequiredRights + "\" " + m_OptionalRights + "\r\n");
+            retVal.Append("* LISTRIGHTS " + IMAP_Utils.EncodeMailbox(m_FolderName,encoding) + " \"" + m_RequiredRights + "\" " + m_OptionalRights + "\r\n");
             
             return retVal.ToString();
         }

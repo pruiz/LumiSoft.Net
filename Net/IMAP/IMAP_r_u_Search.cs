@@ -64,6 +64,29 @@ namespace LumiSoft.Net.IMAP
         #endregion
 
 
+        #region override method ToString
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString()
+        {
+            // Example:    S: * SEARCH 2 3 6
+
+            StringBuilder retVal = new StringBuilder();
+            retVal.Append("* SEARCH");
+            foreach(int i in m_pValues){
+                retVal.Append(" " + i.ToString());
+            }
+            retVal.Append("\r\n");
+
+            return retVal.ToString();
+        }
+
+        #endregion
+
+
         #region Properties implementation
 
         /// <summary>

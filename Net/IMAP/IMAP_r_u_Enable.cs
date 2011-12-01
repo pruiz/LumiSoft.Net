@@ -7,7 +7,7 @@ namespace LumiSoft.Net.IMAP
     /// <summary>
     /// This class represents IMAP ENABLE response. Defined in RFC 5161 4.
     /// </summary>
-    public class IMAP_r_u_Enable: IMAP_r_u
+    public class IMAP_r_u_Enable : IMAP_r_u
     {
         private string[] m_Capabilities = null;
 

@@ -62,6 +62,32 @@ namespace LumiSoft.Net.IMAP
         #endregion
 
 
+        #region override method ToString
+
+        /// <summary>
+        /// Returns this as string.
+        /// </summary>
+        /// <returns>Returns this as string.</returns>
+        public override string ToString()
+        {
+            // Example:    S: * FLAGS (\Answered \Flagged \Deleted \Seen \Draft)
+
+            StringBuilder retVal = new StringBuilder();
+            retVal.Append("* FLAGS (");
+            for(int i=0;i<m_pFlags.Length;i++){
+                if(i > 0){
+                    retVal.Append(" ");
+                }
+                retVal.Append(m_pFlags[i]);
+            }
+            retVal.Append(")\r\n");
+
+            return retVal.ToString();
+        }
+
+        #endregion
+
+
         #region Properties implementation
 
         /// <summary>
