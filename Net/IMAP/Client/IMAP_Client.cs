@@ -8421,7 +8421,8 @@ namespace LumiSoft.Net.IMAP.Client
                             }
                             else{
                                 // We must send next command line of multi-line command line.
-                                if(args.FinalResponse.IsContinue){
+                                // Send only if we have any available, otherwise return reponse to user.
+                                if(args.FinalResponse.IsContinue && m_pCmdLines.Count > 0){
                                     SendCmdLine();
                                 }
                                 else{
