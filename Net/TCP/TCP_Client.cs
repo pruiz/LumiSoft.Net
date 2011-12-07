@@ -779,6 +779,8 @@ namespace LumiSoft.Net.TCP
         /// </summary>
         protected class SwitchToSecureAsyncOP
         {
+            private object                              m_pLock         = new object();
+            private bool                                m_RiseCompleted = false;
             private AsyncOP_State                       m_State         = AsyncOP_State.WaitingForStart;
             private Exception                           m_pException    = null;
             private RemoteCertificateValidationCallback m_pCertCallback = null;
@@ -841,8 +843,13 @@ namespace LumiSoft.Net.TCP
                     SetState(AsyncOP_State.Completed);
                 }
 
-                // NOTE: If operation completed synchronously, then this.State is AsyncOP_State.Completed and we don't have pending operation.
-                return this.State != AsyncOP_State.Completed;
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
             }
 
             #endregion
@@ -856,7 +863,17 @@ namespace LumiSoft.Net.TCP
             /// <param name="state">New state.</param>
             private void SetState(AsyncOP_State state)
             {
-                m_State = state;
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
             }
 
             #endregion
@@ -912,7 +929,6 @@ namespace LumiSoft.Net.TCP
                 }
 
                 SetState(AsyncOP_State.Completed);
-                OnCompletedAsync();
             }
 
             #endregion
