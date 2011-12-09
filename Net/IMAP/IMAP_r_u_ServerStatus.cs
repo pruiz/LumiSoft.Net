@@ -18,6 +18,17 @@ namespace LumiSoft.Net.IMAP
         /// Default constructor.
         /// </summary>
         /// <param name="responseCode">Response code.</param>
+        /// <param name="responseText">Response text after response-code.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>responseCode</b> is null reference.</exception>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        public IMAP_r_u_ServerStatus(string responseCode,string responseText) : this(responseCode,null,null,responseText)
+        {
+        }
+
+        /// <summary>
+        /// Default constructor.
+        /// </summary>
+        /// <param name="responseCode">Response code.</param>
         /// <param name="optResponseCode">Optional response code(Response code between []).</param>
         /// <param name="optResponseArgs">Optional response arguments string.</param>
         /// <param name="responseText">Response text after response-code.</param>
