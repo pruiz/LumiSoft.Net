@@ -301,6 +301,11 @@ namespace LumiSoft.Net.DNS.Client
 				that this field may be an odd number of octets; no
 				padding is used.
 			*/
+
+            // Convert unicode domain name. For more info see RFC 5890.
+            System.Globalization.IdnMapping ldn = new System.Globalization.IdnMapping();
+            qname = ldn.GetAscii(qname);
+
 			string[] labels = qname.Split(new char[] {'.'});
 			int position = 12;
 					
@@ -308,12 +313,12 @@ namespace LumiSoft.Net.DNS.Client
 			// eg. lumisoft.ee = 2 labels, lumisoft and ee.
 			// format = label.length + label(bytes)
 			foreach(string label in labels){
-				// add label lenght to query
-				buffer[position++] = (byte)(label.Length); 
+                // convert label string to byte array
+                byte[] b = Encoding.ASCII.GetBytes(label);
 
-				// convert label string to byte array
-				byte[] b = Encoding.ASCII.GetBytes(label);
-				b.CopyTo(buffer,position);
+				// add label lenght to query
+				buffer[position++] = (byte)(b.Length);
+                b.CopyTo(buffer,position);
 
 				// Move position by label length
 				position += b.Length;

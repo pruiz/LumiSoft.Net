@@ -1665,6 +1665,17 @@ namespace LumiSoft.Net.DNS.Client
         #region method GetQName
 
         internal static bool GetQName(byte[] reply,ref int offset,ref string name)
+		{
+            bool retVal = GetQNameI(reply,ref offset,ref name);
+
+            // Convert domain name to unicode. For more info see RFC 5890.
+            System.Globalization.IdnMapping ldn = new System.Globalization.IdnMapping();
+            name = ldn.GetUnicode(name);
+
+            return retVal;
+        }
+
+        private static bool GetQNameI(byte[] reply,ref int offset,ref string name)
 		{				
 			try{				
 				while(true){
@@ -1689,7 +1700,7 @@ namespace LumiSoft.Net.DNS.Client
 						int pStart = ((reply[offset] & 0x3F) << 8) | (reply[++offset]);
 						offset++;
 			
-						return GetQName(reply,ref pStart,ref name);
+						return GetQNameI(reply,ref pStart,ref name);
 					}
 					else{
 						/* Label length (length = 8Bit and first 2 bits always 0)
@@ -1844,7 +1855,7 @@ namespace LumiSoft.Net.DNS.Client
 				if(!GetQName(reply,ref offset,ref name)){
 					break;
 				}
-
+                                
 				int type     = reply[offset++] << 8  | reply[offset++];
 				int rdClass  = reply[offset++] << 8  | reply[offset++];
 				int ttl      = reply[offset++] << 24 | reply[offset++] << 16 | reply[offset++] << 8  | reply[offset++];
