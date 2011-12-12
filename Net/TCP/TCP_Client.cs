@@ -777,7 +777,7 @@ namespace LumiSoft.Net.TCP
         /// <summary>
         /// This class represents <see cref="TCP_Client.SwitchToSecureAsync"/> asynchronous operation.
         /// </summary>
-        protected class SwitchToSecureAsyncOP
+        protected class SwitchToSecureAsyncOP : IDisposable,IAsyncOP
         {
             private object                              m_pLock         = new object();
             private bool                                m_RiseCompleted = false;
