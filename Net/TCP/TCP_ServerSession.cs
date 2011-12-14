@@ -162,6 +162,9 @@ namespace LumiSoft.Net.TCP
                     switchSecureCompleted(op);
                 }
             }
+            else{
+                Start();
+            }
         }
 
         /// <summary>
