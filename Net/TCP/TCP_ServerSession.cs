@@ -9,6 +9,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 
 using LumiSoft.Net.IO;
+using LumiSoft.Net.Log;
 
 namespace LumiSoft.Net.TCP
 {
@@ -25,6 +26,7 @@ namespace LumiSoft.Net.TCP
         private string                    m_LocalHostName = "";
         private IPEndPoint                m_pLocalEP      = null;
         private IPEndPoint                m_pRemoteEP     = null;
+        private bool                      m_IsSsl         = false;
         private bool                      m_IsSecure      = false;
         private X509Certificate           m_pCertificate  = null;
         private SmartStream               m_pTcpStream    = null;
@@ -101,6 +103,7 @@ namespace LumiSoft.Net.TCP
             
             m_pServer       = server;
             m_LocalHostName = hostName;
+            m_IsSsl         = ssl;
             m_ID            = Guid.NewGuid().ToString();
             m_ConnectTime   = DateTime.Now;
             m_pLocalEP      = (IPEndPoint)socket.LocalEndPoint;
@@ -110,13 +113,7 @@ namespace LumiSoft.Net.TCP
             socket.ReceiveBufferSize = 32000;
             socket.SendBufferSize = 32000;
 
-            if(ssl){
-                m_pTcpStream = new SmartStream(new NetworkStream(socket,true),true);
-                SwitchToSecure();
-            }
-            else{
-                m_pTcpStream = new SmartStream(new NetworkStream(socket,true),true);
-            }
+            m_pTcpStream = new SmartStream(new NetworkStream(socket,true),true);
         }
 
         #endregion
@@ -126,7 +123,51 @@ namespace LumiSoft.Net.TCP
         /// <summary>
         /// This method is called from TCP server when session should start processing incoming connection.
         /// </summary>
-        internal protected virtual void Start()
+        internal void StartI()
+        {
+            if(m_IsSsl){
+                // Log
+                LogAddText("Starting SSL negotiation now.");
+
+                DateTime startTime = DateTime.Now;
+
+                // Create delegate which is called when SwitchToSecureAsync has completed.
+                Action<SwitchToSecureAsyncOP> switchSecureCompleted = delegate(SwitchToSecureAsyncOP e){
+                    try{
+                        // Operation failed.
+                        if(e.Error != null){
+                            LogAddException(e.Error);
+                            Disconnect();
+                        }
+                        // Operation suceeded.
+                        else{
+                            // Log
+                            LogAddText("SSL negotiation completed successfully in " + (DateTime.Now - startTime).TotalSeconds.ToString("f2") + " seconds.");
+
+                            Start();
+                        }
+                    }
+                    catch(Exception x){
+                        LogAddException(x);
+                        Disconnect();
+                    }
+                };
+
+                SwitchToSecureAsyncOP op = new SwitchToSecureAsyncOP();
+                op.CompletedAsync += delegate(object sender,EventArgs<TCP_ServerSession.SwitchToSecureAsyncOP> e){
+                    switchSecureCompleted(op);
+                };
+                // Switch to secure completed synchronously.
+                if(!SwitchToSecureAsync(op)){
+                    switchSecureCompleted(op);
+                }
+            }
+        }
+
+        /// <summary>
+        /// This method is called from TCP server when session should start processing incoming connection.
+        /// </summary>
+        protected virtual void Start()
         {
         }
 
@@ -463,6 +504,70 @@ namespace LumiSoft.Net.TCP
         internal virtual void OnTimeoutI()
         {
             OnTimeout();
+        }
+
+        #endregion
+
+
+        #region method LogAddText
+
+        /// <summary>
+        /// Logs specified text.
+        /// </summary>
+        /// <param name="text">text to log.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>text</b> is null reference.</exception>
+        private void LogAddText(string text)
+        {
+            if(text == null){
+                throw new ArgumentNullException("text");
+            }
+            
+            try{
+                object logger = this.Server.GetType().GetProperty("Logger").GetValue(this.Server,null);
+                if(logger != null){
+                    ((Logger)logger).AddText(
+                        this.ID,
+                        this.AuthenticatedUserIdentity,
+                        text,                        
+                        this.LocalEndPoint,
+                        this.RemoteEndPoint
+                    );
+                }
+            }
+            catch{
+            }
+        }
+
+        #endregion
+
+        #region method LogAddException
+
+        /// <summary>
+        /// Logs specified exception.
+        /// </summary>
+        /// <param name="exception">Exception to log.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>exception</b> is null reference.</exception>
+        private void LogAddException(Exception exception)
+        {
+            if(exception == null){
+                throw new ArgumentNullException("exception");
+            }
+            
+            try{
+                object logger = this.Server.GetType().GetProperty("Logger").GetValue(this.Server,null);
+                if(logger != null){
+                    ((Logger)logger).AddException(
+                        this.ID,
+                        this.AuthenticatedUserIdentity,
+                        exception.Message,                        
+                        this.LocalEndPoint,
+                        this.RemoteEndPoint,
+                        exception
+                    );
+                }
+            }
+            catch{
+            }
         }
 
         #endregion
