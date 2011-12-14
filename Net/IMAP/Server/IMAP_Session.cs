@@ -680,7 +680,7 @@ namespace LumiSoft.Net.IMAP.Server
         /// <summary>
         /// Starts session processing.
         /// </summary>
-        protected internal override void Start()
+        protected override void Start()
         {
             base.Start();
 
@@ -710,7 +710,7 @@ namespace LumiSoft.Net.IMAP.Server
                     m_pResponseSender.SendResponseAsync(e.Response);
                 }
 
-                // Setup rejected flag, so we respond "* NO Session rejected." any command except QUIT.
+                // Setup rejected flag, so we respond "* NO Session rejected." any command except LOGOUT.
                 if(e.Response == null || e.Response.ResponseCode.Equals("NO",StringComparison.InvariantCultureIgnoreCase)){
                     m_SessionRejected = true;
                 }
@@ -756,7 +756,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                     // Try to send "* BAD Internal server error."
                     try{
-                        WriteLine("* BAD Internal server error.");
+                        m_pResponseSender.SendResponseAsync(new IMAP_r_u_ServerStatus("BAD","Internal server error: " + x.Message));
                     }
                     catch{
                         // Error is permanent.
@@ -781,7 +781,7 @@ namespace LumiSoft.Net.IMAP.Server
         /// </remarks>
         protected override void OnTimeout()
         {
-            try{
+            try{                
                 WriteLine("* BYE Idle timeout, closing connection.");
             }
             catch{
@@ -854,8 +854,8 @@ namespace LumiSoft.Net.IMAP.Server
                 }
                                 
                 string[] cmd_args = Encoding.UTF8.GetString(op.Buffer,0,op.LineBytesInBuffer).Split(new char[]{' '},3);
-                if(cmd_args.Length < 2){                    
-                    WriteLine("* BAD Error: Command '" + op.LineUtf8 + "' not recognized.");
+                if(cmd_args.Length < 2){
+                    m_pResponseSender.SendResponseAsync(new IMAP_r_u_ServerStatus("BAD","Error: Command '" + op.LineUtf8 + "' not recognized."));
 
                     return true;
                 }
@@ -876,6 +876,7 @@ namespace LumiSoft.Net.IMAP.Server
 
                 if(cmd == "STARTTLS"){                    
                     STARTTLS(cmdTag,args);
+                    readNextCommand = false;
                 }
                 else if(cmd == "LOGIN"){
                     LOGIN(cmdTag,args);
@@ -918,6 +919,8 @@ namespace LumiSoft.Net.IMAP.Server
                 }
                 else if(cmd == "APPEND"){
                     APPEND(cmdTag,args);
+
+                    return false;
                 }
                 else if(cmd == "GETQUOTAROOT"){
                     GETQUOTAROOT(cmdTag,args);
@@ -981,17 +984,18 @@ namespace LumiSoft.Net.IMAP.Server
                     readNextCommand = false;
                 }
                 else{
-                     m_BadCommands++;
+                    m_BadCommands++;
 
-                     // Maximum allowed bad commands exceeded.
-                     if(this.Server.MaxBadCommands != 0 && m_BadCommands > this.Server.MaxBadCommands){
-                         WriteLine("* BYE Too many bad commands, closing transmission channel.");
-                         Disconnect();
-                         return false;
-                     }
+                    // Maximum allowed bad commands exceeded.
+                    if(this.Server.MaxBadCommands != 0 && m_BadCommands > this.Server.MaxBadCommands){
+                        WriteLine("* BYE Too many bad commands, closing transmission channel.");
+                        Disconnect();
+
+                        return false;
+                    }
                    
-                     WriteLine(cmdTag + " BAD Error: Command '" + cmd + "' not recognized.");
-                 }
+                    m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus(cmdTag,"BAD","Error: Command '" + cmd + "' not recognized."));
+                }
              }
              catch(Exception x){
                  OnError(x);
@@ -1002,7 +1006,7 @@ namespace LumiSoft.Net.IMAP.Server
 
         #endregion
 
-//
+
         #region method STARTTLS
 
         private void STARTTLS(string cmdTag,string cmdText)
@@ -1067,25 +1071,44 @@ namespace LumiSoft.Net.IMAP.Server
                 return;
             }
 
-            /*
-            m_pResponseSender.SendResponseAsync(
-                new IMAP_r_ServerStatus(cmdTag,"OK","Begin TLS negotiation now."),
-                delegate(object s,EventArgs<Exception> e){
-                }
-            );*/
-
-            WriteLine(cmdTag + " OK Begin TLS negotiation now.");
-
+            m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus(cmdTag,"OK","Begin TLS negotiation now."));
+            
             try{
-                SwitchToSecure();
+                DateTime startTime = DateTime.Now;
 
-                // Log
-                LogAddText("TLS negotiation completed successfully.");
+                // Create delegate which is called when SwitchToSecureAsync has completed.
+                Action<SwitchToSecureAsyncOP> switchSecureCompleted = delegate(SwitchToSecureAsyncOP e){
+                    try{
+                        // Operation failed.
+                        if(e.Error != null){
+                            LogAddException(e.Error);
+                            Disconnect();
+                        }
+                        // Operation suceeded.
+                        else{
+                            // Log
+                            LogAddText("SSL negotiation completed successfully in " + (DateTime.Now - startTime).TotalSeconds.ToString("f2") + " seconds.");
+
+                            BeginReadCmd();
+                        }
+                    }
+                    catch(Exception x){
+                        LogAddException(x);
+                        Disconnect();
+                    }
+                };
+
+                SwitchToSecureAsyncOP op = new SwitchToSecureAsyncOP();
+                op.CompletedAsync += delegate(object sender,EventArgs<TCP_ServerSession.SwitchToSecureAsyncOP> e){
+                    switchSecureCompleted(op);
+                };
+                // Switch to secure completed synchronously.
+                if(!SwitchToSecureAsync(op)){
+                    switchSecureCompleted(op);
+                }
             }
             catch(Exception x){
-                // Log
-                LogAddText("TLS negotiation failed: " + x.Message + ".");
-
+                LogAddException(x);
                 Disconnect();
             }
         }
@@ -2486,7 +2509,7 @@ namespace LumiSoft.Net.IMAP.Server
         }
 
         #endregion
-//
+
         #region method APPEND
 
         private void APPEND(string cmdTag,string cmdText)
@@ -2618,19 +2641,38 @@ namespace LumiSoft.Net.IMAP.Server
             else{
                 m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus("+","Ready for literal data."));
                 
-                //this.TcpStream.BeginReadFixedCount(e.Stream,size,null,null);
-                this.TcpStream.ReadFixedCount(e.Stream,size);
-                LogAddRead(size,"Readed " + size + " bytes.");
+                // Create callback which is called when BeginReadFixedCount completes.
+                AsyncCallback readLiteralCompletedCallback = delegate(IAsyncResult ar){
+                    try{
+                        this.TcpStream.EndReadFixedCount(ar);
+                        // Log.
+                        LogAddRead(size,"Readed " + size + " bytes.");
 
-                // Read command line terminating CRLF.
-                SmartStream.ReadLineAsyncOP readLineOP = new SmartStream.ReadLineAsyncOP(new byte[32000],SizeExceededAction.JunkAndThrowException);
-                this.TcpStream.ReadLine(readLineOP,false);
-                LogAddRead(size,"");
+                        // TODO: Async
+                        // Read command line terminating CRLF.
+                        SmartStream.ReadLineAsyncOP readLineOP = new SmartStream.ReadLineAsyncOP(new byte[32000],SizeExceededAction.JunkAndThrowException);
+                        this.TcpStream.ReadLine(readLineOP,false);
+                        // Read command line terminating CRLF failed.
+                        if(readLineOP.Error != null){
+                            OnError(readLineOP.Error);
+                        }
+                        // Read command line terminating CRLF succeeded.
+                        else{
+                            LogAddRead(readLineOP.BytesInBuffer,readLineOP.LineUtf8);
 
-                // Raise Completed event.
-                e.OnCompleted();
+                            // Raise Completed event.
+                            e.OnCompleted();
 
-                WriteLine(e.Response.ToString().Replace("%exectime",((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2")));
+                            m_pResponseSender.SendResponseAsync(IMAP_r_ServerStatus.Parse(e.Response.ToString().TrimEnd().Replace("%exectime",((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2"))));
+                            BeginReadCmd();
+                        }
+                    }
+                    catch(Exception x){
+                        OnError(x);
+                    }
+                };
+
+                this.TcpStream.BeginReadFixedCount(e.Stream,size,readLiteralCompletedCallback,null);
             }
         }
 
@@ -4065,7 +4107,7 @@ namespace LumiSoft.Net.IMAP.Server
         }
 
         #endregion
-//
+
         #region method SEARCH
 
         private void SEARCH(bool uid,string cmdTag,string cmdText)
@@ -4303,32 +4345,25 @@ namespace LumiSoft.Net.IMAP.Server
 
                 UpdateSelectedFolderAndSendChanges();
                 
-                StringBuilder logBuffer = new StringBuilder();                
-                this.TcpStream.Write("* SEARCH");
-                logBuffer.Append("* SEARCH");
+                List<int> matchedValues = new List<int>();
 
                 IMAP_e_Search searchArgs = new IMAP_e_Search(criteria,new IMAP_r_ServerStatus(cmdTag,"OK","SEARCH completed in %exectime seconds."));
                 searchArgs.Matched += new EventHandler<EventArgs<long>>(delegate(object s,EventArgs<long> e){
                     if(uid){
-                        this.TcpStream.Write(" " + e.Value);
-                        logBuffer.Append(" " + e.Value);
+                        matchedValues.Add((int)e.Value);
                     }
                     else{
                         // Search sequence-number for that message.
                         int seqNo = m_pSelectedFolder.GetSeqNo(e.Value);
                         if(seqNo != -1){
-                            this.TcpStream.Write(" " + seqNo);
-                            logBuffer.Append(" " + seqNo);
+                            matchedValues.Add((int)e.Value);
                         }
                     }                    
                 });
                 OnSearch(searchArgs);
 
-                this.TcpStream.Write("\r\n");
-                logBuffer.Append("\r\n");
-                this.LogAddWrite(logBuffer.Length,logBuffer.ToString());
-
-                WriteLine(searchArgs.Response.ToString().Replace("%exectime",((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2")));
+                m_pResponseSender.SendResponseAsync(new IMAP_r_u_Search(matchedValues.ToArray()));
+                m_pResponseSender.SendResponseAsync(IMAP_r_ServerStatus.Parse(searchArgs.Response.ToString().TrimEnd().Replace("%exectime",((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2"))));
             }
             catch{
                 m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus(cmdTag,"BAD","Error in arguments."));
@@ -4336,7 +4371,7 @@ namespace LumiSoft.Net.IMAP.Server
         }
 
         #endregion
-//
+
         #region method STORE
 
         private void STORE(bool uid,string cmdTag,string cmdText)
@@ -4488,15 +4523,30 @@ namespace LumiSoft.Net.IMAP.Server
                 if(!silent){
                     // UID STORE must include UID. For more info see RFC 3501 6.4.8. UID Command.
                     if(uid){
-                        WriteLine("* " + m_pSelectedFolder.GetSeqNo(msgInfo) + " FETCH (FLAGS " + msgInfo.FlagsToImapString() + " UID " + msgInfo.UID + ")");
+                        m_pResponseSender.SendResponseAsync(
+                            new IMAP_r_u_Fetch(
+                                m_pSelectedFolder.GetSeqNo(msgInfo),
+                                new IMAP_t_Fetch_r_i[]{
+                                    new IMAP_t_Fetch_r_i_Flags(new IMAP_t_MsgFlags(msgInfo.Flags)),
+                                    new IMAP_t_Fetch_r_i_Uid(msgInfo.UID)
+                                }
+                            )
+                        );
                     }
                     else{
-                        WriteLine("* " + m_pSelectedFolder.GetSeqNo(msgInfo) + " FETCH (FLAGS " + msgInfo.FlagsToImapString() + ")");
+                        m_pResponseSender.SendResponseAsync(
+                            new IMAP_r_u_Fetch(
+                                m_pSelectedFolder.GetSeqNo(msgInfo),
+                                new IMAP_t_Fetch_r_i[]{
+                                    new IMAP_t_Fetch_r_i_Flags(new IMAP_t_MsgFlags(msgInfo.Flags))
+                                }
+                            )
+                        );
                     }
                 }
             }
 
-            WriteLine(response.ToString().Replace("%exectime",((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2")));
+            m_pResponseSender.SendResponseAsync(IMAP_r_ServerStatus.Parse(response.ToString().TrimEnd().Replace("%exectime",((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2"))));
         }
 
         #endregion
@@ -4748,7 +4798,7 @@ namespace LumiSoft.Net.IMAP.Server
         }
 
         #endregion
-//
+
         #region method IDLE
 
         private bool IDLE(string cmdTag,string cmdText)
@@ -4832,12 +4882,12 @@ namespace LumiSoft.Net.IMAP.Server
             */
 
             if(!this.IsAuthenticated){
-                WriteLine(cmdTag + " NO Authentication required.");
+                m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus(cmdTag,"NO","Authentication required."));
 
                 return true;
             }
 
-            WriteLine("+ idling");
+            m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus("+","idling"));
 
             TimerEx timer = new TimerEx(30000,true);
             timer.Elapsed += new System.Timers.ElapsedEventHandler(delegate(object sender,System.Timers.ElapsedEventArgs e){
@@ -4873,7 +4923,7 @@ namespace LumiSoft.Net.IMAP.Server
                     if(string.Equals(readLineOP.LineUtf8,"DONE",StringComparison.InvariantCultureIgnoreCase)){
                         timer.Dispose();
 
-                        WriteLine(cmdTag + " OK IDLE terminated.\r\n");
+                        m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus(cmdTag,"OK","IDLE terminated."));
                         BeginReadCmd();
                     }
                     else{
@@ -4889,7 +4939,7 @@ namespace LumiSoft.Net.IMAP.Server
                             if(string.Equals(readLineOP.LineUtf8,"DONE",StringComparison.InvariantCultureIgnoreCase)){
                                 timer.Dispose();
 
-                                WriteLine(cmdTag + " OK IDLE terminated.\r\n");
+                                m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus(cmdTag,"OK","IDLE terminated."));
                                 BeginReadCmd();
 
                                 break;
@@ -4916,7 +4966,7 @@ namespace LumiSoft.Net.IMAP.Server
                 if(string.Equals(readLineOP.LineUtf8,"DONE",StringComparison.InvariantCultureIgnoreCase)){
                     timer.Dispose();
 
-                    WriteLine(cmdTag + " OK IDLE terminated.\r\n");
+                    m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus(cmdTag,"OK","IDLE terminated."));
                     BeginReadCmd();
 
                     break;
@@ -5199,6 +5249,37 @@ namespace LumiSoft.Net.IMAP.Server
                         text,                        
                         this.LocalEndPoint,
                         this.RemoteEndPoint
+                    );
+                }
+            }
+            catch{
+            }
+        }
+
+        #endregion
+
+        #region method LogAddException
+
+        /// <summary>
+        /// Logs specified exception.
+        /// </summary>
+        /// <param name="exception">Exception to log.</param>
+        /// <exception cref="ArgumentNullException">Is raised when <b>exception</b> is null reference.</exception>
+        public void LogAddException(Exception exception)
+        {
+            if(exception == null){
+                throw new ArgumentNullException("exception");
+            }
+            
+            try{
+                if(this.Server.Logger != null){
+                    this.Server.Logger.AddException(
+                        this.ID,
+                        this.AuthenticatedUserIdentity,
+                        exception.Message,                        
+                        this.LocalEndPoint,
+                        this.RemoteEndPoint,
+                        exception
                     );
                 }
             }

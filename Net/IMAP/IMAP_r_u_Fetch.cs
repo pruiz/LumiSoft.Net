@@ -5,6 +5,7 @@ using System.Text;
 
 using LumiSoft.Net.IO;
 using LumiSoft.Net.IMAP.Client;
+using LumiSoft.Net.IMAP.Server;
 
 namespace LumiSoft.Net.IMAP
 {
@@ -20,8 +21,30 @@ namespace LumiSoft.Net.IMAP
         /// Default constructor.
         /// </summary>
         /// <param name="msgSeqNo">Message 1-based sequence number.</param>
+        /// <param name="dataItems">Fetch response data-items.</param>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        public IMAP_r_u_Fetch(int msgSeqNo)
+        /// <exception cref="ArgumentNullException">Is raised when <b>dataItems</b> is null reference.</exception>
+        public IMAP_r_u_Fetch(int msgSeqNo,IMAP_t_Fetch_r_i[] dataItems)
+        {
+            if(msgSeqNo < 1){
+                throw new ArgumentException("Argument 'msgSeqNo' value must be >= 1.","msgSeqNo");
+            }
+            if(dataItems == null){
+                throw new ArgumentNullException("dataItems");
+            }
+
+            m_MsgSeqNo = msgSeqNo;
+
+            m_pDataItems = new List<IMAP_t_Fetch_r_i>();
+            m_pDataItems.AddRange(dataItems);
+        }
+
+        /// <summary>
+        /// Default constructor.
+        /// </summary>
+        /// <param name="msgSeqNo">Message 1-based sequence number.</param>
+        /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
+        internal IMAP_r_u_Fetch(int msgSeqNo)
         {
             if(msgSeqNo < 1){
                 throw new ArgumentException("Argument 'msgSeqNo' value must be >= 1.","msgSeqNo");
@@ -73,6 +96,86 @@ namespace LumiSoft.Net.IMAP
             }
 
             ParseDataItems(imap,r,callback);
+        }
+
+        #endregion
+
+
+        #region override method ToStreamAsync
+
+        /// <summary>
+        /// Starts writing response to the specified stream.
+        /// </summary>
+        /// <param name="session">Owner IMAP session.</param>
+        /// <param name="stream">Stream where to store response.</param>
+        /// <param name="mailboxEncoding">Specifies how mailbox name is encoded.</param>
+        /// <param name="completedAsyncCallback">Callback to be called when this method completes asynchronously.</param>
+        /// <returns>Returns true is method completed asynchronously(the completedAsyncCallback is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ArgumentNullException">Is raised when <b>stream</b> is null reference.</exception>
+        protected override bool ToStreamAsync(IMAP_Session session,Stream stream,IMAP_Mailbox_Encoding mailboxEncoding,EventHandler<EventArgs<Exception>> completedAsyncCallback)
+        {
+            if(stream == null){
+                throw new ArgumentNullException("stream");
+            }
+
+            StringBuilder buffer = new StringBuilder();
+            buffer.Append("* " + m_MsgSeqNo + " FETCH (");
+
+            foreach(IMAP_t_Fetch_r_i dataItem in m_pDataItems){
+                if(dataItem is IMAP_t_Fetch_r_i_Flags){
+                    buffer.Append("FLAGS (" + ((IMAP_t_Fetch_r_i_Flags)dataItem).Flags.ToString() + ")");
+                }
+                else{
+                    throw new NotImplementedException("Fetch response data-item '" + dataItem.ToString() + "' not implemented.");
+                }
+            }
+
+            buffer.Append(")\r\n");
+            
+            string responseS = buffer.ToString();
+            byte[] response  = Encoding.UTF8.GetBytes(responseS);
+
+            // Log.
+            if(session != null){
+                session.LogAddWrite(response.Length,responseS.TrimEnd());
+            }
+
+            // Starts writing response to stream.
+            IAsyncResult ar = stream.BeginWrite(
+                response,
+                0,
+                response.Length,
+                delegate(IAsyncResult r){                    
+                    if(r.CompletedSynchronously){
+                        return;
+                    }
+
+                    try{
+                        stream.EndWrite(r);
+
+                        if(completedAsyncCallback != null){
+                            completedAsyncCallback(this,new EventArgs<Exception>(null));
+                        }
+                    }
+                    catch(Exception x){
+                        if(completedAsyncCallback != null){
+                            completedAsyncCallback(this,new EventArgs<Exception>(x));
+                        }
+                    }
+                },
+                null
+            );
+            // Completed synchronously, process result.
+            if(ar.CompletedSynchronously){
+                stream.EndWrite(ar);
+
+                return false;
+            }
+            // Completed asynchronously, stream.BeginWrite AsyncCallback will continue processing.
+            else{
+                return true;
+            }
         }
 
         #endregion
