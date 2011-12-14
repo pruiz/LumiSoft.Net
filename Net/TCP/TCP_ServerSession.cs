@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
+using System.Threading;
 
 using LumiSoft.Net.IO;
 
@@ -151,17 +152,245 @@ namespace LumiSoft.Net.TCP
                 throw new InvalidOperationException("There is no certificate specified.");
             }
 
-            // FIX ME: if ssl switching fails, it closes source stream or otherwise if ssl successful, source stream leaks.
+            ManualResetEvent wait = new ManualResetEvent(false);
+            using(SwitchToSecureAsyncOP op = new SwitchToSecureAsyncOP()){
+                op.CompletedAsync += delegate(object s1,EventArgs<SwitchToSecureAsyncOP> e1){
+                    wait.Set();
+                };
+                if(!this.SwitchToSecureAsync(op)){
+                    wait.Set();
+                }
+                wait.WaitOne();
+                wait.Close();
 
-            SslStream sslStream = new SslStream(m_pTcpStream.SourceStream);
-            sslStream.AuthenticateAsServer(m_pCertificate);
+                if(op.Error != null){
+                    throw op.Error;
+                }
+            }
+        }
 
-            // Close old stream, but leave source stream open.
-            m_pTcpStream.IsOwner = false;
-            m_pTcpStream.Dispose();
+        #endregion
 
-            m_IsSecure   = true;
-            m_pTcpStream = new SmartStream(sslStream,true);
+        #region method SwitchToSecureAsync
+
+        #region class SwitchToSecureAsyncOP
+
+        /// <summary>
+        /// This class represents <see cref="TCP_ServerSession.SwitchToSecureAsync"/> asynchronous operation.
+        /// </summary>
+        public class SwitchToSecureAsyncOP : IDisposable,IAsyncOP
+        {
+            private object            m_pLock         = new object();
+            private bool              m_RiseCompleted = false;
+            private AsyncOP_State     m_State         = AsyncOP_State.WaitingForStart;
+            private Exception         m_pException    = null;
+            private TCP_ServerSession m_pTcpSession   = null;
+            private SslStream         m_pSslStream    = null;
+
+            /// <summary>
+            /// Default constructor.
+            /// </summary>
+            public SwitchToSecureAsyncOP()
+            {
+            }
+
+            #region method Dispose
+
+            /// <summary>
+            /// Cleans up any resource being used.
+            /// </summary>
+            public void Dispose()
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+                SetState(AsyncOP_State.Disposed);
+                
+                m_pException  = null;
+                m_pTcpSession = null;
+                m_pSslStream  = null;
+
+                this.CompletedAsync = null;
+            }
+
+            #endregion
+
+
+            #region method Start
+
+            /// <summary>
+            /// Starts operation processing.
+            /// </summary>
+            /// <param name="owner">Owner TCP session.</param>
+            /// <returns>Returns true if asynchronous operation in progress or false if operation completed synchronously.</returns>
+            /// <exception cref="ArgumentNullException">Is raised when <b>owner</b> is null reference.</exception>
+            internal bool Start(TCP_ServerSession owner)
+            {
+                if(owner == null){
+                    throw new ArgumentNullException("owner");
+                }
+
+                m_pTcpSession = owner;
+
+                SetState(AsyncOP_State.Active);
+
+                try{
+                    m_pSslStream = new SslStream(m_pTcpSession.TcpStream.SourceStream,true);
+                    m_pSslStream.BeginAuthenticateAsServer(m_pTcpSession.m_pCertificate,this.BeginAuthenticateAsServerCompleted,null);
+                }
+                catch(Exception x){
+                    m_pException = x;
+                    SetState(AsyncOP_State.Completed);
+                }
+
+                // Set flag rise CompletedAsync event flag. The event is raised when async op completes.
+                // If already completed sync, that flag has no effect.
+                lock(m_pLock){
+                    m_RiseCompleted = true;
+
+                    return m_State == AsyncOP_State.Active;
+                }
+            }
+
+            #endregion
+
+
+            #region method SetState
+
+            /// <summary>
+            /// Sets operation state.
+            /// </summary>
+            /// <param name="state">New state.</param>
+            private void SetState(AsyncOP_State state)
+            {
+                if(m_State == AsyncOP_State.Disposed){
+                    return;
+                }
+
+                lock(m_pLock){
+                    m_State = state;
+
+                    if(m_State == AsyncOP_State.Completed && m_RiseCompleted){
+                        OnCompletedAsync();
+                    }
+                }
+            }
+
+            #endregion
+
+            #region method BeginAuthenticateAsServerCompleted
+
+            /// <summary>
+            /// This method is called when "BeginAuthenticateAsServer" has completed.
+            /// </summary>
+            /// <param name="ar">Asynchronous result.</param>
+            private void BeginAuthenticateAsServerCompleted(IAsyncResult ar)
+            {
+                try{
+                    m_pSslStream.EndAuthenticateAsServer(ar);
+
+                    // Close old stream, but leave source stream open.
+                    m_pTcpSession.m_pTcpStream.IsOwner = false;
+                    m_pTcpSession.m_pTcpStream.Dispose();
+
+                    m_pTcpSession.m_IsSecure = true;
+                    m_pTcpSession.m_pTcpStream = new SmartStream(m_pSslStream,true);
+                }
+                catch(Exception x){
+                    m_pException = x;                    
+                }
+
+                SetState(AsyncOP_State.Completed);
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets asynchronous operation state.
+            /// </summary>
+            public AsyncOP_State State
+            {
+                get{ return m_State; }
+            }
+
+            /// <summary>
+            /// Gets error happened during operation. Returns null if no error.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public Exception Error
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    return m_pException; 
+                }
+            }
+
+            #endregion
+
+            #region Events implementation
+
+            /// <summary>
+            /// Is called when asynchronous operation has completed.
+            /// </summary>
+            public event EventHandler<EventArgs<SwitchToSecureAsyncOP>> CompletedAsync = null;
+
+            #region method OnCompletedAsync
+
+            /// <summary>
+            /// Raises <b>CompletedAsync</b> event.
+            /// </summary>
+            private void OnCompletedAsync()
+            {
+                if(this.CompletedAsync != null){
+                    this.CompletedAsync(this,new EventArgs<SwitchToSecureAsyncOP>(this));
+                }
+            }
+
+            #endregion
+
+            #endregion
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Starts switching connection to secure.
+        /// </summary>
+        /// <param name="op">Asynchronous operation.</param>
+        /// <returns>Returns true if aynchronous operation is pending (The <see cref="SwitchToSecureAsyncOP.CompletedAsync"/> event is raised upon completion of the operation).
+        /// Returns false if operation completed synchronously.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when connection is already secure or when SSL certificate is not specified.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        public bool SwitchToSecureAsync(SwitchToSecureAsyncOP op)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(this.IsSecureConnection){
+                throw new InvalidOperationException("Connection is already secure.");
+            }            
+            if(m_pCertificate == null){
+                throw new InvalidOperationException("There is no certificate specified.");
+            }
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+            if(op.State != AsyncOP_State.WaitingForStart){
+                throw new ArgumentException("Invalid argument 'op' state, 'op' must be in 'AsyncOP_State.WaitingForStart' state.","op");
+            }
+
+            return op.Start(this);
         }
 
         #endregion
