@@ -834,6 +834,8 @@ namespace LumiSoft.Net.TCP
 
                 m_pTcpClient = owner;
 
+                SetState(AsyncOP_State.Active);
+
                 try{
                     m_pSslStream = new SslStream(m_pTcpClient.m_pTcpStream.SourceStream,false,this.RemoteCertificateValidationCallback);
                     m_pSslStream.BeginAuthenticateAsClient("dummy",this.BeginAuthenticateAsClientCompleted,null);                  
