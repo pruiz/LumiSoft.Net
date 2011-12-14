@@ -38,7 +38,7 @@ namespace LumiSoft.Net.POP3.Server
         /// <summary>
         /// Starts session processing.
         /// </summary>
-        protected internal override void Start()
+        protected override void Start()
         {
             base.Start();
 
