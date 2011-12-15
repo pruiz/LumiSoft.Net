@@ -82,6 +82,10 @@ namespace LumiSoft.Net.IMAP
 
             value = value.Trim();
 
+            if(value.StartsWith("(") && value.EndsWith(")")){
+                value = value.Substring(1,value.Length - 2);
+            }
+
             string[] flags     = new string[0];
             if(!string.IsNullOrEmpty(value)){
                 flags = value.Split(' ');
