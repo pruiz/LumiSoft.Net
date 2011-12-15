@@ -671,9 +671,58 @@ namespace LumiSoft.Net.IMAP.Server
             m_pCapabilities = new List<string>();
             m_pCapabilities.AddRange(new string[]{"IMAP4rev1","NAMESPACE","QUOTA","ACL","IDLE","ENABLE","UTF8=ACCEPT","SASL-IR"});
 
-            m_pResponseSender = new ResponseSender(this); // TODO: Dispose
+            m_pResponseSender = new ResponseSender(this);
         }
 
+        #region override method Dispose
+
+        /// <summary>
+        /// Cleans up any resource being used.
+        /// </summary>
+        public override void Dispose()
+        {
+            if(this.IsDisposed){
+                return;
+            }
+            base.Dispose();
+
+            m_pAuthentications = null;
+            m_pCapabilities = null;
+            m_pUser = null;
+            m_pSelectedFolder = null;
+            if(m_pResponseSender != null){
+                m_pResponseSender.Dispose();
+            }
+
+            // Release events
+            this.Started         = null;
+            this.Login           = null;
+            this.Namespace       = null;
+            this.List            = null;
+            this.Create          = null;
+            this.Delete          = null;
+            this.Rename          = null;
+            this.LSub            = null;
+            this.Subscribe       = null;
+            this.Unsubscribe     = null;
+            this.Select          = null;
+            this.GetMessagesInfo = null;
+            this.Append          = null;
+            this.GetQuotaRoot    = null;
+            this.GetQuota        = null;
+            this.GetAcl          = null;
+            this.SetAcl          = null;
+            this.DeleteAcl       = null;
+            this.ListRights      = null;
+            this.MyRights        = null;
+            this.Fetch           = null;
+            this.Search          = null;
+            this.Store           = null;
+            this.Copy            = null;
+            this.Expunge         = null;
+        }
+
+        #endregion
 
         #region override method Start
 
@@ -3788,6 +3837,45 @@ namespace LumiSoft.Net.IMAP.Server
                 new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"FETCH command completed in %exectime seconds.")
             );
             fetchEArgs.NewMessageData += new EventHandler<IMAP_e_Fetch.e_NewMessageData>(delegate(object s,IMAP_e_Fetch.e_NewMessageData e){
+                /*
+                // Build response data-items.
+                List<IMAP_t_Fetch_r_i> responseItems = new List<IMAP_t_Fetch_r_i>();
+                foreach(IMAP_t_Fetch_i dataItem in dataItems){
+                    if(dataItem is IMAP_t_Fetch_i_BodyS){
+                        //responseItems.Add(new IMAP_t_Fetch_r_i_Uid(e.MessageInfo.UID));
+                    }
+                    else if(dataItem is IMAP_t_Fetch_i_Body){
+                        //responseItems.Add(new IMAP_t_Fetch_r_i_Uid(e.MessageInfo.UID));
+                    }
+                    else if(dataItem is IMAP_t_Fetch_i_BodyStructure){
+                        //responseItems.Add(new IMAP_t_Fetch_r_i_Uid(e.MessageInfo.UID));
+                    }
+                    else if(dataItem is IMAP_t_Fetch_i_Envelope){
+                        //responseItems.Add(new IMAP_t_Fetch_r_i_Uid(e.MessageInfo.UID));
+                    }
+                    else if(dataItem is IMAP_t_Fetch_i_Flags){
+                        responseItems.Add(new IMAP_t_Fetch_r_i_Flags(new IMAP_t_MsgFlags(e.MessageInfo.Flags)));
+                    }
+                    else if(dataItem is IMAP_t_Fetch_i_InternalDate){
+                        responseItems.Add(new IMAP_t_Fetch_r_i_InternalDate(e.MessageInfo.InternalDate));
+                    }
+                    else if(dataItem is IMAP_t_Fetch_i_Rfc822){
+                        //responseItems.Add(new IMAP_t_Fetch_r_i_Uid(e.MessageInfo.UID));
+                    }
+                    else if(dataItem is IMAP_t_Fetch_i_Rfc822Header){
+                        //responseItems.Add(new IMAP_t_Fetch_r_i_Uid(e.MessageInfo.UID));
+                    }
+                    else if(dataItem is IMAP_t_Fetch_i_Rfc822Size){
+                        responseItems.Add(new IMAP_t_Fetch_r_i_Rfc822Size(e.MessageInfo.Size));
+                    }
+                    else if(dataItem is IMAP_t_Fetch_i_Rfc822Text){
+                        //responseItems.Add(new IMAP_t_Fetch_r_i_Uid(e.MessageInfo.UID));
+                    }
+                    else if(dataItem is IMAP_t_Fetch_i_Uid){
+                        responseItems.Add(new IMAP_t_Fetch_r_i_Uid(e.MessageInfo.UID));
+                    }
+                }*/
+
                 StringBuilder reponseBuffer = new StringBuilder();
                 reponseBuffer.Append("* " + e.MessageInfo.SeqNo + " FETCH (");
 
@@ -4527,7 +4615,7 @@ namespace LumiSoft.Net.IMAP.Server
                             new IMAP_r_u_Fetch(
                                 m_pSelectedFolder.GetSeqNo(msgInfo),
                                 new IMAP_t_Fetch_r_i[]{
-                                    new IMAP_t_Fetch_r_i_Flags(new IMAP_t_MsgFlags(msgInfo.Flags)),
+                                    new IMAP_t_Fetch_r_i_Flags(IMAP_t_MsgFlags.Parse(msgInfo.FlagsToImapString())),
                                     new IMAP_t_Fetch_r_i_Uid(msgInfo.UID)
                                 }
                             )

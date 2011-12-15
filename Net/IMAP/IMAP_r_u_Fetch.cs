@@ -122,9 +122,18 @@ namespace LumiSoft.Net.IMAP
             StringBuilder buffer = new StringBuilder();
             buffer.Append("* " + m_MsgSeqNo + " FETCH (");
 
-            foreach(IMAP_t_Fetch_r_i dataItem in m_pDataItems){
+            for(int i=0;i<m_pDataItems.Count;i++){
+                IMAP_t_Fetch_r_i dataItem = m_pDataItems[i];
+
+                if(i > 0){
+                    buffer.Append(" ");
+                }
+
                 if(dataItem is IMAP_t_Fetch_r_i_Flags){
                     buffer.Append("FLAGS (" + ((IMAP_t_Fetch_r_i_Flags)dataItem).Flags.ToString() + ")");
+                }
+                else if(dataItem is IMAP_t_Fetch_r_i_Uid){
+                    buffer.Append("UID " + ((IMAP_t_Fetch_r_i_Uid)dataItem).UID.ToString());
                 }
                 else{
                     throw new NotImplementedException("Fetch response data-item '" + dataItem.ToString() + "' not implemented.");
