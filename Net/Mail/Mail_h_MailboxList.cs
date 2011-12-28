@@ -111,6 +111,10 @@ namespace LumiSoft.Net.Mail
                         retVal.Append(m_pAddresses[i].ToString(wordEncoder) + ",\r\n");
                     }
                 }
+                // No items, we need to add ending CRLF.
+                if(m_pAddresses.Count == 0){
+                    retVal.Append("\r\n");
+                }
 
                 return retVal.ToString();
             }
