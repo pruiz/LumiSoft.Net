@@ -186,7 +186,7 @@ namespace LumiSoft.Net.MIME
         /// <summary>
         /// Gets all MIME entities as list.
         /// </summary>
-        /// <param name="includeEmbbedMessage">If true, then embbed RFC822 message child entities as included.</param>
+        /// <param name="includeEmbbedMessage">If true, then embbed RFC822 message child entities are included.</param>
         /// <returns>Returns all MIME entities as list.</returns>
         /// <exception cref="ObjectDisposedException">Is raised when this class is disposed and this method is accessed.</exception>
         public MIME_Entity[] GetAllEntities(bool includeEmbbedMessage)

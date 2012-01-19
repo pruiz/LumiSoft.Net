@@ -179,12 +179,24 @@ namespace LumiSoft.Net.Mail
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
         public MIME_Entity[] GetAttachments(bool includeInline)
         {
+            return GetAttachments(includeInline,true);
+        }
+
+        /// <summary>
+        /// Gets this message attachments.
+        /// </summary>
+        /// <param name="includeInline">Specifies if 'inline' entities are included.</param>
+        /// <param name="includeEmbbedMessage">Specifies if embbed RFC822 message child entities are included.</param>
+        /// <returns>Returns this message attachments.</returns>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this method is accessed.</exception>
+        public MIME_Entity[] GetAttachments(bool includeInline,bool includeEmbbedMessage)
+        {
             if(this.IsDisposed){
                 throw new ObjectDisposedException(this.GetType().Name);
             }
 
             List<MIME_Entity> retVal = new List<MIME_Entity>();
-            foreach(MIME_Entity entity in this.AllEntities){
+            foreach(MIME_Entity entity in GetAllEntities(includeEmbbedMessage)){
                 MIME_h_ContentType contentType= null;
                 try{
                     contentType = entity.ContentType;
