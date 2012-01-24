@@ -786,7 +786,7 @@ namespace LumiSoft.Net.FTP.Client
                 ms.Position = 0;
                 SmartStream listStream =  new SmartStream(ms,true);
                                             
-                string[] winDateFormats = new string[]{"M-d-yy h:mmtt"};
+                string[] winDateFormats = new string[]{"M-d-yy h:mmtt","MM-dd-yy HH:mm"};
                 string[] unixFormats    = new string[]{"MMM d H:mm","MMM d yyyy"};
 
                 SmartStream.ReadLineAsyncOP args = new SmartStream.ReadLineAsyncOP(new byte[8000],SizeExceededAction.JunkAndThrowException);
@@ -805,7 +805,7 @@ namespace LumiSoft.Net.FTP.Client
                     if(line != null){
                         StringReader r = new StringReader(line);
                         DateTime modified;
-                        if(DateTime.TryParseExact(r.ReadWord() + " " + r.ReadWord(),new string[]{"MM-dd-yy hh:mmtt"},System.Globalization.DateTimeFormatInfo.InvariantInfo,System.Globalization.DateTimeStyles.None,out modified)){
+                        if(DateTime.TryParseExact(r.ReadWord() + " " + r.ReadWord(),winDateFormats,System.Globalization.DateTimeFormatInfo.InvariantInfo,System.Globalization.DateTimeStyles.None,out modified)){
                             listingType = "win";
                         }
                     }
