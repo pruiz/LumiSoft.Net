@@ -408,6 +408,7 @@ namespace LumiSoft.Net.SMTP.Relay
             if(m_pTargets.Count == 0){
                 LogText("No relay target(s) for '" + m_pRelayItem.To + "', aborting.");
                 Dispose(new Exception("No relay target(s) for '" + m_pRelayItem.To + "', aborting."));
+
                 return;
             }
 
@@ -922,7 +923,7 @@ namespace LumiSoft.Net.SMTP.Relay
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                return m_pLocalBindInfo.HostName; 
+                return (m_pLocalBindInfo == null ? "" : m_pLocalBindInfo.HostName); 
             }
         }
 
