@@ -3525,7 +3525,7 @@ namespace LumiSoft.Net.IMAP.Client
                         // IMAP server returned success response.
                         else{
                             // Mark folder as read-only if optional response code "READ-ONLY" specified.
-                            if(m_pFinalResponse.OptionalResponseCode != null && m_pFinalResponse.OptionalResponseCode.Equals("READ-ONLY",StringComparison.InvariantCultureIgnoreCase)){
+                            if(m_pFinalResponse.OptionalResponse != null && m_pFinalResponse.OptionalResponse is IMAP_t_orc_ReadOnly){
                                m_pImapClient.m_pSelectedFolder.SetReadOnly(true);
                             }
                         }
@@ -3890,7 +3890,7 @@ namespace LumiSoft.Net.IMAP.Client
                         // IMAP server returned success response.
                         else{
                             // Mark folder as read-only if optional response code "READ-ONLY" specified.
-                            if(m_pFinalResponse.OptionalResponseCode != null && m_pFinalResponse.OptionalResponseCode.Equals("READ-ONLY",StringComparison.InvariantCultureIgnoreCase)){
+                            if(m_pFinalResponse.OptionalResponse != null && m_pFinalResponse.OptionalResponse is IMAP_t_orc_ReadOnly){
                                m_pImapClient.m_pSelectedFolder.SetReadOnly(true);
                             }
                         }
@@ -8763,37 +8763,35 @@ namespace LumiSoft.Net.IMAP.Client
 
                                 // Process optional response-codes(7.2). ALERT,BADCHARSET,CAPABILITY,PARSE,PERMANENTFLAGS,READ-ONLY,
                                 // READ-WRITE,TRYCREATE,UIDNEXT,UIDVALIDITY,UNSEEN                                
-                                if(!string.IsNullOrEmpty(statusResponse.OptionalResponseCode)){
-                                    if(statusResponse.OptionalResponseCode.Equals("PERMANENTFLAGS",StringComparison.InvariantCultureIgnoreCase)){
+                                if(statusResponse.OptionalResponse != null){
+                                    if(statusResponse.OptionalResponse is IMAP_t_orc_PermanentFlags){
                                         if(m_pImapClient.SelectedFolder != null){
-                                            StringReader r = new StringReader(statusResponse.OptionalResponseArgs);
-
-                                            m_pImapClient.SelectedFolder.SetPermanentFlags(r.ReadParenthesized().Split(' '));
+                                            m_pImapClient.SelectedFolder.SetPermanentFlags(((IMAP_t_orc_PermanentFlags)statusResponse.OptionalResponse).Flags);
                                         }
                                     }
-                                    else if(statusResponse.OptionalResponseCode.Equals("READ-ONLY",StringComparison.InvariantCultureIgnoreCase)){
+                                    else if(statusResponse.OptionalResponse is IMAP_t_orc_ReadOnly){
                                         if(m_pImapClient.SelectedFolder != null){
                                             m_pImapClient.SelectedFolder.SetReadOnly(true);
                                         }
                                     }
-                                    else if(statusResponse.OptionalResponseCode.Equals("READ-WRITE",StringComparison.InvariantCultureIgnoreCase)){
+                                    else if(statusResponse.OptionalResponse is IMAP_t_orc_ReadWrite){
                                         if(m_pImapClient.SelectedFolder != null){
                                             m_pImapClient.SelectedFolder.SetReadOnly(true);
                                         }
                                     }
-                                    else if(statusResponse.OptionalResponseCode.Equals("UIDNEXT",StringComparison.InvariantCultureIgnoreCase)){
+                                    else if(statusResponse.OptionalResponse is IMAP_t_orc_UidNext){
                                         if(m_pImapClient.SelectedFolder != null){
-                                            m_pImapClient.SelectedFolder.SetUidNext(Convert.ToInt64(statusResponse.OptionalResponseArgs));
+                                            m_pImapClient.SelectedFolder.SetUidNext(((IMAP_t_orc_UidNext)statusResponse.OptionalResponse).UidNext);
                                         }
                                     }
-                                    else if(statusResponse.OptionalResponseCode.Equals("UIDVALIDITY",StringComparison.InvariantCultureIgnoreCase)){
+                                    else if(statusResponse.OptionalResponse is IMAP_t_orc_UidValidity){
                                         if(m_pImapClient.SelectedFolder != null){
-                                            m_pImapClient.SelectedFolder.SetUidValidity(Convert.ToInt64(statusResponse.OptionalResponseArgs));
+                                            m_pImapClient.SelectedFolder.SetUidValidity(((IMAP_t_orc_UidValidity)statusResponse.OptionalResponse).Uid);
                                         }
                                     }
-                                    else if(statusResponse.OptionalResponseCode.Equals("UNSEEN",StringComparison.InvariantCultureIgnoreCase)){
+                                    else if(statusResponse.OptionalResponse is IMAP_t_orc_Unseen){
                                         if(m_pImapClient.SelectedFolder != null){
-                                            m_pImapClient.SelectedFolder.SetFirstUnseen(Convert.ToInt32(statusResponse.OptionalResponseArgs));
+                                            m_pImapClient.SelectedFolder.SetFirstUnseen(((IMAP_t_orc_Unseen)statusResponse.OptionalResponse).SeqNo);
                                         }
                                     }
                                     // We don't care about other response codes.                            
@@ -8974,7 +8972,7 @@ namespace LumiSoft.Net.IMAP.Client
                         }
                         // Command continuation response.
                         else if(responseLine.StartsWith("+")){
-                            m_pResponse = new IMAP_r_ServerStatus("+","+",null,null,"+");
+                            m_pResponse = IMAP_r_ServerStatus.Parse(responseLine);
                         }
                         // Completion status response.
                         else{
@@ -10180,7 +10178,7 @@ namespace LumiSoft.Net.IMAP.Client
                 }
                 // Command continuation response.
                 else if(responseLine.StartsWith("+")){
-                    return new IMAP_r_ServerStatus("+","+",null,null,"+");
+                    return new IMAP_r_ServerStatus("+","+","+");
                 }
                 // Completion status response.
                 else{

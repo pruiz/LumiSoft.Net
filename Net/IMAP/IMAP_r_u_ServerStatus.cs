@@ -9,10 +9,9 @@ namespace LumiSoft.Net.IMAP
     /// </summary>
     public class IMAP_r_u_ServerStatus : IMAP_r_u
     {
-        private string m_ResponseCode         = "";
-        private string m_OptionalResponseCode = null;
-        private string m_OptionalResponseArgs = null;
-        private string m_ResponseText         = "";
+        private string     m_ResponseCode      = "";
+        private IMAP_t_orc m_pOptionalResponse = null;
+        private string     m_ResponseText      = "";
 
         /// <summary>
         /// Default constructor.
@@ -21,7 +20,7 @@ namespace LumiSoft.Net.IMAP
         /// <param name="responseText">Response text after response-code.</param>
         /// <exception cref="ArgumentNullException">Is raised when <b>responseCode</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        public IMAP_r_u_ServerStatus(string responseCode,string responseText) : this(responseCode,null,null,responseText)
+        public IMAP_r_u_ServerStatus(string responseCode,string responseText) : this(responseCode,null,responseText)
         {
         }
 
@@ -29,12 +28,11 @@ namespace LumiSoft.Net.IMAP
         /// Default constructor.
         /// </summary>
         /// <param name="responseCode">Response code.</param>
-        /// <param name="optResponseCode">Optional response code(Response code between []).</param>
-        /// <param name="optResponseArgs">Optional response arguments string.</param>
+        /// <param name="optionalResponse">Optional response. Value null means not specified.</param>
         /// <param name="responseText">Response text after response-code.</param>
-        /// <exception cref="ArgumentNullException">Is raised when <b>responseCode</b> is null reference.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when<b>responseCode</b> or <b>responseText</b> is null reference.</exception>
         /// <exception cref="ArgumentException">Is raised when any of the arguments has invalid value.</exception>
-        public IMAP_r_u_ServerStatus(string responseCode,string optResponseCode,string optResponseArgs,string responseText)
+        public IMAP_r_u_ServerStatus(string responseCode,IMAP_t_orc optionalResponse,string responseText)
         {
             if(responseCode == null){
                 throw new ArgumentNullException("responseCode");
@@ -43,10 +41,9 @@ namespace LumiSoft.Net.IMAP
                 throw new ArgumentException("The argument 'responseCode' value must be specified.","responseCode");
             }
 
-            m_ResponseCode         = responseCode;
-            m_OptionalResponseCode = optResponseCode;
-            m_OptionalResponseArgs = optResponseArgs;
-            m_ResponseText         = responseText;
+            m_ResponseCode      = responseCode;
+            m_pOptionalResponse = optionalResponse;
+            m_ResponseText      = responseText;
         }
 
 
@@ -64,25 +61,20 @@ namespace LumiSoft.Net.IMAP
                 throw new ArgumentNullException("responseLine");
             }
 
-            string[] parts           = responseLine.Split(new char[]{' '},3);
-            string   commandTag      = parts[0];
-            string   responseCode    = parts[1];
-            string   optResponseCode = null;
-            string   optResponseArgs = null;
-            string   responseText    = parts[2];
+            string[]   parts        = responseLine.Split(new char[]{' '},3);
+            string     commandTag   = parts[0];
+            string     responseCode = parts[1];
+            IMAP_t_orc optResponse  = null;
+            string     responseText = parts[2];
 
             // Optional status code.
             if(parts[2].StartsWith("[")){
                 StringReader r = new StringReader(parts[2]);
-                string[] code_args = r.ReadParenthesized().Split(new char[]{' '},2);
-                optResponseCode = code_args[0];
-                if(code_args.Length == 2){
-                    optResponseArgs = code_args[1];
-                }
-                responseText    = r.ReadToEnd();
+                optResponse  = IMAP_t_orc.Parse(r.ReadParenthesized());
+                responseText = r.ReadToEnd();
             }
 
-            return new IMAP_r_u_ServerStatus(responseCode,optResponseCode,optResponseArgs,responseText);
+            return new IMAP_r_u_ServerStatus(responseCode,optResponse,responseText);
         }
 
         #endregion
@@ -97,13 +89,9 @@ namespace LumiSoft.Net.IMAP
         public override string ToString()
         {
             StringBuilder retVal = new StringBuilder();
-            retVal.Append("* " + m_ResponseCode + " ");
-            if(!string.IsNullOrEmpty(m_OptionalResponseCode)){
-                retVal.Append("[" + m_OptionalResponseCode);
-                if(!string.IsNullOrEmpty(m_OptionalResponseArgs)){
-                    retVal.Append(" " + m_OptionalResponseArgs);
-                }
-                retVal.Append("] ");
+            retVal.Append("* " + m_ResponseCode + " ");            
+            if(m_pOptionalResponse != null){
+                retVal.Append("[" + m_pOptionalResponse.ToString() + "] ");
             }
             retVal.Append(m_ResponseText + "\r\n");
 
@@ -124,23 +112,13 @@ namespace LumiSoft.Net.IMAP
         }
 
         /// <summary>
-        /// Gets IMAP server status response optiona response-code(ALERT,BADCHARSET,CAPABILITY,PARSE,PERMANENTFLAGS,
-        /// READ-ONLY,READ-WRITE,TRYCREATE,UIDNEXT,UIDVALIDITY,UNSEEN).
-        /// Value null means not specified. For more info see RFC 3501 7.1.
+        /// Gets IMAP server otional response-code. Value null means no optional response.
         /// </summary>
-        public string OptionalResponseCode
+        public IMAP_t_orc OptionalResponse
         {
-            get{ return m_OptionalResponseCode; }
+            get{ return m_pOptionalResponse; }
         }
-
-        /// <summary>
-        /// Gets optional response aruments string. Value null means not specified. For more info see RFC 3501 7.1.
-        /// </summary>
-        public string OptionalResponseArgs
-        {
-            get{ return m_OptionalResponseArgs; }
-        }
-
+                
         /// <summary>
         /// Gets response human readable text after response-code.
         /// </summary>
@@ -155,6 +133,47 @@ namespace LumiSoft.Net.IMAP
         public bool IsError
         {
             get{ return !m_ResponseCode.Equals("OK",StringComparison.InvariantCultureIgnoreCase); }
+        }
+
+        #endregion
+
+
+        #region Obsolete
+
+        /// <summary>
+        /// Gets IMAP server status response optiona response-code(ALERT,BADCHARSET,CAPABILITY,PARSE,PERMANENTFLAGS,
+        /// READ-ONLY,READ-WRITE,TRYCREATE,UIDNEXT,UIDVALIDITY,UNSEEN).
+        /// Value null means not specified. For more info see RFC 3501 7.1.
+        /// </summary>
+        [Obsolete("Use property OptionalResponse instead.")]
+        public string OptionalResponseCode
+        {
+            get{ 
+                if(m_pOptionalResponse == null){
+                    return null;
+                }
+                else{
+                    return m_pOptionalResponse.ToString().Split(' ')[0];
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets optional response aruments string. Value null means not specified. For more info see RFC 3501 7.1.
+        /// </summary>
+        [Obsolete("Use property OptionalResponse instead.")]
+        public string OptionalResponseArgs
+        {
+            get{ 
+                if(m_pOptionalResponse == null){
+                    return null;
+                }
+                else{
+                    string[] code_args = m_pOptionalResponse.ToString().Split(new char[]{' '},2);
+
+                    return code_args.Length == 2 ? code_args[1] : "";
+                }
+            }
         }
 
         #endregion

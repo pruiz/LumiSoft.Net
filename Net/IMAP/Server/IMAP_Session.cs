@@ -747,10 +747,10 @@ namespace LumiSoft.Net.IMAP.Server
             try{
                 IMAP_r_u_ServerStatus response = null;
                 if(string.IsNullOrEmpty(this.Server.GreetingText)){
-                    response = new IMAP_r_u_ServerStatus("OK",null,null,"<" + Net_Utils.GetLocalHostName(this.LocalHostName) + "> IMAP4rev1 server ready.");
+                    response = new IMAP_r_u_ServerStatus("OK","<" + Net_Utils.GetLocalHostName(this.LocalHostName) + "> IMAP4rev1 server ready.");
                 }
                 else{
-                    response = new IMAP_r_u_ServerStatus("OK",null,null,this.Server.GreetingText);
+                    response = new IMAP_r_u_ServerStatus("OK",this.Server.GreetingText);
                 }
                 
                 IMAP_e_Started e = OnStarted(response);
@@ -2391,7 +2391,7 @@ namespace LumiSoft.Net.IMAP.Server
             if(args.Length >= 2){
                 // At moment we don't support UTF-8 mailboxes.
                 if(string.Equals(args[1],"(UTF8)",StringComparison.InvariantCultureIgnoreCase)){
-                    m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus(cmdTag,"NO","NOT-UTF-8",null,"Mailbox does not support UTF-8 access."));
+                    m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus(cmdTag,"NO",new IMAP_t_orc_Unknown("NOT-UTF-8"),"Mailbox does not support UTF-8 access."));
                 }
                 else{
                     m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus(cmdTag,"BAD","Error in arguments."));
@@ -2410,13 +2410,13 @@ namespace LumiSoft.Net.IMAP.Server
                     m_pResponseSender.SendResponseAsync(new IMAP_r_u_Exists(eMessagesInfo.Exists));
                     m_pResponseSender.SendResponseAsync(new IMAP_r_u_Recent(eMessagesInfo.Recent));
                     if(eMessagesInfo.FirstUnseen > -1){
-                        m_pResponseSender.SendResponseAsync(new IMAP_r_u_ServerStatus("OK","UNSEEN",eMessagesInfo.FirstUnseen.ToString(),"Message " + eMessagesInfo.FirstUnseen + " is the first unseen."));
+                        m_pResponseSender.SendResponseAsync(new IMAP_r_u_ServerStatus("OK",new IMAP_t_orc_Unseen(eMessagesInfo.FirstUnseen),"Message " + eMessagesInfo.FirstUnseen + " is the first unseen."));
                     }
-                    m_pResponseSender.SendResponseAsync(new IMAP_r_u_ServerStatus("OK","UIDNEXT",eMessagesInfo.UidNext.ToString(),"Predicted next message UID."));
-                    m_pResponseSender.SendResponseAsync(new IMAP_r_u_ServerStatus("OK","UIDVALIDITY",e.FolderUID.ToString(),"Folder UID value."));
+                    m_pResponseSender.SendResponseAsync(new IMAP_r_u_ServerStatus("OK",new IMAP_t_orc_UidNext((int)eMessagesInfo.UidNext),"Predicted next message UID."));
+                    m_pResponseSender.SendResponseAsync(new IMAP_r_u_ServerStatus("OK",new IMAP_t_orc_UidValidity(e.FolderUID),"Folder UID value."));
                     m_pResponseSender.SendResponseAsync(new IMAP_r_u_Flags(e.Flags.ToArray()));
-                    m_pResponseSender.SendResponseAsync(new IMAP_r_u_ServerStatus("OK","PERMANENTFLAGS","(" + Net_Utils.ArrayToString(e.PermanentFlags.ToArray()," ") + ")","Avaliable permanent flags."));
-                    m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus(cmdTag,"OK",(e.IsReadOnly ? "READ-ONLY" : "READ-WRITE"),"","SELECT completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds."));
+                    m_pResponseSender.SendResponseAsync(new IMAP_r_u_ServerStatus("OK",new IMAP_t_orc_PermanentFlags(e.PermanentFlags.ToArray()),"Avaliable permanent flags."));
+                    m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus(cmdTag,"OK",new IMAP_t_orc_Unknown(e.IsReadOnly ? "READ-ONLY" : "READ-WRITE"),"SELECT completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds."));
 
                     m_pSelectedFolder = new _SelectedFolder(folder,e.IsReadOnly,eMessagesInfo.MessagesInfo);
                     m_pSelectedFolder.Reindex();
@@ -2523,7 +2523,7 @@ namespace LumiSoft.Net.IMAP.Server
             if(args.Length >= 2){
                 // At moment we don't support UTF-8 mailboxes.
                 if(string.Equals(args[1],"(UTF8)",StringComparison.InvariantCultureIgnoreCase)){
-                    m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus(cmdTag,"NO","NOT-UTF-8",null,"Mailbox does not support UTF-8 access."));
+                    m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus(cmdTag,"NO",new IMAP_t_orc_Unknown("NOT-UTF-8"),"Mailbox does not support UTF-8 access."));
                 }
                 else{
                     m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus(cmdTag,"BAD","Error in arguments."));
@@ -2541,13 +2541,13 @@ namespace LumiSoft.Net.IMAP.Server
                 m_pResponseSender.SendResponseAsync(new IMAP_r_u_Exists(eMessagesInfo.Exists));
                 m_pResponseSender.SendResponseAsync(new IMAP_r_u_Recent(eMessagesInfo.Recent));
                 if(eMessagesInfo.FirstUnseen > -1){
-                    m_pResponseSender.SendResponseAsync(new IMAP_r_u_ServerStatus("OK","UNSEEN",eMessagesInfo.FirstUnseen.ToString(),"Message " + eMessagesInfo.FirstUnseen + " is the first unseen."));
+                    m_pResponseSender.SendResponseAsync(new IMAP_r_u_ServerStatus("OK",new IMAP_t_orc_Unseen(eMessagesInfo.FirstUnseen),"Message " + eMessagesInfo.FirstUnseen + " is the first unseen."));
                 }
-                m_pResponseSender.SendResponseAsync(new IMAP_r_u_ServerStatus("OK","UIDNEXT",eMessagesInfo.UidNext.ToString(),"Predicted next message UID."));
-                m_pResponseSender.SendResponseAsync(new IMAP_r_u_ServerStatus("OK","UIDVALIDITY",e.FolderUID.ToString(),"Folder UID value."));
+                m_pResponseSender.SendResponseAsync(new IMAP_r_u_ServerStatus("OK",new IMAP_t_orc_UidNext((int)eMessagesInfo.UidNext),"Predicted next message UID."));
+                m_pResponseSender.SendResponseAsync(new IMAP_r_u_ServerStatus("OK",new IMAP_t_orc_UidValidity(e.FolderUID),"Folder UID value."));
                 m_pResponseSender.SendResponseAsync(new IMAP_r_u_Flags(e.Flags.ToArray()));
-                m_pResponseSender.SendResponseAsync(new IMAP_r_u_ServerStatus("OK","PERMANENTFLAGS","(" + Net_Utils.ArrayToString(e.PermanentFlags.ToArray()," ") + ")","Avaliable permanent flags."));
-                m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus(cmdTag,"OK","READ-ONLY","","EXAMINE completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds."));
+                m_pResponseSender.SendResponseAsync(new IMAP_r_u_ServerStatus("OK",new IMAP_t_orc_PermanentFlags(e.PermanentFlags.ToArray()),"Avaliable permanent flags."));
+                m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus(cmdTag,"OK",new IMAP_t_orc_ReadOnly(),"EXAMINE completed in " + ((DateTime.Now.Ticks - startTime) / (decimal)10000000).ToString("f2") + " seconds."));
 
                 m_pSelectedFolder = new _SelectedFolder(folder,e.IsReadOnly,eMessagesInfo.MessagesInfo);
                 m_pSelectedFolder.Reindex();
@@ -2679,7 +2679,7 @@ namespace LumiSoft.Net.IMAP.Server
 
             #endregion
 
-            IMAP_e_Append e = OnAppend(folder,flags.ToArray(),date,size,new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"APPEND command completed in %exectime seconds."));
+            IMAP_e_Append e = OnAppend(folder,flags.ToArray(),date,size,new IMAP_r_ServerStatus(cmdTag,"OK","APPEND command completed in %exectime seconds."));
             
             if(e.Response.IsError){
                 m_pResponseSender.SendResponseAsync(e.Response);
@@ -2770,7 +2770,7 @@ namespace LumiSoft.Net.IMAP.Server
             
             string folder = IMAP_Utils.DecodeMailbox(TextUtils.UnQuoteString(cmdText));
 
-            IMAP_e_GetQuotaRoot e = OnGetGuotaRoot(folder,new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"GETQUOTAROOT command completed."));
+            IMAP_e_GetQuotaRoot e = OnGetGuotaRoot(folder,new IMAP_r_ServerStatus(cmdTag,"OK","GETQUOTAROOT command completed."));
 
             if(e.QuotaRootResponses.Count > 0){
                 foreach(IMAP_r_u_QuotaRoot r in e.QuotaRootResponses){
@@ -2817,7 +2817,7 @@ namespace LumiSoft.Net.IMAP.Server
 
             string quotaRoot = IMAP_Utils.DecodeMailbox(TextUtils.UnQuoteString(cmdText));
 
-            IMAP_e_GetQuota e = OnGetQuota(quotaRoot,new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"QUOTA command completed."));
+            IMAP_e_GetQuota e = OnGetQuota(quotaRoot,new IMAP_r_ServerStatus(cmdTag,"OK","QUOTA command completed."));
             if(e.QuotaResponses.Count > 0){
                 foreach(IMAP_r_u_Quota r in e.QuotaResponses){
                     m_pResponseSender.SendResponseAsync(r);
@@ -2875,7 +2875,7 @@ namespace LumiSoft.Net.IMAP.Server
 
             string folder = IMAP_Utils.DecodeMailbox(TextUtils.UnQuoteString(cmdText));
 
-            IMAP_e_GetAcl e = OnGetAcl(folder,new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"GETACL command completed."));
+            IMAP_e_GetAcl e = OnGetAcl(folder,new IMAP_r_ServerStatus(cmdTag,"OK","GETACL command completed."));
             if(e.AclResponses.Count > 0){
                 foreach(IMAP_r_u_Acl r in e.AclResponses){
                     m_pResponseSender.SendResponseAsync(r);
@@ -2958,7 +2958,7 @@ namespace LumiSoft.Net.IMAP.Server
                 IMAP_Utils.DecodeMailbox(parts[1]),
                 setType,
                 rights,
-                new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"SETACL command completed.")
+                new IMAP_r_ServerStatus(cmdTag,"OK","SETACL command completed.")
             );
             m_pResponseSender.SendResponseAsync(e.Response);
         }
@@ -3011,7 +3011,7 @@ namespace LumiSoft.Net.IMAP.Server
             IMAP_e_DeleteAcl e = OnDeleteAcl(
                 IMAP_Utils.DecodeMailbox(parts[0]),
                 IMAP_Utils.DecodeMailbox(parts[1]),
-                new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"DELETEACL command completed.")
+                new IMAP_r_ServerStatus(cmdTag,"OK","DELETEACL command completed.")
             );
             m_pResponseSender.SendResponseAsync(e.Response);
         }
@@ -3075,7 +3075,7 @@ namespace LumiSoft.Net.IMAP.Server
             IMAP_e_ListRights e = OnListRights(
                 IMAP_Utils.DecodeMailbox(parts[0]),
                 IMAP_Utils.DecodeMailbox(parts[1]),
-                new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"LISTRIGHTS command completed.")
+                new IMAP_r_ServerStatus(cmdTag,"OK","LISTRIGHTS command completed.")
             );
 
             
@@ -3121,7 +3121,7 @@ namespace LumiSoft.Net.IMAP.Server
             
             string folder = IMAP_Utils.DecodeMailbox(TextUtils.UnQuoteString(cmdText));
 
-            IMAP_e_MyRights e = OnMyRights(folder,new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"MYRIGHTS command completed."));
+            IMAP_e_MyRights e = OnMyRights(folder,new IMAP_r_ServerStatus(cmdTag,"OK","MYRIGHTS command completed."));
             if(e.MyRightsResponse != null){
                 m_pResponseSender.SendResponseAsync(e.MyRightsResponse);
             }
@@ -3834,7 +3834,7 @@ namespace LumiSoft.Net.IMAP.Server
             IMAP_e_Fetch fetchEArgs = new IMAP_e_Fetch(
                 m_pSelectedFolder.Filter(uid,seqSet),
                 fetchDataType,
-                new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"FETCH command completed in %exectime seconds.")
+                new IMAP_r_ServerStatus(cmdTag,"OK","FETCH command completed in %exectime seconds.")
             );
             fetchEArgs.NewMessageData += new EventHandler<IMAP_e_Fetch.e_NewMessageData>(delegate(object s,IMAP_e_Fetch.e_NewMessageData e){
                 /*
@@ -4413,14 +4413,14 @@ namespace LumiSoft.Net.IMAP.Server
             cmdReader.Start();
 
             StringReader r = new StringReader(cmdReader.CmdLine);
-
+            
             // See if we have optional CHARSET argument.
             if(r.StartsWith("CHARSET",false)){
                 r.ReadWord();
 
                 string charset = r.ReadWord();
                 if(!(string.Equals(charset,"US-ASCII",StringComparison.InvariantCultureIgnoreCase) || string.Equals(charset,"UTF-8",StringComparison.InvariantCultureIgnoreCase))){
-                    m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus(cmdTag,"NO","BADCHARSET","(US-ASCII UTF-8)","Not supported charset."));
+                    m_pResponseSender.SendResponseAsync(new IMAP_r_ServerStatus(cmdTag,"NO",new IMAP_t_orc_BadCharset(new string[]{"US-ASCII","UTF-8"}),"Not supported charset."));
 
                     return;
                 }
@@ -4597,7 +4597,7 @@ namespace LumiSoft.Net.IMAP.Server
 
             #endregion
 
-            IMAP_r_ServerStatus response = new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"STORE command completed in %exectime seconds.");
+            IMAP_r_ServerStatus response = new IMAP_r_ServerStatus(cmdTag,"OK","STORE command completed in %exectime seconds.");
             foreach(IMAP_MessageInfo msgInfo in m_pSelectedFolder.Filter(uid,seqSet)){
                 IMAP_e_Store e = OnStore(msgInfo,setType,flags.ToArray(),response);
                 response = e.Response;
@@ -4708,7 +4708,7 @@ namespace LumiSoft.Net.IMAP.Server
             IMAP_e_Copy e = OnCopy(
                 targetFolder,
                 m_pSelectedFolder.Filter(uid,seqSet),
-                new IMAP_r_ServerStatus(cmdTag,"OK",null,null,"COPY completed.")
+                new IMAP_r_ServerStatus(cmdTag,"OK","COPY completed.")
             );
             m_pResponseSender.SendResponseAsync(e.Response);
         }
