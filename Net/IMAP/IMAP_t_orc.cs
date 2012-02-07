@@ -57,6 +57,13 @@ namespace LumiSoft.Net.IMAP
             else if(string.Equals("UNSEEN",responseCode,StringComparison.InvariantCultureIgnoreCase)){
                 return IMAP_t_orc_Unseen.Parse(value);
             }
+            //---------------------
+            else if(string.Equals("APPENDUID",responseCode,StringComparison.InvariantCultureIgnoreCase)){
+                return IMAP_t_orc_AppendUid.Parse(value);
+            }
+            else if(string.Equals("COPYUID",responseCode,StringComparison.InvariantCultureIgnoreCase)){
+                return IMAP_t_orc_CopyUid.Parse(value);
+            }
             else{
                 return IMAP_t_orc_Unknown.Parse(value);
             }
