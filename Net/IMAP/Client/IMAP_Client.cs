@@ -5357,6 +5357,46 @@ namespace LumiSoft.Net.IMAP.Client
             }
         }
 
+        /// <summary>
+        /// Stores specified message to the specified folder.
+        /// </summary>
+        /// <param name="op">Store message operation.</param>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state. For example 'not connected'.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        public void StoreMessage(StoreMessageAsyncOP op)
+        {
+            if(this.IsDisposed){
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+            if(!this.IsConnected){
+                throw new InvalidOperationException("Not connected, you need to connect first.");
+            }
+            if(!this.IsAuthenticated){
+                throw new InvalidOperationException("Not authenticated, you need to authenticate first.");
+            }            
+            if(m_pIdle != null){
+                throw new InvalidOperationException("This command is not valid in IDLE state, you need stop idling before calling this command.");
+            }
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+
+            using(ManualResetEvent wait = new ManualResetEvent(false)){
+                op.CompletedAsync += delegate(object s1,EventArgs<StoreMessageAsyncOP> e1){
+                    wait.Set();
+                };
+                if(!this.StoreMessageAsync(op)){
+                    wait.Set();
+                }
+                wait.WaitOne();
+
+                if(op.Error != null){
+                    throw op.Error;
+                }
+            }
+        }
+
         #endregion
 
         #region method StoreMessageAsync
@@ -5676,6 +5716,12 @@ namespace LumiSoft.Net.IMAP.Client
                             if(args.Error != null){
                                 m_pException = args.Error;
                             }
+                            else{                                
+                                if(args.FinalResponse.IsError){
+                                    m_pException = new IMAP_ClientException(args.FinalResponse);
+                                }
+                                m_pFinalResponse = args.FinalResponse;
+                            }
 
                             SetState(AsyncOP_State.Completed);
                         };
@@ -5683,6 +5729,12 @@ namespace LumiSoft.Net.IMAP.Client
                         if(!m_pImapClient.SendCmdAndReadRespAsync(args)){
                             if(args.Error != null){
                                 m_pException = args.Error;
+                            }
+                            else{
+                                if(args.FinalResponse.IsError){
+                                    m_pException = new IMAP_ClientException(args.FinalResponse);
+                                }
+                                m_pFinalResponse = args.FinalResponse;
                             }
 
                             SetState(AsyncOP_State.Completed);
@@ -5748,6 +5800,30 @@ namespace LumiSoft.Net.IMAP.Client
                     }
 
                     return m_pFinalResponse; 
+                }
+            }
+
+            /// <summary>
+            /// Gets <b>APPENDUID</b> optional response. Returns null if IMAP server doesn't support <b>UIDPLUS</b> extention.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public IMAP_t_orc_AppendUid AppendUid
+            {
+                get{ 
+                    if(m_State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(m_State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Response' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    if(m_pFinalResponse != null && m_pFinalResponse.OptionalResponse != null && m_pFinalResponse.OptionalResponse is IMAP_t_orc_AppendUid){
+                        return ((IMAP_t_orc_AppendUid)m_pFinalResponse.OptionalResponse);
+                    }
+                    else{
+                        return null;
+                    }
                 }
             }
 
@@ -7121,6 +7197,35 @@ namespace LumiSoft.Net.IMAP.Client
             }
         }
 
+        /// <summary>
+        /// Copies specified messages from current selected folder to the specified target folder.
+        /// </summary>
+        /// <param name="op">Copy messages operation.</param>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this method is accessed.</exception>
+        /// <exception cref="InvalidOperationException">Is raised when IMAP client is not in valid state. For example 'not connected'.</exception>
+        /// <exception cref="ArgumentNullException">Is raised when <b>op</b> is null reference.</exception>
+        /// <exception cref="IMAP_ClientException">Is raised when server refuses to complete this command and returns error.</exception>
+        public void CopyMessages(CopyMessagesAsyncOP op)
+        {
+            if(op == null){
+                throw new ArgumentNullException("op");
+            }
+
+            using(ManualResetEvent wait = new ManualResetEvent(false)){
+                op.CompletedAsync += delegate(object s1,EventArgs<CopyMessagesAsyncOP> e1){
+                    wait.Set();
+                };
+                if(!this.CopyMessagesAsync(op)){
+                    wait.Set();
+                }
+                wait.WaitOne();
+
+                if(op.Error != null){
+                    throw op.Error;
+                }
+            }
+        }
+
         #endregion
 
         #region method CopyMessagesAsync
@@ -7210,6 +7315,35 @@ namespace LumiSoft.Net.IMAP.Client
                 else{
                     byte[] cmdLine = Encoding.UTF8.GetBytes((imap.m_CommandIndex++).ToString("d5") + " COPY " + m_pSeqSet.ToString() + " " + IMAP_Utils.EncodeMailbox(m_TargetFolder,imap.m_MailboxEncoding) + "\r\n");
                     this.CmdLines.Add(new CmdLine(cmdLine,Encoding.UTF8.GetString(cmdLine).TrimEnd()));
+                }
+            }
+
+            #endregion
+
+
+            #region Properties implementation
+
+            /// <summary>
+            /// Gets <b>COPYUID</b> optional response. Returns null if IMAP server doesn't support <b>UIDPLUS</b> extention.
+            /// </summary>
+            /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and and this property is accessed.</exception>
+            /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
+            public IMAP_t_orc_CopyUid CopyUid
+            {
+                get{ 
+                    if(this.State == AsyncOP_State.Disposed){
+                        throw new ObjectDisposedException(this.GetType().Name);
+                    }
+                    if(this.State != AsyncOP_State.Completed){
+                        throw new InvalidOperationException("Property 'Response' is accessible only in 'AsyncOP_State.Completed' state.");
+                    }
+
+                    if(this.FinalResponse != null && this.FinalResponse.OptionalResponse != null && this.FinalResponse.OptionalResponse is IMAP_t_orc_CopyUid){
+                        return ((IMAP_t_orc_CopyUid)this.FinalResponse.OptionalResponse);
+                    }
+                    else{
+                        return null;
+                    }
                 }
             }
 
