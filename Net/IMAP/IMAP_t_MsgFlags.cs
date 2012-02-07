@@ -49,18 +49,15 @@ namespace LumiSoft.Net.IMAP
         /// Default constructor.
         /// </summary>
         /// <param name="flags">Message flags.</param>
-        /// <exception cref="ArgumentNullException">Is raised when <b>flags</b> is null reference.</exception>
-        public IMAP_t_MsgFlags(string[] flags)
+        public IMAP_t_MsgFlags(params string[] flags)
         {
-            if(flags == null){
-                throw new ArgumentNullException("flags");
-            }
-
             m_pFlags = new KeyValueCollection<string,string>();
 
-            foreach(string flag in flags){
-                if(!string.IsNullOrEmpty(flag)){
-                    m_pFlags.Add(flag.ToLower(),flag);
+            if(flags != null){
+                foreach(string flag in flags){
+                    if(!string.IsNullOrEmpty(flag)){
+                        m_pFlags.Add(flag.ToLower(),flag);
+                    }
                 }
             }
         }
