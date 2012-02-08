@@ -219,7 +219,7 @@ namespace LumiSoft.Net.MIME
                 throw new ArgumentNullException("transferEncoding");
             }
 
-            if(transferEncoding == MIME_TransferEncodings.QuotedPrintable){
+            if(string.Equals(transferEncoding,MIME_TransferEncodings.QuotedPrintable,StringComparison.InvariantCultureIgnoreCase)){
                 using(MemoryStreamEx fs = new MemoryStreamEx(32000)){
                     QuotedPrintableStream encoder = new QuotedPrintableStream(new SmartStream(fs,false),FileAccess.ReadWrite);
                     Net_Utils.StreamCopy(stream,encoder,32000);
@@ -228,7 +228,7 @@ namespace LumiSoft.Net.MIME
                     SetEncodedData(transferEncoding,fs);
                 }
             }
-            else if(transferEncoding == MIME_TransferEncodings.Base64){
+            else if(string.Equals(transferEncoding,MIME_TransferEncodings.Base64,StringComparison.InvariantCultureIgnoreCase)){
                 using(MemoryStreamEx fs = new MemoryStreamEx(32000)){
                     Base64Stream encoder = new Base64Stream(fs,false,true,FileAccess.ReadWrite);                                     
                     Net_Utils.StreamCopy(stream,encoder,32000);
@@ -237,13 +237,13 @@ namespace LumiSoft.Net.MIME
                     SetEncodedData(transferEncoding,fs);
                 }
             }            
-            else if(transferEncoding == MIME_TransferEncodings.Binary){
+            else if(string.Equals(transferEncoding,MIME_TransferEncodings.Binary,StringComparison.InvariantCultureIgnoreCase)){
                 SetEncodedData(transferEncoding,stream);
             }
-            else if(transferEncoding == MIME_TransferEncodings.EightBit){
+            else if(string.Equals(transferEncoding,MIME_TransferEncodings.EightBit,StringComparison.InvariantCultureIgnoreCase)){
                 SetEncodedData(transferEncoding,stream);
             }
-            else if(transferEncoding == MIME_TransferEncodings.SevenBit){
+            else if(string.Equals(transferEncoding,MIME_TransferEncodings.SevenBit,StringComparison.InvariantCultureIgnoreCase)){
                 SetEncodedData(transferEncoding,stream);
             }
             else{
