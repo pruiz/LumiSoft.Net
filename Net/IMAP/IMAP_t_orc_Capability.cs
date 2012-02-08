@@ -48,10 +48,7 @@ namespace LumiSoft.Net.IMAP
                 throw new ArgumentException("Invalid CAPABILITY response value.","value");
             }
 
-            StringReader r = new StringReader(code_value[1]);
-            r.ReadWord();
-
-            return new IMAP_t_orc_Capability(r.ReadParenthesized().Split(' '));
+            return new IMAP_t_orc_Capability(code_value[1].Split(' '));
         }
 
         #endregion
