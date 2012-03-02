@@ -141,7 +141,9 @@ namespace LumiSoft.Net.MIME
             }
             retVal.m_SubType = subtype;
 
-            retVal.m_pParameters.Parse(r);
+            if(r.Available > 0){
+                retVal.m_pParameters.Parse(r);
+            }
 
             retVal.m_ParseValue = value;
             retVal.m_IsModified = false;
