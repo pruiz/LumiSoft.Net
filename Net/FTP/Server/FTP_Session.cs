@@ -1445,25 +1445,30 @@ namespace LumiSoft.Net.FTP.Server
 				host and port address this server is listening on.
 			*/
 
-            m_pPassiveSocket = new Socket(AddressFamily.InterNetwork,SocketType.Stream,ProtocolType.Tcp);
+            int port = this.Server.PassiveStartPort;
 
-			//--- Find free port -------------------------------//
-			int port = this.Server.PassiveStartPort;
-			while(true){				
-				try{
-                    m_pPassiveSocket.Bind(new IPEndPoint(IPAddress.Any,port));
+            // We have already passive socket.
+            if(m_pPassiveSocket != null){
+                // DO nothing ... Use existing socket.
+            }
+            // Create new passive socket.
+            else{
+                m_pPassiveSocket = new Socket(AddressFamily.InterNetwork,SocketType.Stream,ProtocolType.Tcp);
 
-					// If we reach here then port is free
-					break;
-				}
-				catch{
-				}
+                // Find free port.
+                for(int i=port;i<IPEndPoint.MaxPort;i++){
+                    try{
+                        m_pPassiveSocket.Bind(new IPEndPoint(IPAddress.Any,port));
 
-				port++;
-			}
-			//--------------------------------------------------//
+					    // If we reach here then port is free
+					    break;
+				    }
+				    catch{
+				    }
+                }
 
-            m_pPassiveSocket.Listen(1);
+                m_pPassiveSocket.Listen(1);
+            }
 
 			// Notify client on what IP and port server is listening client to connect.
 			// PORT h1,h2,h3,h4,p1,p2
