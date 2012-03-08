@@ -26,6 +26,7 @@ namespace LumiSoft.Net.SMTP.Server
         private Dictionary<string,SMTP_RcptTo>               m_pTo              = null;
         private Stream                                       m_pMessageStream   = null;
         private int                                          m_BDatReadedCount  = 0;
+        private bool                                         m_UseAsyncSockets  = true;
 
         /// <summary>
         /// Default constructor.
@@ -206,7 +207,7 @@ namespace LumiSoft.Net.SMTP.Server
                     }
                 });
                 // Process incoming commands while, command reading completes synchronously.
-                while(this.TcpStream.ReadLine(readLineOP,true)){                    
+                while(this.TcpStream.ReadLine(readLineOP,m_UseAsyncSockets)){                    
                     if(!ProcessCmd(readLineOP)){
                         break;
                     }
@@ -2420,6 +2421,32 @@ namespace LumiSoft.Net.SMTP.Server
             }
         }
 
+		/// <summary>
+		/// Gets or sets a value indicating whether [use async sockets].
+		/// </summary>
+		/// <remarks>
+		/// Use if your framework may contain bugs related to async. sockets handling.
+		/// </remarks>
+		/// <value><c>true</c> if [use async sockets]; otherwise, <c>false</c>.</value>
+		public bool UseAsyncSockets
+		{
+            get{ 
+                if(this.IsDisposed){
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+				return m_UseAsyncSockets;
+			}
+
+			set{
+				if (this.IsDisposed)
+				{
+					throw new ObjectDisposedException(this.GetType().Name);
+				}
+
+				m_UseAsyncSockets = value;
+			}
+		}
         #endregion
 
         #region Events implementation
