@@ -134,7 +134,7 @@ namespace LumiSoft.Net.SMTP.Server
             */
 
             try{
-                LogAddText("Exception: " + x.Message);
+                LogAddException("Unexpected exception, ", x);
 
                 // Permanent error.
                 if(x is IOException || x is SocketException){
@@ -1233,7 +1233,7 @@ namespace LumiSoft.Net.SMTP.Server
             }
             catch(Exception x){
                 // Log
-                LogAddText("TLS negotiation failed: " + x.Message + ".");
+                LogAddException("TLS negotiation failed!", x);
 
                 Disconnect();
             }
