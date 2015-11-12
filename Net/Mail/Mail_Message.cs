@@ -208,16 +208,21 @@ namespace LumiSoft.Net.Mail
                 try{
                     disposition = entity.ContentDisposition;
                 }
-                catch{
+                catch (Exception ex)
+                {
                     // ContentDisposition parsing failed.
+                    System.Diagnostics.Debug.WriteLine(ex.ToString());
                 }
 
-                if(disposition != null && string.Equals(disposition.DispositionType,"attachment",StringComparison.InvariantCultureIgnoreCase)){
+                if(disposition != null && string.Equals(disposition.DispositionType,"attachment",StringComparison.InvariantCultureIgnoreCase))
+                { // all attachments
                     retVal.Add(entity);
                 }
-                else if(!includeInline && disposition != null && string.Equals(disposition.DispositionType,"inline",StringComparison.InvariantCultureIgnoreCase)){
+                else if(!includeInline && disposition != null && string.Equals(disposition.DispositionType,"inline",StringComparison.InvariantCultureIgnoreCase))
+                { // all inlines are ignored here (depending on includeInline)
                 }
-                else if(contentType != null && contentType.Type.ToLower() == "application"){
+                else if(contentType != null && contentType.Type.ToLower() == "application") // from here on, it's all about inlines
+                {
                     retVal.Add(entity);
                 }
                 else if(contentType != null && contentType.Type.ToLower() == "image"){
@@ -231,6 +236,11 @@ namespace LumiSoft.Net.Mail
                 }
                 else if(contentType != null && contentType.Type.ToLower() == "message"){
                     retVal.Add(entity);
+                }
+                else // just for debugging what kind of inlines could be possibly be ignored
+                {
+                    if (contentType != null && contentType.Type != null && contentType.Type != "multipart") // esse teste eu que fiz.. pra ver o que está sendo ignorado
+                        System.Diagnostics.Debug.WriteLine(contentType.Type);
                 }
             }
 
