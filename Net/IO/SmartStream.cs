@@ -3443,7 +3443,7 @@ namespace LumiSoft.Net.IO
                         // Read buffer empty, buff next data block.
                         if(m_pOwner.BytesInReadBuffer == 0){
                             // Buffering started asynchronously.
-                            if(m_pOwner.BufferRead(true,this.Buffering_Completed)){
+                            if(m_pOwner.BufferRead(false,this.Buffering_Completed)) { // FALSE (SYNC) seems to work better with very large emails
                                 return;
                             }
                             // Buffering completed synchronously, continue processing.

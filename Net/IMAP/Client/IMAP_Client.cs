@@ -6487,7 +6487,7 @@ namespace LumiSoft.Net.IMAP.Client
                 throw new ArgumentNullException("items");
             }
             if(items.Length < 1){
-                throw new ArgumentException("Argument 'items' must conatain at least 1 value.","items");
+                throw new ArgumentException("Argument 'items' must contain at least 1 value.","items");
             }
                         
             using(FetchAsyncOP op = new FetchAsyncOP(uid,seqSet,items,callback)){
@@ -6540,7 +6540,7 @@ namespace LumiSoft.Net.IMAP.Client
                     throw new ArgumentNullException("items");
                 }                
                 if(items.Length < 1){
-                    throw new ArgumentException("Argument 'items' must conatain at least 1 value.","items");
+                    throw new ArgumentException("Argument 'items' must contain at least 1 value.","items");
                 }
 
                 m_Uid        = uid;
@@ -10408,7 +10408,7 @@ namespace LumiSoft.Net.IMAP.Client
                 throw new ArgumentNullException("items");
             }
             if(items.Length < 1){
-                throw new ArgumentException("Argument 'items' must conatain at least 1 value.","items");
+                throw new ArgumentException("Argument 'items' must contain at least 1 value.","items");
             }
             if(handler == null){
                 throw new ArgumentNullException("handler");
