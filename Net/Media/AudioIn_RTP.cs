@@ -23,6 +23,8 @@ namespace LumiSoft.Net.Media
         private AudioCodec                 m_pActiveCodec   = null;
         private _WaveIn                    m_pWaveIn        = null;
         private uint                       m_RtpTimeStamp   = 0;
+        private bool _audioMuted = false;
+
 
         /// <summary>
         /// Default constructor.
@@ -127,7 +129,11 @@ namespace LumiSoft.Net.Media
 
                 if(m_pActiveCodec != null){
                     RTP_Packet rtpPacket = new RTP_Packet();
-                    rtpPacket.Data = m_pActiveCodec.Encode(e.Value,0,e.Value.Length);
+
+                    if (_audioMuted) rtpPacket.Data = m_pActiveCodec.Encode(new byte[e.Value.Length], 0, e.Value.Length);
+                    else rtpPacket.Data = m_pActiveCodec.Encode(e.Value, 0,e.Value.Length);
+
+                    //rtpPacket.Data.Initialize();
                     rtpPacket.Timestamp = m_RtpTimeStamp;
  	        
                     m_pRTP_Stream.Send(rtpPacket);
@@ -221,6 +227,30 @@ namespace LumiSoft.Net.Media
                 }
                 
                 return m_IsRunning; 
+            }
+        }
+
+        /// <summary>
+        /// Mutes the audio sent.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
+        public bool IsMuted
+        {
+            get
+            {
+                if (this.IsDisposed)
+                {
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+                return _audioMuted;
+            }
+            set
+            {
+                if (this.IsDisposed)
+                {
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+                _audioMuted = value;
             }
         }
 
