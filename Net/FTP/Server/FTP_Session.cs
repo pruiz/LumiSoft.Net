@@ -645,7 +645,7 @@ namespace LumiSoft.Net.FTP.Server
                 return;
             }
             if(!this.IsAuthenticated){
-				WriteLine("530 Please authenticate firtst !");
+				WriteLine("530 Please authenticate first !");
 
 				return;
 			} 
@@ -685,7 +685,7 @@ namespace LumiSoft.Net.FTP.Server
                 return;
             }
             if(!this.IsAuthenticated){
-				WriteLine("530 Please authenticate firtst !");
+				WriteLine("530 Please authenticate first !");
 
 				return;
 			}           
@@ -727,7 +727,7 @@ namespace LumiSoft.Net.FTP.Server
                 return;
             }
             if(!this.IsAuthenticated){
-				WriteLine("530 Please authenticate firtst !");
+				WriteLine("530 Please authenticate first !");
 
 				return;
 			}
@@ -753,7 +753,7 @@ namespace LumiSoft.Net.FTP.Server
                 return;
             }			
 			if(!this.IsAuthenticated){
-				WriteLine("530 Please authenticate firtst !");
+				WriteLine("530 Please authenticate first !");
 
 				return;
 			}
@@ -808,7 +808,7 @@ namespace LumiSoft.Net.FTP.Server
                 return;
             }			
 			if(!this.IsAuthenticated){
-				WriteLine("530 Please authenticate firtst !");
+				WriteLine("530 Please authenticate first !");
 
 				return;
 			}
@@ -859,7 +859,7 @@ namespace LumiSoft.Net.FTP.Server
                 return;
             }
             if(!this.IsAuthenticated){
-				WriteLine("530 Please authenticate firtst !");
+				WriteLine("530 Please authenticate first !");
 
 				return;
 			}
@@ -908,7 +908,7 @@ namespace LumiSoft.Net.FTP.Server
                 return;
             }
             if(!this.IsAuthenticated){
-				WriteLine("530 Please authenticate firtst !");
+				WriteLine("530 Please authenticate first !");
 
 				return;
 			}
@@ -949,7 +949,7 @@ namespace LumiSoft.Net.FTP.Server
                 return;
             }
             if(!this.IsAuthenticated){
-				WriteLine("530 Please authenticate firtst !");
+				WriteLine("530 Please authenticate first !");
 
 				return;
 			}
@@ -1000,7 +1000,7 @@ namespace LumiSoft.Net.FTP.Server
                 return;
             }
             if(!this.IsAuthenticated){
-				WriteLine("530 Please authenticate firtst !");
+				WriteLine("530 Please authenticate first !");
 
 				return;
 			}
@@ -1056,7 +1056,7 @@ namespace LumiSoft.Net.FTP.Server
                 return;
             }
             if(!this.IsAuthenticated){
-				WriteLine("530 Please authenticate firtst !");
+				WriteLine("530 Please authenticate first !");
 
 				return;
 			}
@@ -1085,7 +1085,7 @@ namespace LumiSoft.Net.FTP.Server
                 return;
             }
             if(!this.IsAuthenticated){
-				WriteLine("530 Please authenticate firtst !");
+				WriteLine("530 Please authenticate first !");
 
 				return;
 			}
@@ -1132,7 +1132,7 @@ namespace LumiSoft.Net.FTP.Server
                 return;
             }
             if(!this.IsAuthenticated){
-				WriteLine("530 Please authenticate firtst !");
+				WriteLine("530 Please authenticate first !");
 
 				return;
 			}
@@ -1173,7 +1173,7 @@ namespace LumiSoft.Net.FTP.Server
                 return;
             }			
 			if(!this.IsAuthenticated){
-				WriteLine("530 Please authenticate firtst !");
+				WriteLine("530 Please authenticate first !");
 
 				return;
 			}
@@ -1214,7 +1214,7 @@ namespace LumiSoft.Net.FTP.Server
                 return;
             }
             if(!this.IsAuthenticated){
-				WriteLine("530 Please authenticate firtst !");
+				WriteLine("530 Please authenticate first !");
 
 				return;
 			}
@@ -1276,7 +1276,7 @@ namespace LumiSoft.Net.FTP.Server
                 return;
             }			
 			if(!this.IsAuthenticated){
-				WriteLine("530 Please authenticate firtst !");
+				WriteLine("530 Please authenticate first !");
 
 				return;
 			}
@@ -1359,7 +1359,7 @@ namespace LumiSoft.Net.FTP.Server
 				default.
 			*/
 			if(!this.IsAuthenticated){
-				WriteLine("530 Please authenticate firtst !");
+				WriteLine("530 Please authenticate first !");
 				return;
 			}
 
@@ -1400,7 +1400,7 @@ namespace LumiSoft.Net.FTP.Server
 				address.
 			*/
 			if(!this.IsAuthenticated){
-				WriteLine("530 Please authenticate firtst !");
+				WriteLine("530 Please authenticate first !");
 
 				return;
 			}
@@ -1432,7 +1432,7 @@ namespace LumiSoft.Net.FTP.Server
                 return;
             }			
 			if(!this.IsAuthenticated){
-				WriteLine("530 Please authenticate firtst !");
+				WriteLine("530 Please authenticate first !");
 
 				return;
 			}
@@ -1499,7 +1499,7 @@ namespace LumiSoft.Net.FTP.Server
 				of the Assigned Numbers document [4].
 			*/
 			if(!this.IsAuthenticated){
-				WriteLine("530 Please authenticate firtst !");
+				WriteLine("530 Please authenticate first !");
 
 				return;
 			}
