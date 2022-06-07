@@ -62,7 +62,7 @@ namespace LumiSoft.Net.SMTP.Server
         }
 
         #endregion
-    
+
 
         #region override method Start
 
@@ -86,7 +86,7 @@ namespace LumiSoft.Net.SMTP.Server
                 information in the reply text to facilitate debugging of the sending
                 system.
             */
-            
+
             try{
                 SMTP_Reply reply = null;
                 if(string.IsNullOrEmpty(this.Server.GreetingText)){
@@ -104,7 +104,7 @@ namespace LumiSoft.Net.SMTP.Server
                 if(reply.ReplyCode >= 300){
                     m_SessionRejected = true;
                 }
-                               
+
                 BeginReadCmd();
             }
             catch(Exception x){
@@ -186,7 +186,7 @@ namespace LumiSoft.Net.SMTP.Server
 
         #endregion
 
-                
+
         #region method BeginReadCmd
 
         /// <summary>
@@ -201,13 +201,13 @@ namespace LumiSoft.Net.SMTP.Server
             try{
                 SmartStream.ReadLineAsyncOP readLineOP = new SmartStream.ReadLineAsyncOP(new byte[32000],SizeExceededAction.JunkAndThrowException);
                 // This event is raised only if read period-terminated opeartion completes asynchronously.
-                readLineOP.Completed += new EventHandler<EventArgs<SmartStream.ReadLineAsyncOP>>(delegate(object sender,EventArgs<SmartStream.ReadLineAsyncOP> e){                
+                readLineOP.Completed += new EventHandler<EventArgs<SmartStream.ReadLineAsyncOP>>(delegate(object sender,EventArgs<SmartStream.ReadLineAsyncOP> e){
                     if(ProcessCmd(readLineOP)){
                         BeginReadCmd();
                     }
                 });
                 // Process incoming commands while, command reading completes synchronously.
-                while(this.TcpStream.ReadLine(readLineOP,m_UseAsyncSockets)){                    
+                while(this.TcpStream.ReadLine(readLineOP,m_UseAsyncSockets)){
                     if(!ProcessCmd(readLineOP)){
                         break;
                     }
@@ -230,7 +230,7 @@ namespace LumiSoft.Net.SMTP.Server
         private bool ProcessCmd(SmartStream.ReadLineAsyncOP op)
         {
             bool readNextCommand = true;
-                        
+
             try{
                 // We are already disposed.
                 if(this.IsDisposed){
@@ -244,7 +244,7 @@ namespace LumiSoft.Net.SMTP.Server
                 if(op.BytesInBuffer == 0){
                     LogAddText("The remote host '" + this.RemoteEndPoint.ToString() + "' shut down socket.");
                     Dispose();
-                
+
                     return false;
                 }
 
@@ -275,7 +275,7 @@ namespace LumiSoft.Net.SMTP.Server
                 else if(cmd == "RCPT"){
                     RCPT(args);
                 }
-                else if(cmd == "DATA"){                    
+                else if(cmd == "DATA"){
                     Cmd_DATA cmdData = new Cmd_DATA();
                     cmdData.CompletedAsync += delegate(object sender,EventArgs<SMTP_Session.Cmd_DATA> e){
                         if(op.Error != null){
@@ -318,7 +318,7 @@ namespace LumiSoft.Net.SMTP.Server
                          Disconnect();
                          return false;
                      }
-                            
+
                      WriteLine("502 Error: command '" + cmd + "' not recognized.");
                  }
              }
@@ -336,7 +336,7 @@ namespace LumiSoft.Net.SMTP.Server
         #region class ReadCommandAsyncOP
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         private class ReadCommandAsyncOP
         {
@@ -450,7 +450,7 @@ namespace LumiSoft.Net.SMTP.Server
                     return;
                 }
                 SetState(AsyncOP_State.Disposed);
-                
+
                 m_pException  = null;
                 m_pReplyLines = null;
                 m_pSession    = null;
@@ -485,7 +485,7 @@ namespace LumiSoft.Net.SMTP.Server
                     foreach(SMTP_t_ReplyLine replyLine in m_pReplyLines){
                         response.Append(replyLine.ToString());
                     }
-                                        
+
                     byte[] buffer = Encoding.UTF8.GetBytes(response.ToString());
 
                     // Log
@@ -548,7 +548,7 @@ namespace LumiSoft.Net.SMTP.Server
                 }
                 catch(Exception x){
                     m_pException = x;
-                    m_pSession.LogAddException("Exception: " + m_pException.Message,m_pException);                    
+                    m_pSession.LogAddException("Exception: " + m_pException.Message,m_pException);
                 }
 
                 SetState(AsyncOP_State.Completed);
@@ -574,7 +574,7 @@ namespace LumiSoft.Net.SMTP.Server
             /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
             public Exception Error
             {
-                get{ 
+                get{
                     if(m_State == AsyncOP_State.Disposed){
                         throw new ObjectDisposedException(this.GetType().Name);
                     }
@@ -582,7 +582,7 @@ namespace LumiSoft.Net.SMTP.Server
                         throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
                     }
 
-                    return m_pException; 
+                    return m_pException;
                 }
             }
 
@@ -653,7 +653,7 @@ namespace LumiSoft.Net.SMTP.Server
             private SMTP_Session  m_pSession      = null;
             private DateTime      m_StartTime;
             private bool          m_RiseCompleted = false;
-            
+
             /// <summary>
             /// Default constructor.
             /// </summary>
@@ -672,7 +672,7 @@ namespace LumiSoft.Net.SMTP.Server
                     return;
                 }
                 SetState(AsyncOP_State.Disposed);
-                
+
                 m_pException = null;
                 m_pSession   = null;
 
@@ -712,7 +712,7 @@ namespace LumiSoft.Net.SMTP.Server
                         codes, although experience has indicated that use of control
                         characters other than SP, HT, CR, and LF may cause problems and
                         SHOULD be avoided when possible.
-             
+
                         The custom of accepting lines ending only in <LF>, as a concession to
                         non-conforming behavior on the part of some UNIX systems, has proven
                         to cause more interoperability problems than it solves, and SMTP
@@ -720,7 +720,7 @@ namespace LumiSoft.Net.SMTP.Server
                         robustness.  In particular, the sequence "<LF>.<LF>" (bare line
                         feeds, without carriage returns) MUST NOT be treated as equivalent to
                         <CRLF>.<CRLF> as the end of mail data indication.
-             
+
                         Receipt of the end of mail data indication requires the server to
                         process the stored mail transaction information.  This processing
                         consumes the information in the reverse-path buffer, the forward-path
@@ -746,7 +746,7 @@ namespace LumiSoft.Net.SMTP.Server
                         stamp lines.  Details for formation of these lines, including their
                         syntax, is specified in Section 4.4.
                     */
-                                        
+
                     // RFC 5321 3.1.
                     if(m_pSession.m_SessionRejected){
                         SendFinalResponse(new SMTP_t_ReplyLine(503,"Bad sequence of commands: Session rejected.",true));
@@ -771,8 +771,8 @@ namespace LumiSoft.Net.SMTP.Server
                         m_pSession.m_pMessageStream = m_pSession.OnGetMessageStream();
                         if(m_pSession.m_pMessageStream == null){
                             m_pSession.m_pMessageStream = new MemoryStreamEx(32000);
-                        }                   
-                        
+                        }
+
                         // Send "354 Start mail input; end with <CRLF>.<CRLF>".
                         SMTP_Session.SendResponseAsyncOP sendResponseOP = new SendResponseAsyncOP(new SMTP_t_ReplyLine(354,"Start mail input; end with <CRLF>.<CRLF>",true));
                         sendResponseOP.CompletedAsync += delegate(object sender,EventArgs<SendResponseAsyncOP> e){
@@ -839,14 +839,14 @@ namespace LumiSoft.Net.SMTP.Server
                     if(reply == null){
                         throw new ArgumentNullException("reply");
                     }
-                   
+
                     SMTP_Session.SendResponseAsyncOP sendResponseOP = new SendResponseAsyncOP(reply);
                     sendResponseOP.CompletedAsync += delegate(object sender,EventArgs<SendResponseAsyncOP> e){
                         SendFinalResponseCompleted(sendResponseOP);
                     };
                     if(!m_pSession.SendResponseAsync(sendResponseOP)){
                         SendFinalResponseCompleted(sendResponseOP);
-                    }                    
+                    }
                 }
                 catch(Exception x){
                     m_pException = x;
@@ -863,13 +863,13 @@ namespace LumiSoft.Net.SMTP.Server
             /// Is called when SMTP server "final" response sending has completed.
             /// </summary>
             private void SendFinalResponseCompleted(SMTP_Session.SendResponseAsyncOP op)
-            {                 
+            {
                 if(op.Error != null){
                     m_pException = op.Error;
                 }
 
                 SetState(AsyncOP_State.Completed);
-                
+
                 op.Dispose();
             }
 
@@ -887,7 +887,7 @@ namespace LumiSoft.Net.SMTP.Server
                     // RFC 5321.4.4 trace info.
                     byte[] recevived = m_pSession.CreateReceivedHeader();
                     m_pSession.m_pMessageStream.Write(recevived,0,recevived.Length);
-                    
+
                     // Create asynchronous read period-terminated opeartion.
                     SmartStream.ReadPeriodTerminatedAsyncOP readPeriodTermOP = new SmartStream.ReadPeriodTerminatedAsyncOP(
                         m_pSession.m_pMessageStream,
@@ -895,7 +895,7 @@ namespace LumiSoft.Net.SMTP.Server
                         SizeExceededAction.JunkAndThrowException
                     );
                     // This event is raised only if read period-terminated opeartion completes asynchronously.
-                    readPeriodTermOP.Completed += new EventHandler<EventArgs<SmartStream.ReadPeriodTerminatedAsyncOP>>(delegate(object sender,EventArgs<SmartStream.ReadPeriodTerminatedAsyncOP> e){                
+                    readPeriodTermOP.Completed += new EventHandler<EventArgs<SmartStream.ReadPeriodTerminatedAsyncOP>>(delegate(object sender,EventArgs<SmartStream.ReadPeriodTerminatedAsyncOP> e){
                         MessageReadingCompleted(readPeriodTermOP);
                     });
                     // Read period-terminated completed synchronously.
@@ -921,7 +921,7 @@ namespace LumiSoft.Net.SMTP.Server
             /// </summary>
             /// <param name="op">Asynchronous operation.</param>
             private void MessageReadingCompleted(SmartStream.ReadPeriodTerminatedAsyncOP op)
-            {      
+            {
                 try{
                     if(op.Error != null){
                         if(op.Error is LineSizeExceededException){
@@ -948,7 +948,7 @@ namespace LumiSoft.Net.SMTP.Server
                     }
                 }
                 catch(Exception x){
-                    m_pException = x;       
+                    m_pException = x;
                 }
 
                 // We got some unknown error, we are done.
@@ -979,7 +979,7 @@ namespace LumiSoft.Net.SMTP.Server
             /// <exception cref="InvalidOperationException">Is raised when this property is accessed other than <b>AsyncOP_State.Completed</b> state.</exception>
             public Exception Error
             {
-                get{ 
+                get{
                     if(m_State == AsyncOP_State.Disposed){
                         throw new ObjectDisposedException(this.GetType().Name);
                     }
@@ -987,7 +987,7 @@ namespace LumiSoft.Net.SMTP.Server
                         throw new InvalidOperationException("Property 'Error' is accessible only in 'AsyncOP_State.Completed' state.");
                     }
 
-                    return m_pException; 
+                    return m_pException;
                 }
             }
 
@@ -1077,7 +1077,10 @@ namespace LumiSoft.Net.SMTP.Server
             if(this.Server.Extentions.Contains(SMTP_ServiceExtensions.DSN)){
                 ehloLines.Add(SMTP_ServiceExtensions.DSN);
             }
-            
+            if(this.Server.Extentions.Contains(SMTP_ServiceExtensions.ENHANCEDSTATUSCODES)){
+                ehloLines.Add(SMTP_ServiceExtensions.ENHANCEDSTATUSCODES);
+            }
+
             StringBuilder sasl = new StringBuilder();
             foreach(AUTH_SASL_ServerMechanism authMechanism in this.Authentications.Values){
                 if(!authMechanism.RequireSSL || (authMechanism.RequireSSL && this.IsSecureConnection)){
@@ -1087,7 +1090,7 @@ namespace LumiSoft.Net.SMTP.Server
             if(sasl.Length > 0){
                 ehloLines.Add(SMTP_ServiceExtensions.AUTH + " " + sasl.ToString().Trim());
             }
-            
+
             SMTP_Reply reply = new SMTP_Reply(250,ehloLines.ToArray());
 
             reply = OnEhlo(cmdText,reply);
@@ -1122,10 +1125,10 @@ namespace LumiSoft.Net.SMTP.Server
                 WriteLine("503 bad sequence of commands: Session rejected.");
                 return;
             }
-            
+
             /* RFC 5321 4.1.1.1.
                 helo     = "HELO" SP Domain CRLF
-            
+
                 response = "250" SP Domain [ SP ehlo-greet ] CRLF
             */
             if(string.IsNullOrEmpty(cmdText) || cmdText.Split(' ').Length != 1){
@@ -1181,7 +1184,7 @@ namespace LumiSoft.Net.SMTP.Server
                 220 Ready to start TLS
                 501 Syntax error (no parameters allowed)
                 454 TLS not available due to temporary reason
-             
+
                4.2 Result of the STARTTLS Command
                 Upon completion of the TLS handshake, the SMTP protocol is reset to
                 the initial state (the state in SMTP after a server issues a 220
@@ -1192,21 +1195,21 @@ namespace LumiSoft.Net.SMTP.Server
                 of SMTP service extensions, which was not obtained from the TLS
                 negotiation itself.  The client SHOULD send an EHLO command as the
                 first command after a successful TLS negotiation.
-            
+
                 Both the client and the server MUST know if there is a TLS session
                 active.  A client MUST NOT attempt to start a TLS session if a TLS
                 session is already active.  A server MUST NOT return the STARTTLS
                 extension in response to an EHLO command received after a TLS
                 handshake has completed.
-              
-             
+
+
                RFC 2246 7.2.2. Error alerts.
                 Error handling in the TLS Handshake protocol is very simple. When an
                 error is detected, the detecting party sends a message to the other
                 party. Upon transmission or receipt of an fatal alert message, both
                 parties immediately close the connection.  <...>
             */
-            
+
             if(!string.IsNullOrEmpty(cmdText)){
                 WriteLine("501 Syntax error: No parameters allowed.");
                 return;
@@ -1251,7 +1254,7 @@ namespace LumiSoft.Net.SMTP.Server
                 return;
             }
 
-            /* RFC 4954 
+            /* RFC 4954
 			    AUTH mechanism [initial-response]
 
                 Arguments:
@@ -1270,21 +1273,21 @@ namespace LumiSoft.Net.SMTP.Server
                     The AUTH command is not permitted during a mail transaction.
                     An AUTH command issued during a mail transaction MUST be
                     rejected with a 503 reply.
-             
+
                 A server challenge is sent as a 334 reply with the text part
                 containing the [BASE64] encoded string supplied by the SASL
                 mechanism.  This challenge MUST NOT contain any text other
                 than the BASE64 encoded challenge.
-             
-                In SMTP, a server challenge that contains no data is defined 
-                as a 334 reply with no text part. Note that there is still a space 
+
+                In SMTP, a server challenge that contains no data is defined
+                as a 334 reply with no text part. Note that there is still a space
                 following the reply code, so the complete response line is "334 ".
-             
-                If the client wishes to cancel the authentication exchange, 
-                it issues a line with a single "*". If the server receives 
+
+                If the client wishes to cancel the authentication exchange,
+                it issues a line with a single "*". If the server receives
                 such a response, it MUST reject the AUTH command by sending a 501 reply.
 			*/
-            
+
 			if(this.IsAuthenticated){
 				WriteLine("503 Bad sequence of commands: you are already authenticated.");
 				return;
@@ -1352,12 +1355,12 @@ namespace LumiSoft.Net.SMTP.Server
                         WriteLine("334 " + Convert.ToBase64String(serverResponse));
                     }
 
-                    // Read client response. 
+                    // Read client response.
                     SmartStream.ReadLineAsyncOP readLineOP = new SmartStream.ReadLineAsyncOP(new byte[32000],SizeExceededAction.JunkAndThrowException);
                     this.TcpStream.ReadLine(readLineOP,false);
                     if(readLineOP.Error != null){
                         throw readLineOP.Error;
-                    }                    
+                    }
                     // Log
                     if(this.Server.Logger != null){
                         this.Server.Logger.AddRead(this.ID,this.AuthenticatedUserIdentity,readLineOP.BytesInBuffer,"base64 auth-data",this.LocalEndPoint,this.RemoteEndPoint);
@@ -1415,7 +1418,7 @@ namespace LumiSoft.Net.SMTP.Server
 
             /* RFC 5321 4.1.1.2.
                 mail            = "MAIL FROM:" Reverse-path [SP Mail-parameters] CRLF
-              
+
                 Mail-parameters = esmtp-param *(SP esmtp-param)
 
                 esmtp-param     = esmtp-keyword ["=" esmtp-value]
@@ -1426,10 +1429,10 @@ namespace LumiSoft.Net.SMTP.Server
                                   ; any CHAR excluding "=", SP, and control
                                   ; characters.  If this string is an email address,
                                   ; i.e., a Mailbox, then the "xtext" syntax [32] SHOULD be used.
-              
+
                 Reverse-path   = Path / "<>"
                 Path           = "<" [ A-d-l ":" ] Mailbox ">"
-              
+
                4.1.1.11.
                 If the server SMTP does not recognize or cannot implement one or more
                 of the parameters associated with a particular MAIL FROM or RCPT TO
@@ -1463,7 +1466,7 @@ namespace LumiSoft.Net.SMTP.Server
             }
 
             #region Parse parameters
-                                    
+
             string[] parameters = string.IsNullOrEmpty(cmdText) ? new string[0] : cmdText.Split(' ');
             foreach(string parameter in parameters){
                 string[] name_value = parameter.Split(new char[]{'='},2);
@@ -1588,7 +1591,7 @@ namespace LumiSoft.Net.SMTP.Server
 
             /* RFC 5321 4.1.1.3.
                 rcpt = "RCPT TO:" ( "<Postmaster@" Domain ">" / "<Postmaster>" /  Forward-path ) [SP Rcpt-parameters] CRLF
-              
+
                 Rcpt-parameters = esmtp-param *(SP esmtp-param)
 
                 esmtp-param     = esmtp-keyword ["=" esmtp-value]
@@ -1602,10 +1605,10 @@ namespace LumiSoft.Net.SMTP.Server
 
                     Note that, in a departure from the usual rules for local-parts, the "Postmaster" string shown above is
                     treated as case-insensitive.
-             
+
                 Forward-path   = Path
                 Path           = "<" [ A-d-l ":" ] Mailbox ">"
-              
+
                4.1.1.11.
                 If the server SMTP does not recognize or cannot implement one or more
                 of the parameters associated with a particular MAIL FROM or RCPT TO
@@ -1651,7 +1654,7 @@ namespace LumiSoft.Net.SMTP.Server
                     /* RFC 1891 5.1.
                         notify-esmtp-value  = "NEVER" / 1#notify-list-element
                         notify-list-element = "SUCCESS" / "FAILURE" / "DELAY"
-                      
+
                         a. Multiple notify-list-elements, separated by commas, MAY appear in a
                            NOTIFY parameter; however, the NEVER keyword MUST appear by itself.
                     */
@@ -1758,7 +1761,7 @@ namespace LumiSoft.Net.SMTP.Server
                 codes, although experience has indicated that use of control
                 characters other than SP, HT, CR, and LF may cause problems and
                 SHOULD be avoided when possible.
-             
+
                 The custom of accepting lines ending only in <LF>, as a concession to
                 non-conforming behavior on the part of some UNIX systems, has proven
                 to cause more interoperability problems than it solves, and SMTP
@@ -1766,7 +1769,7 @@ namespace LumiSoft.Net.SMTP.Server
                 robustness.  In particular, the sequence "<LF>.<LF>" (bare line
                 feeds, without carriage returns) MUST NOT be treated as equivalent to
                 <CRLF>.<CRLF> as the end of mail data indication.
-             
+
                 Receipt of the end of mail data indication requires the server to
                 process the stored mail transaction information.  This processing
                 consumes the information in the reverse-path buffer, the forward-path
@@ -1804,7 +1807,7 @@ namespace LumiSoft.Net.SMTP.Server
             m_pMessageStream.Write(recevived,0,recevived.Length);
 
             WriteLine("354 Start mail input; end with <CRLF>.<CRLF>");
-            
+
             // Create asynchronous read period-terminated opeartion.
             SmartStream.ReadPeriodTerminatedAsyncOP readPeriodTermOP = new SmartStream.ReadPeriodTerminatedAsyncOP(
                 m_pMessageStream,
@@ -1812,7 +1815,7 @@ namespace LumiSoft.Net.SMTP.Server
                 SizeExceededAction.JunkAndThrowException
             );
             // This event is raised only if read period-terminated opeartion completes asynchronously.
-            readPeriodTermOP.Completed += new EventHandler<EventArgs<SmartStream.ReadPeriodTerminatedAsyncOP>>(delegate(object sender,EventArgs<SmartStream.ReadPeriodTerminatedAsyncOP> e){                
+            readPeriodTermOP.Completed += new EventHandler<EventArgs<SmartStream.ReadPeriodTerminatedAsyncOP>>(delegate(object sender,EventArgs<SmartStream.ReadPeriodTerminatedAsyncOP> e){
                 DATA_End(startTime,readPeriodTermOP);
             });
             // Read period-terminated completed synchronously.
@@ -1823,7 +1826,7 @@ namespace LumiSoft.Net.SMTP.Server
             }
             // Read period-terminated completed asynchronously, Completed event will be raised once operation completes.
             // else{
-         
+
             return false;
         }
 
@@ -1857,7 +1860,7 @@ namespace LumiSoft.Net.SMTP.Server
                 }
             }
             catch(Exception x){
-                OnError(x);                
+                OnError(x);
             }
 
             Reset();
@@ -1892,10 +1895,10 @@ namespace LumiSoft.Net.SMTP.Server
             }
 
             /* RFC 3030 2
-				The BDAT verb takes two arguments.The first argument indicates the length, 
-                in octets, of the binary data chunk. The second optional argument indicates 
+				The BDAT verb takes two arguments.The first argument indicates the length,
+                in octets, of the binary data chunk. The second optional argument indicates
                 that the data chunk	is the last.
-				
+
 				The message data is sent immediately after the trailing <CR>
 				<LF> of the BDAT command line.  Once the receiver-SMTP receives the
 				specified number of octets, it will return a 250 reply code.
@@ -1907,7 +1910,7 @@ namespace LumiSoft.Net.SMTP.Server
 				MUST be replied to with a 503 "Bad sequence of commands" reply code.
 				The state resulting from this error is indeterminate.  A RSET command
 				MUST be sent to clear the transaction before continuing.
-				
+
 				A 250 response MUST be sent to each successful BDAT data block within
 				a mail transaction.
 
@@ -1968,7 +1971,7 @@ namespace LumiSoft.Net.SMTP.Server
                         if(m_BDatReadedCount > this.Server.MaxMessageSize){
                             WriteLine("552 Too much mail data.");
 
-                            OnMessageStoringCanceled();            
+                            OnMessageStoringCanceled();
                         }
                         else{
                             SMTP_Reply reply = new SMTP_Reply(250,chunkSize + " bytes received in " + (DateTime.Now - startTime).TotalSeconds.ToString("f2") + " seconds.");
@@ -1976,13 +1979,13 @@ namespace LumiSoft.Net.SMTP.Server
                             if(last){
                                 reply = OnMessageStoringCompleted(reply);
                             }
-                            
-                            WriteLine(reply.ToString());                            
+
+                            WriteLine(reply.ToString());
                         }
 
                         if(last){
                             // Accoring RFC 3030, client should send RSET and we must wait it and reject transaction commands.
-                            // If we reset internally, then all works as specified. 
+                            // If we reset internally, then all works as specified.
                             Reset();
                         }
                     }
@@ -2070,15 +2073,15 @@ namespace LumiSoft.Net.SMTP.Server
             /* RFC 5321 4.1.1.10.
                 This command specifies that the receiver MUST send a "221 OK" reply,
                 and then close the transmission channel.
-              
+
                 The QUIT command may be issued at any time.  Any current uncompleted
                 mail transaction will be aborted.
-            
+
                 quit = "QUIT" CRLF
             */
 
             try{
-                WriteLine("221 <" + Net_Utils.GetLocalHostName(this.LocalHostName) + "> Service closing transmission channel.");                
+                WriteLine("221 <" + Net_Utils.GetLocalHostName(this.LocalHostName) + "> Service closing transmission channel.");
             }
             catch{
             }
@@ -2101,7 +2104,7 @@ namespace LumiSoft.Net.SMTP.Server
             }
 
             m_pFrom = null;
-            m_pTo.Clear();                    
+            m_pTo.Clear();
             m_pMessageStream = null;
             m_BDatReadedCount = 0;
         }
@@ -2131,7 +2134,7 @@ namespace LumiSoft.Net.SMTP.Server
                 a server SHOULD use the "ESMTPA" or the "ESMTPSA" [SMTP-TT] (when
                 appropriate) keyword in the "with" clause of the Received header
                 field.
-               
+
                http://www.iana.org/assignments/mail-parameters
                 ESMTP                SMTP with Service Extensions               [RFC5321]
                 ESMTPA               ESMTP with SMTP AUTH                       [RFC3848]
@@ -2154,7 +2157,7 @@ namespace LumiSoft.Net.SMTP.Server
             else if(this.IsAuthenticated && this.IsSecureConnection){
                 received.With = "ESMTPSA";
             }
-            
+
             return Encoding.UTF8.GetBytes(received.ToString());
         }
 
@@ -2198,7 +2201,7 @@ namespace LumiSoft.Net.SMTP.Server
                         this.ID,
                         this.AuthenticatedUserIdentity,
                         size,
-                        text,                        
+                        text,
                         this.LocalEndPoint,
                         this.RemoteEndPoint
                     );
@@ -2226,7 +2229,7 @@ namespace LumiSoft.Net.SMTP.Server
                         this.ID,
                         this.AuthenticatedUserIdentity,
                         size,
-                        text,                        
+                        text,
                         this.LocalEndPoint,
                         this.RemoteEndPoint
                     );
@@ -2252,7 +2255,7 @@ namespace LumiSoft.Net.SMTP.Server
                     this.Server.Logger.AddText(
                         this.IsConnected ? this.ID : "",
                         this.IsConnected ? this.AuthenticatedUserIdentity : null,
-                        text,                        
+                        text,
                         this.IsConnected ? this.LocalEndPoint : null,
                         this.IsConnected ? this.RemoteEndPoint : null
                     );
@@ -2279,7 +2282,7 @@ namespace LumiSoft.Net.SMTP.Server
                     this.Server.Logger.AddException(
                         this.IsConnected ? this.ID : "",
                         this.IsConnected ? this.AuthenticatedUserIdentity : null,
-                        text,                        
+                        text,
                         this.IsConnected ? this.LocalEndPoint : null,
                         this.IsConnected ? this.RemoteEndPoint : null,
                         x
@@ -2322,7 +2325,7 @@ namespace LumiSoft.Net.SMTP.Server
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                return m_pAuthentications; 
+                return m_pAuthentications;
             }
         }
 
@@ -2332,12 +2335,12 @@ namespace LumiSoft.Net.SMTP.Server
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
         public int BadCommands
         {
-            get{ 
+            get{
                 if(this.IsDisposed){
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                return m_BadCommands; 
+                return m_BadCommands;
             }
         }
 
@@ -2352,22 +2355,22 @@ namespace LumiSoft.Net.SMTP.Server
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                return m_Transactions; 
+                return m_Transactions;
             }
         }
-                
+
         /// <summary>
         /// Gets client reported EHLO host name. Returns null if EHLO/HELO is not issued yet.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
         public string EhloHost
         {
-            get{ 
+            get{
                 if(this.IsDisposed){
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                return m_EhloHost; 
+                return m_EhloHost;
             }
         }
 
@@ -2385,19 +2388,19 @@ namespace LumiSoft.Net.SMTP.Server
 		        return m_pUser;
 	        }
         }
-        
+
         /// <summary>
         /// Gets MAIL FROM: value. Returns null if MAIL FROM: is not issued yet.
         /// </summary>
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
         public SMTP_MailFrom From
         {
-            get{ 
+            get{
                 if(this.IsDisposed){
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
 
-                return m_pFrom; 
+                return m_pFrom;
             }
         }
 
@@ -2407,7 +2410,7 @@ namespace LumiSoft.Net.SMTP.Server
         /// <exception cref="ObjectDisposedException">Is raised when this object is disposed and this property is accessed.</exception>
         public SMTP_RcptTo[] To
         {
-            get{ 
+            get{
                 if(this.IsDisposed){
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
@@ -2430,7 +2433,7 @@ namespace LumiSoft.Net.SMTP.Server
 		/// <value><c>true</c> if [use async sockets]; otherwise, <c>false</c>.</value>
 		public bool UseAsyncSockets
 		{
-            get{ 
+            get{
                 if(this.IsDisposed){
                     throw new ObjectDisposedException(this.GetType().Name);
                 }
