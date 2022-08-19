@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Linq;
 
 namespace LumiSoft.Net.MIME
 {
@@ -249,6 +250,14 @@ namespace LumiSoft.Net.MIME
             */
 
             string retVal = text;
+
+            // sometimes texts can have simultaneously multiple encoded blocks
+            // ex: "=?iso-8859-1?Q?Seg.:_Geranorte_*_Resseg.:_Tokio_Marine_*_Ramo:_RO_*_Solic?= =?iso-8859-1?Q?ita=E7=E3o_de_suporte?="
+            // that's two different blocks, each one encoded separately (separated by a space which didn't exist originally)
+            // So we should split by the space, and decode individually each part.
+            List<string> split = retVal.Trim().Split(' ').ToList();
+            if (split.Count >= 2 && split.TrueForAll(x => x.StartsWith("=?") && x.EndsWith("?=")))
+                return split.Aggregate((a, b) => DecodeTextS(a) + DecodeTextS(b));
 
             retVal = encodedword_regex.Replace(retVal,delegate(Match m){
                 // We have encoded word, try to decode it.
