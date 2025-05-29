@@ -34,6 +34,11 @@ namespace LumiSoft.Net.TCP
         private Dictionary<string,object> m_pTags         = null;
 
         /// <summary>
+        /// Create ssl stream for STARTTLS operation.
+        /// </summary>
+        public Func<TCP_ServerSession, SslStream> SslStreamFactory { get; set; }
+
+        /// <summary>
         /// Default constructor.
         /// </summary>
         public TCP_ServerSession()
@@ -279,7 +284,7 @@ namespace LumiSoft.Net.TCP
                 SetState(AsyncOP_State.Active);
 
                 try{
-                    m_pSslStream = new SslStream(m_pTcpSession.TcpStream.SourceStream,true);
+                    m_pSslStream = owner.SslStreamFactory?.Invoke(m_pTcpSession) ?? new SslStream(m_pTcpSession.TcpStream.SourceStream,true);
                     m_pSslStream.BeginAuthenticateAsServer(m_pTcpSession.m_pCertificate,this.BeginAuthenticateAsServerCompleted,null);
                 }
                 catch(Exception x){
